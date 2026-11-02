@@ -62,6 +62,8 @@
     const myId = (CFG.legacyIds || {})[key] || u.uid;
     const myName = (CFG.displayNames || {})[key] || u.displayName || email.split("@")[0];
     const owner = (CFG.owners || []).includes(key);
+    window.__fbOwner = owner;
+    if (owner && !window.__fbRelayBoot) { window.__fbRelayBoot = 1; setTimeout(() => { paintBadge(); scheduleRelay(0); }, 6000); } // 打开 App 时（含老婆记的账）刷新一次中转站
     // 每人登录时把「ID → 名字」写进 meta/people，另一个人的手机上就能显示「老婆记的」
     const peopleRef = fs.doc("meta/people");
     peopleRef.set({ [myId]: myName }, { merge: true }).catch(() => {});
@@ -129,8 +131,17 @@
     else if (off) { t = "没网 · 先存在手机里"; c = "#d08a2e"; }
     else { t = "已保存到云端" + (lastSaved ? " " + hhmm(lastSaved) : ""); c = "#2fa36b"; }
     badge.firstChild.style.background = c;
-    badge.lastChild.textContent = t;
-    badge.lastChild.style.color = c === "#2fa36b" ? "var(--muted, #66707d)" : c;
+    const main = badge.querySelector("b");
+    main.textContent = t;
+    main.style.color = c === "#2fa36b" ? "var(--muted, #66707d)" : c;
+    // 中转站状态（只有 Bowen 的手机负责上传，老婆的手机不显示）
+    let r = badge.querySelector("u");
+    if (!r) { r = document.createElement("u"); r.style.cssText = "text-decoration:none;margin-left:4px"; badge.appendChild(r); }
+    if (!relayOn()) { r.textContent = ""; badge.style.cursor = ""; return; }
+    const stale = relayState === "stale" || relayState === "error";
+    r.textContent = relayState === "uploading" ? "· 中转站上传中…" : stale ? "· 中转站待更新 ↻" : relayAt ? "· 中转站 " + hhmm(relayAt) : "· 中转站待更新 ↻";
+    r.style.color = stale || !relayAt ? "#d08a2e" : "var(--muted, #66707d)";
+    badge.style.cursor = stale || !relayAt ? "pointer" : "";
   }
   function trackWrite(p) {
     pending++; paintBadge();
@@ -138,6 +149,7 @@
       pending = 0; lastSaved = new Date().toISOString();
       try { localStorage.setItem("fb-last-saved", lastSaved); } catch (_) {}
       paintBadge();
+      scheduleRelay();
     });
     Promise.resolve(p).then(done, done);
     return p;
@@ -155,6 +167,8 @@
   // 「本应用创建的文件」权限 drive.file，看不到你 Drive 里的其他文件）直接上传。
   const DRIVE_FOLDER = "FB 记账备份";
   let token = null, tokenExp = 0, tokenWait = null, tokenClient = null;
+  try { const t = JSON.parse(localStorage.getItem("fb-gtoken") || "null"); if (t && t.exp > Date.now()) { token = t.t; tokenExp = t.exp; } } catch (_) {}
+  const tokenOk = () => !!token && Date.now() < tokenExp;
   function gis() {
     if (tokenClient || !(window.google && google.accounts && google.accounts.oauth2) || !CFG.googleClientId) return tokenClient;
     tokenClient = google.accounts.oauth2.initTokenClient({
@@ -166,12 +180,16 @@
   }
   // 必须在「点按钮」的那一刻直接弹授权窗口，否则 iPhone 会拦截弹窗；所以在按钮上抢先监听点击
   function askToken() {
-    if (token && Date.now() < tokenExp) return Promise.resolve(token);
+    if (tokenOk()) return Promise.resolve(token);
     const tc = gis();
     if (!tc) return Promise.reject({ code: "tool_error", message: "Google 授权组件没加载出来，请检查网络后刷新" });
     tokenWait = new Promise((ok, bad) => {
       tc.callback = (r) => {
-        if (r && r.access_token) { token = r.access_token; tokenExp = Date.now() + (Number(r.expires_in) || 3000) * 1000 - 60000; ok(token); }
+        if (r && r.access_token) {
+          token = r.access_token; tokenExp = Date.now() + (Number(r.expires_in) || 3000) * 1000 - 60000;
+          try { localStorage.setItem("fb-gtoken", JSON.stringify({ t: token, exp: tokenExp })); } catch (_) {}
+          ok(token); scheduleRelay(0);
+        }
         else bad({ code: "consent_required", message: (r && r.error) || "没有授权" });
       };
       tc.error_callback = (e) => bad({ code: "tool_error", message: e && e.type === "popup_failed_to_open" ? "授权窗口被拦截了。可以先用「导出 Excel」→ 分享 → Google Drive" : e && e.type === "popup_closed" ? "授权窗口被关掉了" : "Google 授权失败" });
@@ -182,7 +200,7 @@
   document.addEventListener("click", (e) => { if (e.target && e.target.closest && e.target.closest("#bk-btn")) askToken().catch(() => {}); }, true);
   async function gfetch(url, opt = {}) {
     const r = await fetch(url, Object.assign({}, opt, { headers: Object.assign({ Authorization: "Bearer " + token }, opt.headers || {}) }));
-    if (r.status === 401) { token = null; throw { code: "tool_error", message: "Google 授权过期了，请再点一次备份" }; }
+    if (r.status === 401) { token = null; tokenExp = 0; try { localStorage.removeItem("fb-gtoken"); } catch (_) {} throw { code: "tool_error", message: "Google 授权过期了，请再点一次备份" }; }
     if (!r.ok) throw { code: "tool_error", message: "Google Drive 返回 " + r.status };
     return r.json();
   }
@@ -213,6 +231,86 @@
     },
   };
   try { const c = localStorage.getItem("fb-drive-folder"); if (c) window.__driveFolderUrl = "https://drive.google.com/drive/folders/" + c; } catch (_) {}
+
+  /* ---------- 中转站：把 Firebase 的完整数据拷贝一份到 Google Drive，给 Claude 版读取 ---------- */
+  // 不是一条条攒改动，而是每次上传「当前全部数据」的完整拷贝，覆盖旧的那份；所以晚传、漏传都不会乱。
+  const RELAY_FOLDER = "FB 记账中转站", RELAY_FILE = "最新数据.json";
+  const COLLS = ["items", "movements", "orders", "expenses", "purchases", "settlements", "transfers", "customers", "followups", "log", "meta"];
+  let relayAt = null, relayState = "idle", relayTimer = null, relayBusy = false, relayAgain = false;
+  try { relayAt = localStorage.getItem("fb-relay-at"); if (localStorage.getItem("fb-relay-stale")) relayState = "stale"; } catch (_) {}
+  const relayOn = () => window.__fbOwner === true && !!CFG.googleClientId;
+  function markStale() { relayState = "stale"; try { localStorage.setItem("fb-relay-stale", "1"); } catch (_) {} paintBadge(); }
+  function scheduleRelay(ms) {
+    if (!relayOn()) return;
+    if (!tokenOk()) { markStale(); return; } // 授权过期：只记一个「待更新」标记，等你点一下再传
+    clearTimeout(relayTimer);
+    relayTimer = setTimeout(uploadRelay, ms == null ? 4000 : ms); // 连续记几笔只传一次
+  }
+  async function relayIds() {
+    let ids = {};
+    try { ids = JSON.parse(localStorage.getItem("fb-relay-ids") || "{}"); } catch (_) {}
+    if (ids.folder && ids.file) return ids;
+    const q = (x) => encodeURIComponent(x);
+    const fl = await gfetch("https://www.googleapis.com/drive/v3/files?fields=files(id)&q=" + q("name='" + RELAY_FOLDER + "' and mimeType='application/vnd.google-apps.folder' and trashed=false"));
+    ids.folder = fl.files && fl.files[0] ? fl.files[0].id : (await gfetch("https://www.googleapis.com/drive/v3/files?fields=id", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: RELAY_FOLDER, mimeType: "application/vnd.google-apps.folder" }),
+    })).id;
+    const ff = await gfetch("https://www.googleapis.com/drive/v3/files?fields=files(id)&q=" + q("name='" + RELAY_FILE + "' and '" + ids.folder + "' in parents and trashed=false"));
+    ids.file = ff.files && ff.files[0] ? ff.files[0].id : null;
+    try { localStorage.setItem("fb-relay-ids", JSON.stringify(ids)); } catch (_) {}
+    return ids;
+  }
+  function lastRecord(data) {
+    const all = [];
+    for (const c of ["orders", "movements", "expenses", "transfers", "settlements"]) for (const [id, d] of Object.entries(data[c] || {})) if (d && d.at) all.push([String(d.at), c, id, d]);
+    all.sort((a, b) => (a[0] < b[0] ? 1 : -1));
+    if (!all.length) return null;
+    const [at, c, id, d] = all[0];
+    const what = c === "orders" ? (d.customer ? d.customer + " " : "") + (d.lines || []).map((l) => (l.name || l.sku) + "×" + l.qty).join("、") : d.note || d.name || "";
+    return { at, collection: c, id, text: what.slice(0, 80) };
+  }
+  async function uploadRelay() {
+    if (!relayOn() || !tokenOk()) { if (relayOn()) markStale(); return; }
+    if (relayBusy) { relayAgain = true; return; }
+    if (pending > 0) { relayTimer = setTimeout(uploadRelay, 2000); return; } // 等云端确认保存后再拷贝
+    relayBusy = true; relayState = "uploading"; paintBadge();
+    try {
+      const data = {};
+      for (const c of COLLS) {
+        let snap;
+        try { snap = await fs.collection(c).get({ source: "cache" }); } catch (_) { snap = await fs.collection(c).get(); } // 读手机缓存，不消耗 Firebase 读取额度
+        data[c] = {}; snap.docs.forEach((d) => { data[c][d.id] = d.data(); });
+      }
+      const counts = {}; for (const c of COLLS) counts[c] = Object.keys(data[c]).length;
+      const body = JSON.stringify({ format: "fb-jizhang-relay/1", uploaded_at: new Date().toISOString(), saved_at: lastSaved, uploaded_by: "Bowen 的手机", counts, last_record: lastRecord(data), data });
+      let ids = await relayIds();
+      const put = (id) => id
+        ? gfetch("https://www.googleapis.com/upload/drive/v3/files/" + id + "?uploadType=media&fields=id", { method: "PATCH", headers: { "Content-Type": "application/json" }, body })
+        : (() => { const f = new FormData();
+            f.append("metadata", new Blob([JSON.stringify({ name: RELAY_FILE, parents: [ids.folder], mimeType: "application/json" })], { type: "application/json" }));
+            f.append("file", new Blob([body], { type: "application/json" }));
+            return gfetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", { method: "POST", body: f }); })();
+      let r;
+      try { r = await put(ids.file); }
+      catch (e) { if (!ids.file || !/404/.test(e && e.message)) throw e; try { localStorage.removeItem("fb-relay-ids"); } catch (_) {} ids = await relayIds(); r = await put(ids.file); } // 文件被删了就重建
+      if (!ids.file) { ids.file = r.id; try { localStorage.setItem("fb-relay-ids", JSON.stringify(ids)); } catch (_) {} }
+      relayAt = new Date().toISOString(); relayState = "ok";
+      try { localStorage.setItem("fb-relay-at", relayAt); localStorage.removeItem("fb-relay-stale"); } catch (_) {}
+    } catch (e) {
+      relayState = "error"; try { localStorage.setItem("fb-relay-stale", "1"); } catch (_) {}
+    } finally {
+      relayBusy = false; paintBadge();
+      if (relayAgain) { relayAgain = false; scheduleRelay(1000); }
+    }
+  }
+  // 点「中转站待更新 ↻」：在点的那一刻弹授权（iPhone 要求），然后马上上传
+  document.addEventListener("click", (e) => {
+    const b = e.target && e.target.closest && e.target.closest("#sync-badge");
+    if (!b || !relayOn() || relayState === "uploading") return;
+    if (relayState !== "stale" && relayState !== "error" && relayAt) return;
+    askToken().then(() => scheduleRelay(0), () => {});
+  }, true);
+  window.__fbRelayNow = () => scheduleRelay(0);
 
   window.claude = {
     use: async (name) => {

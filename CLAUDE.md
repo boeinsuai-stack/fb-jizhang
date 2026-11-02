@@ -12,6 +12,13 @@
 - `public/firebase-config.js`：Firebase 配置 + APP_CONFIG（只放指纹，不放邮箱）
 - 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一
 
+## 中转站（App ↔ Claude 版 的同步，2026-11 起）
+- Claude 版不能直连 Firebase（artifact 网络被拦，已实测），所以用 Google Drive 当中转站
+- App → 中转站：只有 owner 的手机上传；每次云端确认保存后 4 秒，把所有集合（读手机缓存，不耗额度）打包成
+  `FB 记账中转站/最新数据.json`（格式 fb-jizhang-relay/1，整份覆盖，不是增量）；授权过期则标记「中转站待更新 ↻」，点一下补传
+- Google token 存在 localStorage 到过期为止（约 1 小时）
+- Claude 版 → App（待做）：Claude 版生成「改动清单」放进中转站；App 打开时检查、预览、查冲突、用户确认后写入 Firebase
+
 ## 规则
 - 公开仓库：不要提交邮箱、人名、金额、客户数据、备份文件
 - 记账流程要快：快速下单在最上面，记一笔不能强制填客户信息
