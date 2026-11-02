@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>导入备份</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script><script src="shim.js"></script>
+<style>
+body{margin:0;font-family:"Noto Sans SC",system-ui,sans-serif;background:#f5f6f3;color:#1d2430}
+main{max-width:640px;margin:0 auto;padding:24px 16px;display:grid;gap:14px}
+button{font:inherit;padding:10px 14px;border:0;border-radius:8px;background:#2f6b5a;color:#fff;font-weight:600}
+button:disabled{opacity:.5}
+pre{white-space:pre-wrap;background:#fff;border:1px solid #dde1dc;border-radius:8px;padding:12px;font-size:.85rem;min-height:4em}
+.ok{color:#2f6b5a;font-weight:700}.bad{color:#b23b3b;font-weight:700}
+</style></head>
+<body><main>
+<h1>导入旧数据并核对</h1>
+<p>选择备份文件 <code>backup-2026-11-03.json</code>。导入后会把云端每一条记录读回来，和备份文件逐字段比对。</p>
+<input type="file" id="f" accept="application/json">
+<button id="go" disabled>导入并核对</button>
+<button id="check" disabled>只核对（不写入）</button>
+<pre id="out"></pre>
+</main>
+<script>
+const out = document.getElementById("out");
+const log = (s) => { out.textContent += s + "\n"; };
+let bundle = null, fs = null;
+// 与键顺序无关的深比较
+function same(a, b) {
+  if (a === b) return true;
+  if (typeof a !== typeof b || a === null || b === null || typeof a !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) return a.length === b.length && a.every((x, i) => same(x, b[i]));
+  const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
+  return same(ka, kb) && ka.every((k) => same(a[k], b[k]));
+}
+document.getElementById("f").addEventListener("change", async (e) => {
+  out.textContent = "";
+  try { bundle = JSON.parse(await e.target.files[0].text()); }
+  catch (_) { log("文件读不了，确认选的是备份 JSON。"); return; }
+  for (const [c, docs] of Object.entries(bundle)) log(c + "：" + Object.keys(docs).length + " 条");
+  fs = await window.claude.use("db");
+  document.getElementById("go").disabled = document.getElementById("check").disabled = false;
+});
+async function verify() {
+  let bad = 0, total = 0;
+  for (const [c, docs] of Object.entries(bundle)) {
+    const snap = await fs.collection(c).get({ source: "server" });
+    const cloud = {}; snap.docs.forEach((d) => { cloud[d.id] = d.data(); });
+    const ids = Object.keys(docs);
+    const missing = ids.filter((id) => !(id in cloud));
+    const diff = ids.filter((id) => id in cloud && !same(docs[id], cloud[id]));
+    const extra = Object.keys(cloud).filter((id) => !(id in docs));
+    total += ids.length; bad += missing.length + diff.length;
+    log(`${c}：备份 ${ids.length}，云端 ${snap.size}` + (missing.length ? `，缺 ${missing.length}` : "") + (diff.length ? `，不一致 ${diff.length}（${diff.slice(0, 3).join("、")}…）` : "") + (extra.length ? `，云端多出 ${extra.length}（迁移后新记的，正常）` : ""));
+  }
+  log(bad ? `\n✗ 有 ${bad} 条对不上，先别停用旧版。` : `\n✓ 全部 ${total} 条记录逐字段一致。`);
+}
+document.getElementById("check").addEventListener("click", async () => { out.textContent = ""; await verify(); });
+document.getElementById("go").addEventListener("click", async () => {
+  out.textContent = "";
+  const first = await fs.collection("orders").limit(1).get({ source: "server" });
+  if (!first.empty && !confirm("云端已经有数据。继续导入会用备份覆盖同 ID 的记录，确定吗？")) return;
+  const writes = [];
+  for (const [c, docs] of Object.entries(bundle)) for (const [id, data] of Object.entries(docs)) writes.push([c, id, data]);
+  for (let i = 0; i < writes.length; i += 400) {
+    const b = fs.batch();
+    for (const [c, id, data] of writes.slice(i, i + 400)) b.set(fs.collection(c).doc(id), data);
+    await b.commit();
+    log(`已写入 ${Math.min(i + 400, writes.length)} / ${writes.length}`);
+  }
+  log("\n开始核对…");
+  await verify();
+});
+</script>
+</body></html>

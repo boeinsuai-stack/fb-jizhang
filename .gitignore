@@ -1,0 +1,5 @@
+data-backup/
+firestore.rules
+node_modules/
+.firebase/
+*.log
