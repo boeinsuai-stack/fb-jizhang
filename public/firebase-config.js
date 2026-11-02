@@ -9,6 +9,8 @@ window.FIREBASE_CONFIG = {
 };
 /* 能登录的人：你和老婆。邮箱只以 SHA-256 指纹出现，代码公开时不会暴露邮箱 */
 window.APP_CONFIG = {
+  // Google Drive 备份用的网页授权编号（OAuth Client ID），不是密码
+  googleClientId: "",
   owners: ["ba5ce8a0e85e31ba5f9ade1d360593ab8ba76047daa6cafdb191cae28e59f97f"],
   // 旧数据里记录的是 Claude 的用户 ID；你登录后沿用它，旧记录才会显示为「我记的」
   legacyIds: { "ba5ce8a0e85e31ba5f9ade1d360593ab8ba76047daa6cafdb191cae28e59f97f": "u_mgqGbjzgSn0HLhOA4YHRKA" },
