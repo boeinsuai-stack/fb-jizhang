@@ -20,16 +20,13 @@
 - 记一笔卖出：订单 +1、库存流水 +1、操作记录 +1，记录人显示为「我」
 - 旧记录仍显示「我记的」（旧 Claude 用户 ID 已映射到登录账号；配置里只存邮箱的 SHA-256 指纹）
 
-## 上线步骤
+## 部署方式
 
-1. 在 console.firebase.google.com 用 Google 账号新建项目
-2. Firestore Database → 创建数据库，区域选 `australia-southeast1`（悉尼）
-3. Authentication → 启用「电子邮件/密码」→ 用户 → 手动添加你的账号；设置里关闭「允许注册」
-4. 项目设置 → 添加 Web 应用 → 把配置填进 `public/firebase-config.js`
-5. 电脑上：`npm i -g firebase-tools` → `firebase login` → `firebase use --add` → `firebase deploy`
-6. 打开 `https://<项目>.web.app/import.html` → 登录 → 选备份文件 → 导入并核对，必须显示「✓ 全部记录逐字段一致」
-7. iPhone Safari 打开 `https://<项目>.web.app` → 分享 → 添加到主屏幕
-8. 新旧版本并行一周，数字一致后停用旧版
+- 网址：https://boeinsuai-stack.github.io/fb-jizhang/
+- 每次推送到 `main`，GitHub Actions 自动把 `public/` 发布到 GitHub Pages（见 `.github/workflows/pages.yml`）
+- 数据库：Firebase 项目 `fb-jizhang`，Firestore 在悉尼（australia-southeast1）；只开放邮箱/密码登录，已关闭自助注册
+- 安全规则在 Firebase 控制台里维护（本地副本 `firestore.rules` 含邮箱，不进仓库）
+- 迁移：打开 `import.html` → 登录 → 选备份 JSON → 导入并核对，必须显示「✓ 全部记录逐字段一致」
 
 ## 和旧版的差别
 
