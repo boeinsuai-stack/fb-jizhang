@@ -103,22 +103,34 @@
   // 每次写入后等 Firestore 服务器确认；确认了才显示「已保存到云端」
   let pending = 0, lastSaved = null, badge = null;
   try { lastSaved = localStorage.getItem("fb-last-saved"); } catch (_) {}
-  const hhmm = (d) => { d = new Date(d); return (d.getMonth() + 1) + "月" + d.getDate() + "日 " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+  const hhmm = (d) => { d = new Date(d); const t = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); return new Date().toDateString() === d.toDateString() ? t : (d.getMonth() + 1) + "/" + d.getDate() + " " + t; };
   function paintBadge() {
-    if (!badge) {
-      badge = document.createElement("div");
+    if (!badge || !badge.isConnected) {
+      badge = document.createElement("span");
       badge.id = "sync-badge";
       badge.setAttribute("role", "status");
-      badge.style.cssText = "position:fixed;z-index:40;top:calc(env(safe-area-inset-top,0px) + 6px);right:10px;font:600 12px/1.2 'Noto Sans SC',system-ui,sans-serif;padding:5px 10px;border-radius:999px;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.08)";
-      document.body.appendChild(badge);
+      badge.style.cssText = "display:inline-flex;align-items:center;gap:5px;margin-left:10px;font:500 11px/1 -apple-system,'Noto Sans SC',system-ui,sans-serif;letter-spacing:0;vertical-align:1px;white-space:nowrap";
+      badge.innerHTML = '<i style="width:7px;height:7px;border-radius:50%;display:inline-block;flex:none"></i><b style="font-weight:500"></b>';
+      // 固定在 App 顶部标题区的右上角，跟着页面一起滚动（往下滑就看不到了）
+      const host = document.querySelector("header.top");
+      if (host) {
+        host.style.position = "relative";
+        badge.style.cssText += ";position:absolute;top:1px;right:0;margin:0";
+        host.appendChild(badge);
+      } else {
+        badge.style.cssText += ";position:absolute;top:calc(env(safe-area-inset-top,0px) + 10px);right:16px;margin:0";
+        document.body.appendChild(badge);
+      }
     }
     const off = !navigator.onLine;
-    let t, bg, fg;
-    if (pending > 0 && off) { t = "⚠ 没网：" + pending + " 笔待上传，联网后自动保存"; bg = "#fbeedd"; fg = "#a8641a"; }
-    else if (pending > 0) { t = "⏳ 正在保存到云端…"; bg = "#ecebe7"; fg = "#4d5560"; }
-    else if (off) { t = "⚠ 没网（记的账会先存在手机里）"; bg = "#fbeedd"; fg = "#a8641a"; }
-    else { t = "✓ 已全部保存到云端" + (lastSaved ? " · " + hhmm(lastSaved) : ""); bg = "#e2efe9"; fg = "#2f6b5a"; }
-    badge.textContent = t; badge.style.background = bg; badge.style.color = fg;
+    let t, c;
+    if (pending > 0 && off) { t = "没网 · " + pending + " 笔待上传"; c = "#d08a2e"; }
+    else if (pending > 0) { t = "保存中…"; c = "#9aa3ad"; }
+    else if (off) { t = "没网 · 先存在手机里"; c = "#d08a2e"; }
+    else { t = "已保存到云端" + (lastSaved ? " " + hhmm(lastSaved) : ""); c = "#2fa36b"; }
+    badge.firstChild.style.background = c;
+    badge.lastChild.textContent = t;
+    badge.lastChild.style.color = c === "#2fa36b" ? "var(--muted, #66707d)" : c;
   }
   function trackWrite(p) {
     pending++; paintBadge();
