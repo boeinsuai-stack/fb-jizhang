@@ -17,6 +17,8 @@
 - App → 中转站：只有 owner 的手机上传；每次云端确认保存后 4 秒，把所有集合（读手机缓存，不耗额度）打包成
   `FB 记账中转站/最新数据.json`（格式 fb-jizhang-relay/1，整份覆盖，不是增量）；授权过期则标记「中转站待更新 ↻」，点一下补传
 - Google token 存在 localStorage 到过期为止（约 1 小时）
+- 中转站 → Claude 版（已完成，代码在 Claude artifact 里，不在本仓库）：Claude 版每次打开用 Google Drive 连接器读 `最新数据.json`，
+  三方对照合并（基准 = Claude 版数据库 `meta/relay_import.seen` 里的记录指纹）。所以**不要改中转站文件格式**（fb-jizhang-relay/1）而不同步改 Claude 版
 - Claude 版 → App（待做）：Claude 版生成「改动清单」放进中转站；App 打开时检查、预览、查冲突、用户确认后写入 Firebase
 
 ## 规则
