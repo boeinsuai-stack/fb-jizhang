@@ -31,9 +31,12 @@
       box.querySelector("form").addEventListener("submit", async (ev) => {
         ev.preventDefault();
         const f = ev.target;
+        const btn = f.querySelector("button");
         f.querySelector("p").textContent = "";
+        btn.disabled = true; btn.textContent = "登录中…";
         try { await auth.signInWithEmailAndPassword(f.e.value.trim(), f.p.value); }
-        catch (e) { f.querySelector("p").textContent = "登录失败：邮箱或密码不对。"; }
+        catch (e) { f.querySelector("p").textContent = e && e.code === "auth/network-request-failed" ? "网络不通，请检查网络后再试。" : "登录失败：邮箱或密码不对。"; }
+        finally { btn.disabled = false; btn.textContent = "登录"; }
       });
       document.body.appendChild(box);
     }
