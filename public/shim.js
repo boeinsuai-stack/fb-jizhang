@@ -62,8 +62,8 @@
     const myId = (CFG.legacyIds || {})[key] || u.uid;
     const myName = (CFG.displayNames || {})[key] || u.displayName || email.split("@")[0];
     const owner = (CFG.owners || []).includes(key);
-    window.__fbOwner = owner;
-    if (owner && !window.__fbRelayBoot) { window.__fbRelayBoot = 1; setTimeout(() => { paintBadge(); scheduleRelay(0); }, 6000); } // 打开 App 时（含老婆记的账）刷新一次中转站
+    window.__fbOwner = owner; window.__fbMyId = myId;
+    if (owner && !window.__fbRelayBoot) { window.__fbRelayBoot = 1; setTimeout(() => { paintBadge(); scheduleRelay(0); checkInbox(); }, 6000); } // 打开 App 时（含老婆记的账）刷新一次中转站
     // 每人登录时把「ID → 名字」写进 meta/people，另一个人的手机上就能显示「老婆记的」
     const peopleRef = fs.doc("meta/people");
     peopleRef.set({ [myId]: myName }, { merge: true }).catch(() => {});
@@ -138,7 +138,7 @@
     let r = badge.querySelector("u");
     if (!r) { r = document.createElement("u"); r.style.cssText = "text-decoration:none;margin-left:4px"; badge.appendChild(r); }
     if (!relayOn()) { r.textContent = ""; badge.style.cursor = ""; return; }
-    const stale = relayState === "stale" || relayState === "error";
+    const stale = relayState === "stale" || relayState === "error" || (!canRead() && relayState !== "uploading");
     r.textContent = relayState === "uploading" ? "· 中转站上传中…" : stale ? "· 中转站待更新 ↻" : relayAt ? "· 中转站 " + hhmm(relayAt) : "· 中转站待更新 ↻";
     r.style.color = stale || !relayAt ? "#d08a2e" : "var(--muted, #66707d)";
     badge.style.cursor = stale || !relayAt ? "pointer" : "";
@@ -166,34 +166,38 @@
   // 原 App 调用 mcp.callTool("Google Drive", "create_file", {...})。这里用 Google 官方的网页授权（只申请
   // 「本应用创建的文件」权限 drive.file，看不到你 Drive 里的其他文件）直接上传。
   const DRIVE_FOLDER = "FB 记账备份";
-  let token = null, tokenExp = 0, tokenWait = null, tokenClient = null;
-  try { const t = JSON.parse(localStorage.getItem("fb-gtoken") || "null"); if (t && t.exp > Date.now()) { token = t.t; tokenExp = t.exp; } } catch (_) {}
+  // drive.file：上传备份和中转站；drive.readonly：读 Claude 版放进中转站的「改动清单」（Claude 建的文件 drive.file 看不到）
+  const SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly";
+  let token = null, tokenExp = 0, tokenScope = "", tokenWait = null, tokenClient = null;
+  try { const t = JSON.parse(localStorage.getItem("fb-gtoken") || "null"); if (t && t.exp > Date.now()) { token = t.t; tokenExp = t.exp; tokenScope = t.sc || ""; } } catch (_) {}
   const tokenOk = () => !!token && Date.now() < tokenExp;
+  const canRead = () => tokenOk() && /drive\.readonly/.test(tokenScope);
   function gis() {
     if (tokenClient || !(window.google && google.accounts && google.accounts.oauth2) || !CFG.googleClientId) return tokenClient;
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CFG.googleClientId,
-      scope: "https://www.googleapis.com/auth/drive.file",
+      scope: SCOPES,
       callback: () => {},
     });
     return tokenClient;
   }
   // 必须在「点按钮」的那一刻直接弹授权窗口，否则 iPhone 会拦截弹窗；所以在按钮上抢先监听点击
   function askToken() {
-    if (tokenOk()) return Promise.resolve(token);
+    if (tokenOk() && (canRead() || !window.__fbOwner)) return Promise.resolve(token);
     const tc = gis();
     if (!tc) return Promise.reject({ code: "tool_error", message: "Google 授权组件没加载出来，请检查网络后刷新" });
     tokenWait = new Promise((ok, bad) => {
       tc.callback = (r) => {
         if (r && r.access_token) {
-          token = r.access_token; tokenExp = Date.now() + (Number(r.expires_in) || 3000) * 1000 - 60000;
-          try { localStorage.setItem("fb-gtoken", JSON.stringify({ t: token, exp: tokenExp })); } catch (_) {}
-          ok(token); scheduleRelay(0);
+          token = r.access_token; tokenExp = Date.now() + (Number(r.expires_in) || 3000) * 1000 - 60000; tokenScope = r.scope || "";
+          try { localStorage.setItem("fb-gtoken", JSON.stringify({ t: token, exp: tokenExp, sc: tokenScope })); } catch (_) {}
+          ok(token); scheduleRelay(0); checkInbox();
         }
         else bad({ code: "consent_required", message: (r && r.error) || "没有授权" });
       };
       tc.error_callback = (e) => bad({ code: "tool_error", message: e && e.type === "popup_failed_to_open" ? "授权窗口被拦截了。可以先用「导出 Excel」→ 分享 → Google Drive" : e && e.type === "popup_closed" ? "授权窗口被关掉了" : "Google 授权失败" });
-      tc.requestAccessToken({ prompt: token ? "" : "consent" });
+      let seen = false; try { seen = !!localStorage.getItem("fb-gauth-once"); localStorage.setItem("fb-gauth-once", "1"); } catch (_) {}
+      tc.requestAccessToken({ prompt: token || seen ? "" : "consent" });
     });
     return tokenWait;
   }
@@ -202,7 +206,7 @@
     const r = await fetch(url, Object.assign({}, opt, { headers: Object.assign({ Authorization: "Bearer " + token }, opt.headers || {}) }));
     if (r.status === 401) { token = null; tokenExp = 0; try { localStorage.removeItem("fb-gtoken"); } catch (_) {} throw { code: "tool_error", message: "Google 授权过期了，请再点一次备份" }; }
     if (!r.ok) throw { code: "tool_error", message: "Google Drive 返回 " + r.status };
-    return r.json();
+    return opt.raw ? r.text() : r.json();
   }
   async function folderId() {
     try { const c = localStorage.getItem("fb-drive-folder"); if (c) return c; } catch (_) {}
@@ -307,10 +311,190 @@
   document.addEventListener("click", (e) => {
     const b = e.target && e.target.closest && e.target.closest("#sync-badge");
     if (!b || !relayOn() || relayState === "uploading") return;
-    if (relayState !== "stale" && relayState !== "error" && relayAt) return;
-    askToken().then(() => scheduleRelay(0), () => {});
+    if (relayState !== "stale" && relayState !== "error" && relayAt && canRead()) return;
+    askToken().then(() => { scheduleRelay(0); checkInbox(); }, () => {});
   }, true);
   window.__fbRelayNow = () => scheduleRelay(0);
+
+  /* ---------- 中转站 → App：Claude 版发来的「改动清单」 ----------
+     Claude 版点「同步到 App」后，在中转站文件夹新建 Claude改动-*.json（格式 fb-jizhang-changes/1）。
+     这里在打开 App / 每次拿到 Google 授权时检查最新一份：用人话列出来 → 逐条核对冲突 → 你点确认才写入 Firebase。
+     写入前把每条记录原来的样子存进 relay_undo/<清单id>，可以一键撤销。只认最新一份清单。 */
+  const INBOX_COLLS = ["items", "movements", "orders", "expenses", "purchases", "settlements", "transfers", "customers", "followups"];
+  const INBOX_LABEL = { items: "香型", movements: "库存流水", orders: "订单", expenses: "支出", purchases: "订货单", settlements: "结账", transfers: "合伙人往来", customers: "客户资料", followups: "跟进" };
+  const ID_OK = /^[A-Za-z0-9_\-.~:@+]{1,200}$/;
+  let inbox = null, inboxBusy = false, inboxBar = null, inboxDone = null;
+  try { inboxDone = JSON.parse(localStorage.getItem("fb-inbox-done") || "null"); if (inboxDone && Date.now() - new Date(inboxDone.at).getTime() > 864e5) inboxDone = null; } catch (_) {}
+  function same(a, b) {
+    if (a === b) return true;
+    if (a == null || b == null || typeof a !== "object" || typeof b !== "object") return a === b;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    if (Array.isArray(a)) return a.length === b.length && a.every((x, i) => same(x, b[i]));
+    const ka = Object.keys(a).filter((k) => a[k] !== undefined).sort(), kb = Object.keys(b).filter((k) => b[k] !== undefined).sort();
+    return ka.length === kb.length && ka.every((k, i) => k === kb[i] && same(a[k], b[k]));
+  }
+  const ihhmm = (iso) => { const d = new Date(iso); return isNaN(d) ? "?" : (d.getMonth() + 1) + "月" + d.getDate() + "日 " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+  const iesc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  function inboxCss() {
+    if (document.getElementById("inbox-css")) return;
+    const st = document.createElement("style"); st.id = "inbox-css";
+    st.textContent = "#inbox-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;padding:10px 14px;border-radius:10px;border:1px solid var(--accent,#2f6b5a);background:var(--accent-soft,#e2efe9);color:var(--fg,#1d2430);font-size:.9rem}" +
+      "#inbox-bar.done{border-color:var(--line,#dde1dc);background:var(--surface,#fff)}#inbox-bar b{font-weight:600}#inbox-bar .ib-btns{display:flex;gap:6px}" +
+      "#inbox-dlg{position:fixed;inset:0;z-index:60;background:rgba(20,26,32,.45);display:flex;align-items:flex-end;justify-content:center;padding:calc(12px + env(safe-area-inset-top,0px)) 12px calc(12px + env(safe-area-inset-bottom,0px))}" +
+      "@media(min-width:640px){#inbox-dlg{align-items:center}}" +
+      "#inbox-dlg .card{background:var(--surface,#fff);color:var(--fg,#1d2430);border-radius:14px;width:100%;max-width:560px;max-height:100%;overflow:auto;padding:18px;display:grid;gap:12px;box-shadow:0 12px 40px rgba(0,0,0,.25)}" +
+      "#inbox-dlg h3{margin:0;font-size:1.3rem}#inbox-dlg p{margin:0;font-size:.86rem;color:var(--muted,#66707d)}#inbox-dlg p.err{color:var(--bad,#b23b3b)}" +
+      "#inbox-dlg ul{list-style:none;margin:0;padding:0;border:1px solid var(--line,#dde1dc);border-radius:8px;max-height:52vh;overflow:auto}" +
+      "#inbox-dlg li{padding:9px 12px;font-size:.88rem;overflow-wrap:anywhere}#inbox-dlg li+li{border-top:1px solid var(--line,#dde1dc)}" +
+      "#inbox-dlg li .k{font-weight:600;margin-right:6px}#inbox-dlg li .k.add{color:var(--accent,#2f6b5a)}#inbox-dlg li .k.mod{color:var(--warn,#a8641a)}#inbox-dlg li .k.del{color:var(--bad,#b23b3b)}" +
+      "#inbox-dlg li small{display:block;color:var(--muted,#66707d);font-size:.78rem;margin-top:2px}#inbox-dlg li.skip{opacity:.55}" +
+      "#inbox-dlg li.conf{background:var(--warn-soft,#fbeedd)}#inbox-dlg li.conf label{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:.82rem;color:var(--warn,#a8641a)}#inbox-dlg li.conf input{width:auto;margin:0}" +
+      "#inbox-dlg .acts{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}";
+    document.head.appendChild(st);
+  }
+  function paintInbox() {
+    inboxCss();
+    const host = document.querySelector("header.top");
+    if (!host) return;
+    if (!inboxBar || !inboxBar.isConnected) { inboxBar = document.createElement("div"); inboxBar.id = "inbox-bar"; inboxBar.setAttribute("role", "status"); host.insertAdjacentElement("afterend", inboxBar); }
+    if (inbox && inbox.pending) {
+      inboxBar.className = ""; inboxBar.hidden = false;
+      inboxBar.innerHTML = "<span><b>Claude 版发来 " + inbox.file.count + " 条改动</b>（" + iesc(ihhmm(inbox.file.created_at)) + "）</span><span class=\"ib-btns\"><button class=\"btn small primary\" type=\"button\" data-ib=\"open\">查看并确认</button></span>";
+    } else if (inboxDone) {
+      inboxBar.className = "done"; inboxBar.hidden = false;
+      inboxBar.innerHTML = "<span>已写入 Claude 版的 " + inboxDone.n + " 条改动（" + iesc(ihhmm(inboxDone.at)) + "）</span><span class=\"ib-btns\"><button class=\"btn small\" type=\"button\" data-ib=\"undo\">撤销</button><button class=\"btn small ghost\" type=\"button\" data-ib=\"ok\">知道了</button></span>";
+    } else inboxBar.hidden = true;
+  }
+  async function checkInbox() {
+    if (!relayOn() || !canRead() || inboxBusy) { paintBadge(); return; }
+    inboxBusy = true;
+    try {
+      const ids = await relayIds();
+      const q = encodeURIComponent("'" + ids.folder + "' in parents and name contains 'Claude改动-' and trashed=false");
+      const l = await gfetch("https://www.googleapis.com/drive/v3/files?orderBy=createdTime%20desc&pageSize=5&fields=files(id,name,createdTime)&q=" + q);
+      const f = l.files && l.files[0];
+      if (!f) { inbox = null; paintInbox(); return; }
+      const applied = await fs.doc("meta/relay_applied").get().catch(() => null);
+      const last = applied && applied.exists ? applied.data() : {};
+      if (last.last_file_id === f.id) { inbox = null; paintInbox(); return; }
+      const file = JSON.parse(await gfetch("https://www.googleapis.com/drive/v3/files/" + f.id + "?alt=media", { raw: true }));
+      if (!file || file.format !== "fb-jizhang-changes/1" || !Array.isArray(file.changes)) throw new Error("清单格式不对");
+      if (last.last_created_at && file.created_at <= last.last_created_at) { inbox = null; paintInbox(); return; }
+      inbox = { pending: true, fileId: f.id, fileName: f.name, file };
+      paintInbox();
+    } catch (e) {
+      inbox = null; paintInbox();
+    } finally { inboxBusy = false; }
+  }
+  // 逐条核对：拿 Firebase 现在的数据，和清单里「Claude 版读取时 App 的样子」(base) 以及要写成的样子比
+  async function inboxPlan(file) {
+    const rows = [];
+    for (let i = 0; i < file.changes.length; i++) {
+      const ch = file.changes[i], text = (file.summary && file.summary[i]) || (ch.col + "/" + ch.id);
+      const kind = ch.op === "delete" ? "del" : ch.base ? "mod" : "add";
+      const row = { i, ch, text, kind, state: "ok", note: "" };
+      if (!INBOX_COLLS.includes(ch.col) || !ID_OK.test(String(ch.id || "")) || (ch.op !== "set" && ch.op !== "delete") || (ch.op === "set" && (!ch.data || typeof ch.data !== "object" || Array.isArray(ch.data)))) { row.state = "bad"; row.note = "格式不对，跳过"; rows.push(row); continue; }
+      let cur = null;
+      try { const s = await fs.doc(ch.col + "/" + ch.id).get(); cur = s.exists ? s.data() : null; } catch (_) { const s = await fs.doc(ch.col + "/" + ch.id).get({ source: "cache" }).catch(() => null); cur = s && s.exists ? s.data() : null; }
+      row.before = cur;
+      const target = ch.op === "delete" ? null : ch.data;
+      if (same(cur, target)) { row.state = "same"; row.note = "App 里已经是这样了，跳过"; }
+      else if (!same(cur, ch.base || null)) { row.state = "conf"; row.note = cur ? "这条在 Claude 版读取之后，App 里又改过" : "这条在 Claude 版读取之后，App 里被删掉了"; }
+      rows.push(row);
+    }
+    return rows;
+  }
+  function dlg(html) {
+    inboxCss();
+    let d = document.getElementById("inbox-dlg");
+    if (!d) { d = document.createElement("div"); d.id = "inbox-dlg"; document.body.appendChild(d); }
+    d.innerHTML = '<div class="card" role="dialog" aria-modal="true">' + html + "</div>"; d.hidden = false;
+    return d;
+  }
+  const closeDlg = () => { const d = document.getElementById("inbox-dlg"); if (d) d.hidden = true; };
+  async function openInbox() {
+    if (!inbox || !inbox.pending) return;
+    const file = inbox.file;
+    dlg("<h3>Claude 版发来的改动</h3><p>正在和 App 现在的数据逐条核对…</p>");
+    let rows;
+    try { rows = await inboxPlan(file); } catch (e) { dlg('<h3>Claude 版发来的改动</h3><p class="err">核对时读不到 App 的数据，请联网后再试。</p><div class="acts"><button class="btn" data-ib="close">关闭</button></div>'); return; }
+    const okN = rows.filter((r) => r.state === "ok").length, conf = rows.filter((r) => r.state === "conf"), skip = rows.filter((r) => r.state === "same" || r.state === "bad").length;
+    const word = { add: "新增", mod: "修改", del: "删除" };
+    const list = rows.map((r) => '<li class="' + (r.state === "conf" ? "conf" : r.state !== "ok" ? "skip" : "") + '"><span class="k ' + r.kind + '">' + word[r.kind] + " " + (INBOX_LABEL[r.ch.col] || r.ch.col) + "</span>" + iesc(String(r.text).replace(/^[^：]*：/, "")) +
+      (r.note ? "<small>" + iesc(r.note) + "</small>" : "") + (r.state === "conf" ? '<label><input type="checkbox" data-force="' + r.i + '">仍然用 Claude 版的（会覆盖 App 里的这条）</label>' : "") + "</li>").join("");
+    dlg("<h3>Claude 版发来的改动</h3><p>Claude 版 " + iesc(ihhmm(file.created_at)) + " 发出，基于 App " + iesc(ihhmm(file.based_on && file.based_on.uploaded_at)) + " 的数据。可以写入 <b>" + okN + "</b> 条" +
+      (conf.length ? "，<b style=\"color:var(--warn,#a8641a)\">" + conf.length + " 条有冲突</b>（默认保留 App 的）" : "") + (skip ? "，" + skip + " 条跳过" : "") + "。写入前会先备份，写完可以一键撤销。</p><ul>" + list + "</ul>" +
+      '<p class="err" id="ib-err" hidden></p><div class="acts"><button class="btn ghost" data-ib="ignore">不要这份</button><button class="btn" data-ib="close">稍后</button><button class="btn primary" data-ib="apply" id="ib-apply">写入</button></div>');
+    const btn = document.getElementById("ib-apply");
+    const count = () => okN + document.querySelectorAll("#inbox-dlg [data-force]:checked").length;
+    const label = () => { const n = count(); btn.textContent = n ? "确认写入 " + n + " 条" : "没有要写入的"; btn.disabled = !n; };
+    label(); document.querySelectorAll("#inbox-dlg [data-force]").forEach((x) => x.addEventListener("change", label));
+    inbox.rows = rows;
+  }
+  async function applyInbox() {
+    const rows = inbox.rows || [], file = inbox.file, btn = document.getElementById("ib-apply");
+    const forced = new Set(Array.from(document.querySelectorAll("#inbox-dlg [data-force]:checked")).map((x) => Number(x.dataset.force)));
+    const todo = rows.filter((r) => r.state === "ok" || (r.state === "conf" && forced.has(r.i)));
+    if (!todo.length) return;
+    btn.disabled = true; btn.textContent = "写入中…";
+    try {
+      const undoId = String(file.id || inbox.fileId).replace(/[^A-Za-z0-9_\-]/g, "") || ("u" + Date.now());
+      const now = new Date().toISOString(), me = window.__fbMyId || null;
+      const undo = { at: now, file_id: inbox.fileId, file_name: inbox.fileName, change_id: file.id || null, by: me,
+        items: todo.map((r) => ({ col: r.ch.col, id: r.ch.id, before: r.before == null ? null : r.before, after: r.ch.op === "delete" ? null : r.ch.data })) };
+      if (JSON.stringify(undo).length > 900000) throw new Error("这份改动太大（超过 0.9MB），请让 Claude 分几次发");
+      const ops = [];
+      ops.push((b) => b.set(fs.doc("relay_undo/" + undoId), undo));
+      for (const r of todo) {
+        const ref = fs.doc(r.ch.col + "/" + r.ch.id);
+        ops.push(r.ch.op === "delete" ? (b) => b.delete(ref) : (b) => b.set(ref, r.ch.data));
+        if (r.ch.col !== "movements") ops.push((b) => b.set(fs.collection("log").doc("l-c-" + undoId + "-" + r.i), { at: now, by: me, op: { add: "新增", mod: "修改", del: "删除" }[r.kind], col: r.ch.col, ref: r.ch.id, text: String(r.text).replace(/^[^：]*：/, "") + "（Claude 版同步）" }));
+      }
+      ops.push((b) => b.set(fs.doc("meta/relay_applied"), { last_file_id: inbox.fileId, last_change_id: file.id || null, last_created_at: file.created_at || now, applied_at: now, applied: todo.length, skipped: rows.length - todo.length, undo_id: undoId, by: me }));
+      for (let i = 0; i < ops.length; i += 450) { const b = fs.batch(); ops.slice(i, i + 450).forEach((f) => f(b)); await b.commit(); }
+      inboxDone = { at: now, n: todo.length, undo: undoId };
+      try { localStorage.setItem("fb-inbox-done", JSON.stringify(inboxDone)); } catch (_) {}
+      inbox = null; closeDlg(); paintInbox();
+    } catch (e) {
+      const er = document.getElementById("ib-err"); er.textContent = "写入失败：" + ((e && e.message) || e) + "。什么都没改，可以再试一次。"; er.hidden = false;
+      btn.disabled = false; btn.textContent = "再试一次";
+    }
+  }
+  async function ignoreInbox() {
+    const now = new Date().toISOString();
+    await fs.doc("meta/relay_applied").set({ last_file_id: inbox.fileId, last_change_id: inbox.file.id || null, last_created_at: inbox.file.created_at || now, applied_at: now, applied: 0, ignored: true, by: window.__fbMyId || null }).catch(() => {});
+    inbox = null; closeDlg(); paintInbox();
+  }
+  async function undoInbox() {
+    if (!inboxDone) return;
+    const s = await fs.doc("relay_undo/" + inboxDone.undo).get().catch(() => null);
+    if (!s || !s.exists) { alert("找不到这次写入的备份，没法撤销。"); return; }
+    const u = s.data(), items = u.items || [];
+    let changedSince = 0;
+    for (const it of items) { const c = await fs.doc(it.col + "/" + it.id).get().catch(() => null); if (!same(c && c.exists ? c.data() : null, it.after)) changedSince++; }
+    if (!confirm("撤销这次写入的 " + items.length + " 条改动，恢复成写入前的样子？" + (changedSince ? "\n\n注意：其中 " + changedSince + " 条在写入后又改过，撤销会把那些后来的改动也退回去。" : ""))) return;
+    const ops = items.map((it) => { const ref = fs.doc(it.col + "/" + it.id); return it.before == null ? (b) => b.delete(ref) : (b) => b.set(ref, it.before); });
+    const now = new Date().toISOString();
+    ops.push((b) => b.set(fs.collection("log").doc("l-c-undo-" + inboxDone.undo), { at: now, by: window.__fbMyId || null, op: "撤销", col: "", ref: inboxDone.undo, text: "撤销了 Claude 版同步的 " + items.length + " 条改动" }));
+    ops.push((b) => b.set(fs.doc("relay_undo/" + inboxDone.undo), { undone_at: now }, { merge: true }));
+    for (let i = 0; i < ops.length; i += 450) { const b = fs.batch(); ops.slice(i, i + 450).forEach((f) => f(b)); await b.commit(); }
+    inboxDone = null; try { localStorage.removeItem("fb-inbox-done"); } catch (_) {}
+    paintInbox();
+  }
+  document.addEventListener("click", (e) => {
+    const t = e.target && e.target.closest && e.target.closest("[data-ib]");
+    if (!t) { if (e.target && e.target.id === "inbox-dlg") closeDlg(); return; }
+    const a = t.dataset.ib;
+    if (a === "open") openInbox();
+    else if (a === "close") closeDlg();
+    else if (a === "apply") applyInbox();
+    else if (a === "ignore") { if (confirm("不要这份改动？以后不会再提示这份。")) ignoreInbox(); }
+    else if (a === "undo") undoInbox().catch((x) => alert("撤销失败：" + ((x && x.message) || x)));
+    else if (a === "ok") { inboxDone = null; try { localStorage.removeItem("fb-inbox-done"); } catch (_) {} paintInbox(); }
+  });
+  if (inboxDone) document.addEventListener("DOMContentLoaded", () => setTimeout(paintInbox, 500));
+  window.__fbCheckInbox = checkInbox;
+
 
   window.claude = {
     use: async (name) => {
