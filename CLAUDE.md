@@ -19,7 +19,9 @@
 - Google token 存在 localStorage 到过期为止（约 1 小时）
 - 中转站 → Claude 版（已完成，代码在 Claude artifact 里，不在本仓库）：Claude 版每次打开用 Google Drive 连接器读 `最新数据.json`，
   三方对照合并（基准 = Claude 版数据库 `meta/relay_import.seen` 里的记录指纹）。所以**不要改中转站文件格式**（fb-jizhang-relay/1）而不同步改 Claude 版
-- Claude 版 → App（待做）：Claude 版生成「改动清单」放进中转站；App 打开时检查、预览、查冲突、用户确认后写入 Firebase
+- Claude 版 → 中转站（已完成）：Claude 版「同步到 App」在中转站文件夹新建 `Claude改动-YYYYMMDD-HHMM.json`，格式 fb-jizhang-changes/1：
+  `{id, created_at, based_on, supersedes, count, summary[], changes[{col,id,op:"set"|"delete",data,base}], log[]}`；base = 当时 App 的版本（新增为 null）；只认最新一份
+- 中转站 → App（待做）：Claude 版生成「改动清单」放进中转站；App 打开时检查、预览、查冲突、用户确认后写入 Firebase
 
 ## 规则
 - 公开仓库：不要提交邮箱、人名、金额、客户数据、备份文件
