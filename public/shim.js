@@ -63,7 +63,7 @@
     const myName = (CFG.displayNames || {})[key] || u.displayName || email.split("@")[0];
     const owner = (CFG.owners || []).includes(key);
     window.__fbOwner = owner; window.__fbMyId = myId;
-    if (owner && !window.__fbRelayBoot) { window.__fbRelayBoot = 1; setTimeout(() => { paintBadge(); scheduleRelay(0); checkInbox(); }, 6000); } // 打开 App 时（含老婆记的账）刷新一次中转站
+    if (owner && !window.__fbRelayBoot) { window.__fbRelayBoot = 1; setTimeout(() => { paintBadge(); scheduleRelay(0); }, 6000); setTimeout(checkInbox, 800); } // 打开 App 时（含老婆记的账）刷新一次中转站
     // 每人登录时把「ID → 名字」写进 meta/people，另一个人的手机上就能显示「老婆记的」
     const peopleRef = fs.doc("meta/people");
     peopleRef.set({ [myId]: myName }, { merge: true }).catch(() => {});
@@ -367,6 +367,7 @@
   }
   async function checkInbox() {
     if (!relayOn() || !canRead() || inboxBusy) { paintBadge(); return; }
+    const dlgOpen = document.getElementById("inbox-dlg"); if (dlgOpen && !dlgOpen.hidden) return; // 正在看弹窗时不打扰
     inboxBusy = true;
     try {
       const ids = await relayIds();
@@ -374,9 +375,12 @@
       const l = await gfetch("https://www.googleapis.com/drive/v3/files?orderBy=createdTime%20desc&pageSize=5&fields=files(id,name,createdTime)&q=" + q);
       const f = l.files && l.files[0];
       if (!f) { inbox = null; paintInbox(); return; }
+      let seenId = null; try { seenId = localStorage.getItem("fb-inbox-seen"); } catch (_) {}
+      if (seenId === f.id) { inbox = null; paintInbox(); return; } // 这份已经处理过，不用再查
       const applied = await fs.doc("meta/relay_applied").get().catch(() => null);
       const last = applied && applied.exists ? applied.data() : {};
-      if (last.last_file_id === f.id) { inbox = null; paintInbox(); return; }
+      if (inbox && inbox.pending && inbox.fileId === f.id) { paintInbox(); return; } // 已经提示着这份
+      if (last.last_file_id === f.id) { try { localStorage.setItem("fb-inbox-seen", f.id); } catch (_) {} inbox = null; paintInbox(); return; }
       const file = JSON.parse(await gfetch("https://www.googleapis.com/drive/v3/files/" + f.id + "?alt=media", { raw: true }));
       if (!file || file.format !== "fb-jizhang-changes/1" || !Array.isArray(file.changes)) throw new Error("清单格式不对");
       if (last.last_created_at && file.created_at <= last.last_created_at) { inbox = null; paintInbox(); return; }
@@ -453,6 +457,7 @@
       ops.push((b) => b.set(fs.doc("meta/relay_applied"), { last_file_id: inbox.fileId, last_change_id: file.id || null, last_created_at: file.created_at || now, applied_at: now, applied: todo.length, skipped: rows.length - todo.length, undo_id: undoId, by: me }));
       for (let i = 0; i < ops.length; i += 450) { const b = fs.batch(); ops.slice(i, i + 450).forEach((f) => f(b)); await b.commit(); }
       inboxDone = { at: now, n: todo.length, undo: undoId };
+      try { localStorage.setItem("fb-inbox-seen", inbox.fileId); } catch (_) {}
       try { localStorage.setItem("fb-inbox-done", JSON.stringify(inboxDone)); } catch (_) {}
       inbox = null; closeDlg(); paintInbox();
     } catch (e) {
@@ -463,6 +468,7 @@
   async function ignoreInbox() {
     const now = new Date().toISOString();
     await fs.doc("meta/relay_applied").set({ last_file_id: inbox.fileId, last_change_id: inbox.file.id || null, last_created_at: inbox.file.created_at || now, applied_at: now, applied: 0, ignored: true, by: window.__fbMyId || null }).catch(() => {});
+    try { localStorage.setItem("fb-inbox-seen", inbox.fileId); } catch (_) {}
     inbox = null; closeDlg(); paintInbox();
   }
   async function undoInbox() {
@@ -494,6 +500,12 @@
   });
   if (inboxDone) document.addEventListener("DOMContentLoaded", () => setTimeout(paintInbox, 500));
   window.__fbCheckInbox = checkInbox;
+  // 流畅度：从后台切回 App 时马上查一次；App 开着时每 45 秒查一次（只是列一下文件夹，很轻）
+  let inboxLast = 0;
+  const inboxTick = (force) => { if (!relayOn() || document.visibilityState !== "visible") return; if (!force && Date.now() - inboxLast < 10000) return; inboxLast = Date.now(); checkInbox(); };
+  document.addEventListener("visibilitychange", () => inboxTick(false));
+  window.addEventListener("pageshow", () => inboxTick(false));
+  setInterval(() => inboxTick(true), 45000);
 
 
   window.claude = {
