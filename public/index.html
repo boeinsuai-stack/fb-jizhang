@@ -48,15 +48,23 @@
 }
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
-.wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 56px; display: grid; gap: 24px; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px calc(92px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 24px; }
 main { display: grid; gap: 24px; }
 
 .top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .eyebrow { margin: 0 0 4px; font-size: .75rem; letter-spacing: .08em; color: var(--muted); }
 h1 { font-family: var(--font-display); font-weight: 700; font-size: 2.4rem; line-height: 1; margin: 0; letter-spacing: .01em; }
-.switch { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--surface); }
-.switch a { padding: 6px 18px; border-radius: 999px; text-decoration: none; color: var(--muted); font-weight: 500; font-size: .9rem; }
-.switch a[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
+/* 底部导航：手机单手就能换页，滑到哪都在 */
+.switch { position: fixed; left: 0; right: 0; bottom: 0; z-index: 16; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 6px 4px calc(4px + env(safe-area-inset-bottom, 0px)); background: var(--surface); background: color-mix(in srgb, var(--surface) 93%, transparent); -webkit-backdrop-filter: saturate(1.6) blur(18px); backdrop-filter: saturate(1.6) blur(18px); border-top: 1px solid var(--line); }
+.switch a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0 0 2px; text-decoration: none; color: var(--muted); font-size: .68rem; font-weight: 500; letter-spacing: .02em; -webkit-tap-highlight-color: transparent; }
+.switch .ico { position: relative; display: grid; place-items: center; width: 54px; height: 30px; border-radius: 15px; transition: background-color .18s ease; }
+.switch svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.switch a[aria-current="page"] { color: var(--accent); font-weight: 700; }
+.switch a[aria-current="page"] .ico { background: var(--accent-soft); }
+.switch a[aria-current="page"] svg { stroke-width: 2.1; }
+.switch a:active .ico { background: var(--hover); }
+.nav-dot { position: absolute; top: 3px; right: 13px; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 0 2px var(--surface); }
+.nav-badge { position: absolute; top: -3px; right: 5px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--warn); color: var(--surface); font-size: .66rem; font-weight: 700; font-style: normal; line-height: 18px; text-align: center; box-shadow: 0 0 0 2px var(--surface); }
 
 .summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 .stat { padding: 14px 16px; display: grid; gap: 2px; min-width: 0; }
@@ -155,6 +163,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .rv[open] > summary .l-amt::after { transform: rotate(45deg); }
 .rv > summary .l-amt { display: block; white-space: nowrap; }
 .rv-body { display: grid; gap: 8px; padding: 0 16px 14px; }
+.resv-card { border: 1.5px solid var(--warn); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.resv-card .rc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 10px 16px; background: var(--warn-soft); color: var(--warn); font-weight: 700; font-size: .95rem; }
+.resv-card .rc-n { font-size: .82rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.resv-card .list { border: 0; border-radius: 0; }
+.tag-resv { display: inline-block; font-size: .68rem; font-weight: 700; padding: 1px 7px; margin-right: 6px; border-radius: 5px; background: var(--warn); color: var(--surface); letter-spacing: .04em; vertical-align: 1px; }
 .callout { padding: 10px 14px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: .88rem; }
 .refcard { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline; justify-content: space-between; }
 .refcard a { color: var(--accent); font-weight: 500; text-decoration: none; }
@@ -275,7 +288,7 @@ label.chip input { width: auto; margin: 0; accent-color: var(--accent); }
 .fin-tbl .mini th { color: var(--muted); font-size: .72rem; }
 .fin-tbl .mini th:first-child, .fin-tbl .mini td:first-child { text-align: left; white-space: normal; min-width: 200px; }
 .fin-tbl .mini .tag { margin-left: 4px; }
-@media (max-width: 440px) { .switch a { padding: 6px 11px; } }
+/* (底部导航字号在 .switch a 里统一) */
 .wrap > *, main > *, section { min-width: 0; }
 .qo { display: grid; gap: 10px; }
 .qo-top { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
@@ -327,8 +340,10 @@ label.chip input { width: auto; margin: 0; accent-color: var(--accent); }
 .cb-info b { font-family: var(--font-display); font-size: 1.25rem; font-variant-numeric: tabular-nums; }
 .cb-list { font-size: .76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cb-pick { color: var(--warn); }
-body.has-cart .wrap { padding-bottom: 120px; }
-body.has-cart .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
+body.has-cart .wrap { padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px)); }
+body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
+.cartbar { bottom: calc(62px + env(safe-area-inset-bottom, 0px)) !important; padding-bottom: 10px !important; }
+.toast { bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important; }
 .daylist { display: grid; gap: 12px; }
 .day { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; min-width: 0; }
 .day-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 16px; background: var(--hover); border-bottom: 1px solid var(--line); }
@@ -422,6 +437,9 @@ body.has-cart .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
 .lg-pend .lg-l { color: var(--muted); }
 .pend-n { color: var(--muted); font-size: .8rem; }
 .k-out { background: var(--accent-soft); color: var(--accent); }
+.k-settle { background: var(--fg); color: var(--bg); }
+#ptx-log .lg-h { margin: 2px 0; }
+#ptx-log .lg-h small.open { color: var(--warn); }
 .lg-h small { color: var(--muted); font-size: .76rem; }
 .lg-k { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: .78rem; font-weight: 700; line-height: 1.6; }
 .k-pick, .k-give { background: var(--warn-soft); color: var(--warn); }
@@ -630,11 +648,12 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <h1 id="view-title">库存</h1>
     </div>
     <nav class="switch" aria-label="切换系统">
-      <a id="nav-inv" href="#inventory" aria-current="page">库存</a>
-      <a id="nav-po" href="#purchases">订货</a>
-      <a id="nav-fin" href="#finance">财务</a>
-      <a id="nav-cu" href="#customers">客户</a>
-      <a id="nav-ptx" href="#partner">合伙人</a>
+      <a id="nav-inv" href="#inventory" aria-current="page"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.6 12 3.4l8.5 4.2v8.8L12 20.6l-8.5-4.2z"/><path d="M3.5 7.6 12 11.8l8.5-4.2M12 11.8v8.8"/></svg></span>库存</a>
+      <a id="nav-po" href="#purchases"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h10.5v9H3zM13.5 9.5h3.8l3.2 3.3v2.7h-7"/><circle cx="7" cy="17.6" r="1.8"/><circle cx="17" cy="17.6" r="1.8"/></svg></span>订货</a>
+      <a id="nav-fin" href="#finance"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20h17"/><rect x="5" y="11" width="3.4" height="6" rx="1"/><rect x="10.3" y="5" width="3.4" height="12" rx="1"/><rect x="15.6" y="13.5" width="3.4" height="3.5" rx="1"/></svg></span>财务</a>
+      <a id="nav-cu" href="#customers"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.7"/><path d="M4.8 20c.8-3.9 3.6-6 7.2-6s6.4 2.1 7.2 6"/></svg><i class="nav-badge" id="cu-badge" hidden></i></span>客户</a>
+      <a id="nav-ptx" href="#partner"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h15M15.5 5 19 8.5 15.5 12M20 15.5H5M8.5 12 5 15.5 8.5 19"/></svg></span>合伙人</a>
+      <a id="nav-set" href="#settings"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.1"/><circle cx="9" cy="17" r="2.1"/></svg><i class="nav-dot" id="set-dot" hidden></i></span>设置</a>
     </nav>
   </header>
 
@@ -725,17 +744,18 @@ details.restock > summary::-webkit-details-marker { display: none; }
 
   <main id="po-view" hidden>
     <div class="summary" aria-label="订货概览">
-      <div class="stat"><span class="k">未到齐的订单</span><span class="v" id="p-open">–</span></div>
+      <div class="stat"><span class="k">进行中</span><span class="v" id="p-open">–</span></div>
       <div class="stat"><span class="k">在途根数</span><span class="v" id="p-transit">–</span></div>
-      <div class="stat"><span class="k">本月订货付款</span><span class="v" id="p-month">–</span></div>
-      <div class="stat"><span class="k">已到齐</span><span class="v" id="p-done">–</span></div>
+      <div class="stat"><span class="k">还没付</span><span class="v" id="p-month">–</span></div>
+      <div class="stat"><span class="k">本月订货</span><span class="v" id="p-done">–</span></div>
     </div>
     <div class="actions"><button class="btn primary" id="po-new" type="button">新建订货</button></div>
     <section>
       <h2>订货单</h2>
       <div class="toolbar"><div class="chips" id="po-filter" role="group" aria-label="筛选订货单">
-        <button class="chip" type="button" data-pf="open" aria-pressed="true">未到齐</button>
-        <button class="chip" type="button" data-pf="done" aria-pressed="false">已到齐</button>
+        <button class="chip" type="button" data-pf="open" aria-pressed="true">进行中</button>
+        <button class="chip" type="button" data-pf="unpaid" aria-pressed="false">未付</button>
+        <button class="chip" type="button" data-pf="closed" aria-pressed="false">已完成</button>
         <button class="chip" type="button" data-pf="all" aria-pressed="false">全部</button>
       </div></div>
       <div class="polist" id="po-list"><div class="empty card">正在读取订货单…</div></div>
@@ -744,6 +764,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
 
   <main id="ptx-view" hidden>
     <div class="ptx-bal" id="ptx-bal"></div>
+    <details class="fold" id="ptx-rec">
+      <summary>记往来 · 点口味（他拿我的 / 我拿他的）</summary>
     <section class="qo" id="ptx-sec" aria-label="合伙人往来">
       <div class="chips seg" id="ptx-dir" role="group" aria-label="哪个方向">
         <button class="chip" type="button" data-pd="take" aria-pressed="true">合伙人拿我的货</button>
@@ -753,15 +775,47 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <input id="ptx-q" type="search" placeholder="搜口味（英文、中文都行）" aria-label="搜口味">
       <div class="tiles" id="ptx-tiles"><div class="empty">正在读取…</div></div>
     </section>
-    <div class="actions"><button class="btn ghost" id="ptx-xfer" type="button">换货 / 其他往来</button></div>
+      <div class="actions" style="margin-top:10px"><button class="btn ghost" id="ptx-xfer" type="button">换货 / 其他往来</button></div>
+    </details>
     <section>
-      <h2>往来记录</h2>
+      <div class="qo-top"><h2>往来记录</h2><div class="chips" id="ptx-logwho" role="group" aria-label="看谁的记录"></div></div>
       <div class="list" id="ptx-log"><div class="empty">正在读取…</div></div>
     </section>
   </main>
 
+  <main id="set-view" hidden>
+    <section>
+      <h2>备份</h2>
+  <div class="backup" aria-label="Google Drive 备份">
+    <div class="backup-row">
+      <p id="bk-status">Google Drive 备份：读取中…</p>
+      <span class="actions">
+        <button class="btn small" id="xl-btn" type="button">导出 Excel</button>
+        <button class="btn small" id="bk-btn" type="button">备份到 Google Drive</button>
+      </span>
+    </div>
+    <div class="files" id="bk-files"></div>
+    <p class="msg" id="bk-msg" hidden></p>
+  </div>
+    </section>
+    <section>
+      <h2>使用说明</h2>
+  <p class="note">底价和参考口味只给你自己看，不要对买家公开。客人要几种口味：在上面「快速下单」里点口味凑成一单，再点底部「下单」。手上不够的会自动记成找合伙人拿。点「＋」进货（成本先算库存）。</p>
+
+    </section>
+  </main>
+
   <main id="cu-view" hidden>
+    <section class="resv-card" id="resv-sec" hidden aria-label="预定">
+      <div class="rc-head"><span>预定 · 还没交付</span><span class="rc-n" id="resv-n"></span></div>
+      <div class="owe" id="resv-pick" hidden></div>
+      <div class="list" id="resv"></div>
+    </section>
     <div class="actions"><button class="btn primary" id="cu-fu-new" type="button">+ 记跟进</button></div>
+    <section id="fu-sec" hidden>
+      <h2>要跟进的客户</h2>
+      <div class="list" id="fu-list"></div>
+    </section>
     <div class="summary" aria-label="客户概览">
       <div class="stat"><span class="k">客户</span><span class="v" id="c-n">–</span></div>
       <div class="stat"><span class="k">回头客（买过 2 次以上）</span><span class="v" id="c-rep">–</span></div>
@@ -805,20 +859,13 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <button class="btn primary" id="fin-sale" type="button">记一笔卖出</button>
       <button class="btn" id="fin-exp" type="button">记一笔支出</button>
       <button class="btn ghost" id="fin-fee" type="button">记代送费</button>
-      <button class="btn ghost" id="fin-xfer" type="button">合伙人往来</button>
+      <button class="btn ghost" id="fin-xfer" type="button" hidden>合伙人往来</button>
     </div>
     <div class="owe" id="f-owe" hidden></div>
-    <section id="fu-sec" hidden>
-      <h2>要跟进的客户</h2>
-      <div class="list" id="fu-list"></div>
-    </section>
-    <section id="resv-sec" hidden>
-      <h2>预定（还没结算，不算收入）</h2>
-      <div class="owe" id="resv-pick" hidden style="margin-bottom:10px"></div>
-      <div class="list" id="resv"></div>
-    </section>
     <section>
       <h2>每天（点开看每一单）</h2>
+      <input id="f-oq" type="search" placeholder="搜订单：客户、口味、日期（如 11/3）" aria-label="搜订单" style="margin-bottom:10px">
+      <div class="list" id="f-osr" hidden></div>
       <div class="daylist" id="f-daily"><div class="empty card">正在读取账目…</div></div>
     </section>
     <details class="fold">
@@ -838,29 +885,17 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <summary>收支流水（按付款时间，含进货付款）</summary>
       <div class="list" id="ledger"><div class="empty">正在读取账目…</div></div>
     </details>
-    <details class="fold">
+    <details class="fold" hidden>
       <summary>合伙人往来记录（换货、他拿我的货 · 记错了在这里撤销）</summary>
       <div class="list" id="xfers"><div class="empty">正在读取…</div></div>
     </details>
-    <details class="fold">
+    <details class="fold" hidden>
       <summary>和合伙人的结账记录</summary>
       <div class="list" id="pt-settles"><div class="empty">正在读取…</div></div>
     </details>
   </main>
 
-  <section class="backup" aria-label="Google Drive 备份">
-    <div class="backup-row">
-      <p id="bk-status">Google Drive 备份：读取中…</p>
-      <span class="actions">
-        <button class="btn small" id="xl-btn" type="button">导出 Excel</button>
-        <button class="btn small" id="bk-btn" type="button">备份到 Google Drive</button>
-      </span>
-    </div>
-    <div class="files" id="bk-files"></div>
-    <p class="msg" id="bk-msg" hidden></p>
-  </section>
 
-  <p class="note">底价和参考口味只给你自己看，不要对买家公开。客人要几种口味：在上面「快速下单」里点口味凑成一单，再点底部「下单」。手上不够的会自动记成找合伙人拿。点「＋」进货（成本先算库存）。</p>
 </div>
 
 <div class="sheet" id="sheet" hidden>
@@ -2016,34 +2051,6 @@ details.restock > summary::-webkit-details-marker { display: none; }
     miss.hidden = !L || !bad;
     miss.textContent = bad ? "有 " + (T.miss ? T.miss + " 单还没填单价" : "") + (T.miss && T.unk ? "、" : "") + (T.unk ? T.unk + " 单有香型缺进价" : "") + "，这些单没算进收入和利润。在下面「每日明细」点开那一天，按「编辑」补上。" : "";
 
-    /* customers to get back to, soonest first; overdue ones flagged */
-    const FU = openFUs(), td = today();
-    $("fu-sec").hidden = !FU.length;
-    $("fu-list").innerHTML = FU.map((x) => {
-      const due = !!x.date && x.date <= td, times = x.customer ? custOrders(x.customer).filter((o) => !isReserved(o)).length : 0;
-      return '<div class="lrow fu' + ((due && !x.contacted_at) || x.restocked ? " due" : "") + '"><div><span class="l-date">' + (x.restocked ? "到货了 · " : "") + fuWhen(x) + "</span>" +
-        '<span class="l-desc"><b>' + esc(x.customer || "（没写名字）") + "</b>" + (x.suburb ? " · " + esc(x.suburb) : "") + "</span>" +
-        (x.wants.length ? '<span class="l-sub">想要：' + wantsHtml(x.wants) + "</span>" : "") +
-        (x.note ? '<span class="l-sub">' + esc(x.note) + "</span>" : "") +
-        '<span class="l-sub">' + esc(x.origin) + (times > 1 ? " · 一共买过 " + times + " 次" : "") + "</span></div>" +
-        '<div class="l-actions">' + fuButtons(x) + "</div></div>";
-    }).join("");
-
-    const resv = S.orders.filter(isReserved).sort(moveSort);
-    const RS = resvAlloc().RS;
-    $("resv-pick").hidden = true;
-    $("resv-sec").hidden = !resv.length;
-    $("resv").innerHTML = resv.map((o) => { const t = orderTotal(o), n = (o.lines || []).reduce((a, l) => a + (Number(l.qty) || 0), 0);
-      const who = o.customer ? o.customer + (o.suburb ? " · " + o.suburb : "") : (o.note || "").split(/[（(，,·]/)[0].trim().slice(0, 18);
-      const pk = RS[o.id] ? Object.values(RS[o.id]).reduce((a, x) => a + x, 0) : 0;
-      return '<details class="rv"><summary><span class="rv-main"><span class="l-date">' + fmtD(o.date) + " · 预定</span>" +
-        "<b>" + esc(who || "（没写客人名字）") + "</b>" + '<span class="l-sub">' + esc(serTxt(serQty([o]))) + "</span>" +
-        (pk ? '<span class="pick-tag">要找' + esc(whoFrom(o)) + "拿 " + pk + " 根</span>" : "") +
-        (o.partner_settlement_id ? '<span class="pick-tag done">已从' + esc(whoFrom(o)) + "拿货 · 已结账</span>" : S.moves.some((m) => m.order_id === o.id && m.type === "in") ? '<span class="pick-tag done">已从' + esc(whoFrom(o)) + "拿货 · 还没结账</span>" : "") + "</span>" +
-        '<span class="l-amt">' + (t == null ? '<span class="pill warn">未定价</span>' : money(t)) + "</span></summary>" +
-        '<div class="rv-body"><div class="l-desc">' + (o.payment ? payBadgeO(o) : "") + linesHtml(o, null, RS[o.id] ? Object.assign({ __who: o.pick_from || "" }, RS[o.id]) : null) + "</div>" + (custLine(o) ? '<span class="l-sub">' + esc(custLine(o)) + "</span>" : "") + (o.note ? '<span class="l-sub">' + esc(o.note) + "</span>" : "") +
-        '<div class="l-actions"><button class="btn small primary" type="button" data-settle="' + esc(o.id) + '">结算</button><button class="btn small" type="button" data-edit-order="' + esc(o.id) + '">编辑</button><button class="btn small ghost danger" type="button" data-void-order="' + esc(o.id) + '">取消预定</button></div></div></details>'; }).join("");
-
     /* income statement */
     const row = (label, v, cls) => '<div class="st-row' + (cls ? " " + cls : "") + '"><span>' + label + "</span><b>" + v + "</b></div>";
     const catRows = Object.entries(FB.cats).sort((a, b) => b[1] - a[1]);
@@ -2544,13 +2551,14 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const st = Object.fromEntries(all.map((p) => [p.id, poStatus(p)]));
     const transit = inTransit();
     const ym = today().slice(0, 7);
-    const openN = all.filter((p) => st[p.id] !== "done").length;
+    const isOpen = (p) => st[p.id] !== "done" || poUnpaid(p);
+    const openN = all.filter(isOpen).length, owe = r2(all.filter(poUnpaid).reduce((a, p) => a + poOweAmt(p), 0));
     $("p-open").textContent = S.loaded ? openN : "–"; $("p-open").className = "v" + (openN ? " warn" : "");
     $("p-transit").textContent = S.loaded ? Object.values(transit).reduce((a, q) => a + q, 0) : "–";
-    $("p-month").textContent = S.loaded ? money(all.filter((p) => (p.date || "").startsWith(ym)).reduce((a, p) => a + poPaid(p), 0)) : "–";
-    $("p-done").textContent = S.loaded ? all.filter((p) => st[p.id] === "done").length : "–";
-    const list = all.filter((p) => poFilter === "all" || (poFilter === "open" ? st[p.id] !== "done" : st[p.id] === "done"));
-    if (!list.length) { $("po-list").innerHTML = '<div class="empty card">' + (all.length ? "这里没有订货单。" : "还没有订货单。付完款后点「新建订货」记一笔，口味不知道可以只填系列和根数。") + "</div>"; return; }
+    $("p-month").textContent = S.loaded ? money(owe) : "–"; $("p-month").className = "v" + (owe ? " bad" : "");
+    $("p-done").textContent = S.loaded ? money(all.filter((p) => (p.date || "").startsWith(ym)).reduce((a, p) => a + poPaid(p), 0)) : "–";
+    const list = all.filter((p) => poFilter === "all" || (poFilter === "open" ? isOpen(p) : poFilter === "unpaid" ? poUnpaid(p) : !isOpen(p)));
+    if (!list.length) { $("po-list").innerHTML = '<div class="empty card">' + (all.length ? (poFilter === "open" ? "没有进行中的订货单，都到齐也付清了。" : "这里没有订货单。") : "还没有订货单。点「新建订货」记一笔，口味不知道可以只填系列和根数。") + "</div>"; return; }
     $("po-list").innerHTML = list.map((po) => {
       const recv = poRecv(po.id), s = st[po.id], lab = PO_LABEL[s];
       const hasSer = (po.lines || []).some(isSerLine);
@@ -2558,8 +2566,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
       for (const m of S.moves) if (m.po_id === po.id) { (rcpts[m.receipt_id] = rcpts[m.receipt_id] || { date: m.date, items: [] }).items.push(m); }
       const rlist = Object.entries(rcpts).sort((a, b) => (a[1].date || "").localeCompare(b[1].date || ""));
       return '<article class="po">' +
-        '<div class="po-head"><div><span class="l-date">订货 ' + fmtD(po.date) + (po.supplier ? " · " + esc(po.supplier) : "") + (poUnpaid(po) ? "" : po.paid_date && po.paid_date !== po.date ? " · " + fmtD(po.paid_date) + " 已付" : " · 已付") + '</span><b class="po-title">' + esc(po.note || "订货单") + "</b></div>" +
-        '<div class="po-amt"><span>−' + money(poPaid(po)) + '</span>' + (poUnpaid(po) ? '<span class="pill bad">未付</span>' : "") + '<span class="pill ' + lab[1] + '">' + lab[0] + "</span></div></div>" +
+        '<div class="po-head"><div><span class="l-date">订货 ' + fmtD(po.date) + (po.supplier ? " · " + esc(po.supplier) : "") + '</span><b class="po-title">' + esc(po.note || poLinesTxt(po)) + "</b>" +
+          '<span class="l-sub">' + (poUnpaid(po) ? "还没付" + (po.supplier ? "，记在应付" + esc(po.supplier) + "里" : "") : "已付" + (po.paid_date ? " " + fmtD(po.paid_date) : "") + (po.settlement_id ? " · 跟" + esc(poWho(po)) + "结账时一起付" : po.payment ? " · " + esc(po.payment) : "")) + "</span></div>" +
+        '<div class="po-amt"><span>' + money(poPaid(po)) + '</span><span class="pill ' + (poUnpaid(po) ? "bad" : "") + '">' + (poUnpaid(po) ? "未付" : "已付") + '</span><span class="pill ' + lab[1] + '">' + lab[0] + "</span></div></div>" +
         '<div class="tblwrap"><table class="po-tbl"><thead><tr><th>订的</th><th>订</th><th>已到</th><th>未到</th><th>$/根</th></tr></thead><tbody>' +
         (po.lines || []).map((l) => { const g = recv[lineKey(l)] || 0, lf = Math.max(0, l.qty - g);
           return "<tr><td>" + (isSerLine(l) ? "<b>" + esc(l.series) + '</b><small class="cn"> 口味到货再分</small>' : esc(nm(l.sku, l.name)) + '<small class="cn"> ' + esc((itemBy(l.sku) || {}).name || "") + "</small>") + "</td><td>" + l.qty + "</td><td>" + g + '</td><td class="' + (lf ? "left" : "") + '">' + lf + "</td><td>" + (l.unit_cost == null ? "–" : money(l.unit_cost)) + "</td></tr>"; }).join("") +
@@ -3069,8 +3078,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
   function partnerSettleForm(who) {
     if (typeof who !== "string") who = "";
     const byT = (a, b) => (a.date || "").localeCompare(b.date || "") || (a.at || "").localeCompare(b.at || "");
-    const open = partnerItems("").filter((g) => g.o).sort(byT), xs = openXfers("").sort(byT), pos = openPOs("").sort(byT);
-    if (!open.length && !xs.length && !pos.length) { toast("没有要结的账。"); return; }
+    const open = partnerItems(who).filter((g) => g.o).sort(byT), xs = openXfers(who).sort(byT), pos = openPOs(who).sort(byT);
+    if (!open.length && !xs.length && !pos.length) { toast(who ? "跟" + who + "没有要结的账。" : "没有要结的账。"); return; }
     const on = (w) => !who || w === who;
     const html =
       '<div class="field"><label for="f-date">结账日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
@@ -3188,7 +3197,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   });
   $("pt-settles").addEventListener("click", (e) => {
     const t = e.target.closest("button"); if (!t) return;
-    if (t.dataset.copySettle) { const s = S.settles.find((x) => x.id === t.dataset.copySettle); if (s) copyText(statementText(pickups().filter((g) => g.sid === s.id), fmtD(s.date) + " 结账明细", numOrNull(s.paid), S.transfers.filter((x) => x.partner_settlement_id === s.id))); }
+    if (t.dataset.copySettle) settleCopy(t.dataset.copySettle);
     else if (t.dataset.unsettle) arm(t, "确认撤销？", () => unsettle(t.dataset.unsettle));
   });
   $("pt-filter").addEventListener("click", (e) => {
@@ -3200,6 +3209,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
   $("pt-new").addEventListener("click", pickupForm);
   $("pt-settle").addEventListener("click", partnerSettleForm);
   $("resv-pick").addEventListener("click", (e) => { if (e.target.closest("#resv-pick-copy")) copyText("要找合伙人拿：\n" + (window.__resvPickText || "")); });
+  $("f-oq").addEventListener("input", (e) => { oQuery = e.target.value; renderOrderSearch(); });
+  $("f-osr").addEventListener("click", (e) => { const b = e.target.closest("[data-oq-edit]"); if (b) orderEditForm(b.dataset.oqEdit); });
   $("f-owe").addEventListener("click", (e) => {
     const lo = e.target.closest("[data-lg-open]"); if (lo) { ledgerSheet(lo.dataset.lgOpen); return; }
     const tg = e.target.closest("[data-pt-toggle]"); if (tg) { const w = tg.dataset.ptToggle; if (ptOpen.has(w)) ptOpen.delete(w); else ptOpen.add(w); renderFinance(); return; }
@@ -3415,18 +3426,45 @@ details.restock > summary::-webkit-details-marker { display: none; }
         '<span class="t-meta">' + serTag(seriesOf(i)) + (q > 0 ? '<span class="t-stock">剩 ' + q + "</span>" : '<span class="t-pick">没货</span>') + "</span></button>" +
         (n ? '<span class="t-n" aria-hidden="true">' + n + '</span><button type="button" class="t-minus" data-psub="' + esc(i.sku) + '" aria-label="' + esc(enOf(i)) + ' 减一根">−</button>' : "") + "</div>"; };
     $("ptx-tiles").innerHTML = !S.loaded ? '<div class="empty">正在读取…</div>' : list.length ? list.map(tile).join("") : '<div class="empty">' + (ql ? "没有匹配的口味。" : take ? "手上没有可以给的货。" : "这个系列还没有口味。") + "</div>";
-    const XA = S.transfers.slice().sort(moveSort), shown = XA.slice(0, ptLogN);
-    $("ptx-log").innerHTML = !S.loaded ? '<div class="empty">正在读取…</div>' : shown.length ? shown.map((t) => { const net = xferNet(t), w = xWho(t), k = xferKind(t);
-      const status = t.partner_settlement_id ? "已结账" : t.closed ? "两边相等，不用结" : net > 0 ? w + " 欠你 " + money(net) : net < 0 ? "你欠 " + w + " " + money(-net) : "两清";
-      return '<div class="lrow"><div><span class="l-date">' + fmtD(t.date) + " · " + esc(w) + " · " + (k === "take" ? "他拿我的货" : k === "give" ? "我拿他的货" : "换货") + "</span>" +
-        ((t.out || []).length ? '<span class="l-desc">我给' + esc(w) + "：" + esc(xLines(t.out)) + "</span>" : "") + ((t.in || []).length ? '<span class="l-desc">' + esc(w) + "给我：" + esc(xLines(t.in)) + "</span>" : "") +
-        '<span class="l-sub">' + esc(status) + (t.note ? " · " + esc(t.note) : "") + "</span></div>" +
-        '<div class="l-amt">' + (net ? money(Math.abs(net)) : "–") + "</div>" +
-        (t.partner_settlement_id ? "" : '<div class="l-actions"><button class="btn small ghost danger" type="button" data-void-xfer="' + esc(t.id) + '">撤销这笔</button></div>') + "</div>"; }).join("") +
-      (XA.length > shown.length ? '<div class="lrow"><button class="btn small" type="button" data-ptx-more="1">看更多（还有 ' + (XA.length - shown.length) + " 笔）</button></div>" : "")
+    const LW = ["", ...partnerNames()];
+    if (ptLogWho && !LW.includes(ptLogWho)) ptLogWho = "";
+    $("ptx-logwho").innerHTML = LW.map((w) => '<button class="chip" type="button" data-logwho="' + esc(w) + '" aria-pressed="' + (w === ptLogWho) + '">' + esc(w || "全部") + "</button>").join("");
+    const XA = historyRows(), shown = XA.slice(0, ptLogN);
+    const TAG = { in: ["调入", "k-in"], out: ["调出", "k-out"], swap: ["换货", "k-swap"], po: ["订货", "k-po"], settle: ["结账", "k-settle"] };
+    const ln = (ls) => esc(ls.map((l) => l.k + " ×" + l.q).join("、"));
+    $("ptx-log").innerHTML = !S.loaded ? '<div class="empty">正在读取…</div>' : shown.length ? shown.map((r) => {
+      const [tg, cls] = TAG[r.t], W = esc(r.who);
+      let desc = "", amt = "", act = "", st = r.done ? '<small>' + esc(r.done) + "</small>" : r.t === "settle" ? "" : '<small class="open">未结</small>';
+      if (r.t === "settle") {
+        const s0 = r.s, v = numOrNull(s0.paid) ?? numOrNull(s0.amount) ?? 0;
+        desc = (v > 0 ? "付给" + W : v < 0 ? W + "付你" : "两清") + '<span class="l-sub">' + esc([(s0.order_ids || []).length ? (s0.order_ids || []).length + " 笔随单调入" : "", (s0.transfer_ids || []).length ? (s0.transfer_ids || []).length + " 笔往来" : "", (s0.po_ids || []).length ? (s0.po_ids || []).length + " 张订货" : "", s0.payment, s0.note].filter(Boolean).join(" · ")) + "</span>";
+        amt = money(Math.abs(v));
+        act = '<div class="l-actions"><button class="btn small" type="button" data-copy-settle="' + esc(s0.id) + '">复制明细</button><button class="btn small ghost danger" type="button" data-unsettle="' + esc(s0.id) + '">撤销结账</button></div>';
+      } else {
+        desc = r.t === "swap" ? "我给：" + ln(lnArr(r.x.out)) + '<span class="l-sub">他给：' + ln(lnArr(r.x.in)) + "</span>" : ln(r.lines);
+        amt = r.amt ? money(r.amt) : "–";
+        if (r.id && r.t !== "po" && !r.done) act = '<div class="l-actions"><button class="btn small ghost danger" type="button" data-void-xfer="' + esc(r.id) + '">撤销这笔</button></div>';
+      }
+      return '<div class="lrow"><div><span class="l-date">' + fmtD(r.date) + " · " + W + '</span><div class="lg-h"><span class="lg-k ' + cls + '">' + tg + "</span>" + (r.src ? "<small>" + r.src + "</small>" : "") + st + "</div>" +
+        '<span class="l-desc">' + desc + "</span></div>" + '<div class="l-amt">' + amt + "</div>" + act + "</div>"; }).join("") +
+      (XA.length > shown.length ? '<div class="lrow"><button class="btn small" type="button" data-ptx-more="1">看更多（还有 ' + (XA.length - shown.length) + " 条）</button></div>" : "")
       : '<div class="empty">还没有往来记录。</div>';
     renderCart();
   }
+  let ptLogWho = "";
+  function historyRows() {
+    const rows = [];
+    for (const g of pickups()) rows.push({ t: "in", date: g.date, at: g.at || "", who: whoFrom(g.o), lines: lnArr(g.moves), amt: g.cost, done: g.sid ? "已结" : "", src: "随单" });
+    for (const t of S.transfers) { const k = xferKind(t);
+      rows.push({ t: k === "take" ? "out" : k === "give" ? "in" : "swap", date: t.date, at: t.at || "", who: xWho(t), x: t, id: t.id, lines: k === "take" ? lnArr(t.out) : k === "give" ? lnArr(t.in) : [], amt: Math.abs(xferNet(t)), done: t.partner_settlement_id ? "已结" : t.closed ? "两清" : "" }); }
+    for (const q of S.purchases) if (q.supplier || q.paid === false) rows.push({ t: "po", date: q.date, at: q.at || "", who: poWho(q), id: q.id, amt: poOweAmt(q), done: poUnpaid(q) ? "" : "已付" + (q.paid_date ? " " + fmtD(q.paid_date) : ""),
+      lines: (q.lines || []).map((l) => ({ k: isSerLine(l) ? l.series + "（口味到货再分）" : seriesOf(itemBy(l.sku)) + " " + nm(l.sku, l.name), q: l.qty })) });
+    for (const s0 of S.settles) rows.push({ t: "settle", date: s0.date, at: s0.at || "", who: s0.partner || "合伙人", s: s0 });
+    return rows.filter((r) => !ptLogWho || r.who === ptLogWho || (r.t === "settle" && r.who.split("、").includes(ptLogWho)))
+      .sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.at || "").localeCompare(a.at || ""));
+  }
+  const settleCopy = (sid) => { const s0 = S.settles.find((x) => x.id === sid); if (!s0) return;
+    copyText(statementText(pickups().filter((g) => g.sid === sid), (s0.partner ? s0.partner + " · " : "") + fmtD(s0.date) + " 结账明细", numOrNull(s0.paid), S.transfers.filter((x) => x.partner_settlement_id === sid), S.purchases.filter((x) => x.settlement_id === sid))); };
   function bumpPt(sku, d) {
     const c = ptCart(); c[sku] = Math.max(0, (c[sku] || 0) + d); if (!c[sku]) delete c[sku];
     saveCart(); renderPartnerPage();
@@ -3437,8 +3475,11 @@ details.restock > summary::-webkit-details-marker { display: none; }
   $("ptx-tabs").addEventListener("click", (e) => { const c = e.target.closest("[data-pt-tab]"); if (!c) return; ptTab = c.dataset.ptTab; ptQuery = ""; $("ptx-q").value = ""; renderPartnerPage(); });
   $("ptx-q").addEventListener("input", (e) => { ptQuery = e.target.value; renderPartnerPage(); });
   $("ptx-bal").addEventListener("click", (e) => { const lo = e.target.closest("[data-lg-open]"); if (lo) { ledgerSheet(lo.dataset.lgOpen); return; } const b = e.target.closest("[data-ptx-settle]"); if (b) partnerSettleForm(b.dataset.ptxSettle); });
+  $("ptx-logwho").addEventListener("click", (e) => { const c = e.target.closest("[data-logwho]"); if (!c) return; ptLogWho = c.dataset.logwho; ptLogN = 15; renderPartnerPage(); });
   $("ptx-log").addEventListener("click", (e) => {
     if (e.target.closest("[data-ptx-more]")) { ptLogN += 20; renderPartnerPage(); return; }
+    const cs = e.target.closest("[data-copy-settle]"); if (cs) { settleCopy(cs.dataset.copySettle); return; }
+    const us = e.target.closest("[data-unsettle]"); if (us) { arm(us, "确认撤销？", () => unsettle(us.dataset.unsettle)); return; }
     const v = e.target.closest("[data-void-xfer]"); if (v) arm(v, "确认撤销？", () => voidXfer(v.dataset.voidXfer));
   });
   $("ptx-xfer").addEventListener("click", () => xferForm(""));
@@ -3908,9 +3949,60 @@ details.restock > summary::-webkit-details-marker { display: none; }
       () => { $("sheet-save").textContent = wake.length ? "改回在售" : "知道了"; });
   });
 
-  function render() { renderHealth(); resolveNames(); if (view === "inventory" && !STANDALONE) renderLog(); if (view === "finance") renderFinance(); else if (view === "customers") renderCustomers(); else if (view === "partner") renderPartnerPage(); else if (view === "purchases") renderPurchases(); else renderInventory(); renderBackup(); renderCart(); }
-  const VIEWS = { inventory: ["inv-view", "nav-inv", "库存"], purchases: ["po-view", "nav-po", "订货"], finance: ["fin-view", "nav-fin", "财务"], customers: ["cu-view", "nav-cu", "客户"], partner: ["ptx-view", "nav-ptx", "合伙人"] };
+  let oQuery = "";
+  function renderOrderSearch() {
+    const q = oQuery.trim().toLowerCase(), box = $("f-osr");
+    $("f-daily").hidden = !!q; box.hidden = !q;
+    if (!q) return;
+    const dq = (d) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || ""); return m ? [+m[2] + "/" + +m[3], +m[2] + "月" + +m[3] + "日", d].join(" ") : ""; };
+    const hay = (o) => [o.customer, o.suburb, o.note, o.pick_from, dq(o.date), ...(o.lines || []).map((l) => { const it = itemBy(l.sku); return [l.sku, l.name, it && it.variant, it && it.series].join(" "); })].join(" ").toLowerCase();
+    const hits = S.orders.filter((o) => q.split(/\s+/).every((t) => hay(o).includes(t))).sort(moveSort);
+    box.innerHTML = hits.length ? hits.slice(0, 60).map((o) => { const t = orderTotal(o);
+      return '<div class="lrow"><div><span class="l-date">' + fmtD(o.date) + (isReserved(o) ? " · 预定" : "") + (o.pick_from ? " · 找" + esc(o.pick_from) + "拿" : "") + "</span>" +
+        '<span class="l-desc"><b>' + esc(o.customer || "（没写名字）") + "</b> · " + esc(linesText(o)) + "</span></div>" +
+        '<div class="l-amt">' + (t == null ? '<span class="pill warn">未定价</span>' : money(t)) + (o.payment ? payBadgeO(o) : "") + "</div>" +
+        '<div class="l-actions"><button class="btn small" type="button" data-oq-edit="' + esc(o.id) + '">查看/编辑</button></div></div>'; }).join("") +
+      (hits.length > 60 ? '<div class="lrow"><span class="l-sub">只显示最近 60 单，再加关键词缩小范围。</span></div>' : "")
+      : '<div class="empty">没找到。可以搜客户名、口味（中英文）、日期（11/3）。</div>';
+  }
+  function renderFuResv() {
+    /* customers to get back to, soonest first; overdue ones flagged */
+    const FU = openFUs(), td = today();
+    $("fu-sec").hidden = !FU.length;
+    $("fu-list").innerHTML = FU.map((x) => {
+      const due = !!x.date && x.date <= td, times = x.customer ? custOrders(x.customer).filter((o) => !isReserved(o)).length : 0;
+      return '<div class="lrow fu' + ((due && !x.contacted_at) || x.restocked ? " due" : "") + '"><div><span class="l-date">' + (x.restocked ? "到货了 · " : "") + fuWhen(x) + "</span>" +
+        '<span class="l-desc"><b>' + esc(x.customer || "（没写名字）") + "</b>" + (x.suburb ? " · " + esc(x.suburb) : "") + "</span>" +
+        (x.wants.length ? '<span class="l-sub">想要：' + wantsHtml(x.wants) + "</span>" : "") +
+        (x.note ? '<span class="l-sub">' + esc(x.note) + "</span>" : "") +
+        '<span class="l-sub">' + esc(x.origin) + (times > 1 ? " · 一共买过 " + times + " 次" : "") + "</span></div>" +
+        '<div class="l-actions">' + fuButtons(x) + "</div></div>";
+    }).join("");
+
+    const resv = S.orders.filter(isReserved).sort(moveSort);
+    const RS = resvAlloc().RS;
+    $("resv-pick").hidden = true;
+    $("resv-sec").hidden = !resv.length;
+    const rvN = resv.reduce((a, o) => a + (o.lines || []).reduce((b, l) => b + (Number(l.qty) || 0), 0), 0);
+    $("resv-n").textContent = resv.length + " 单 · " + rvN + " 根";
+    $("cu-badge").hidden = !resv.length; $("cu-badge").textContent = resv.length > 99 ? "99+" : String(resv.length);
+    $("resv").innerHTML = resv.map((o) => { const t = orderTotal(o), n = (o.lines || []).reduce((a, l) => a + (Number(l.qty) || 0), 0);
+      const who = o.customer ? o.customer + (o.suburb ? " · " + o.suburb : "") : (o.note || "").split(/[（(，,·]/)[0].trim().slice(0, 18);
+      const pk = RS[o.id] ? Object.values(RS[o.id]).reduce((a, x) => a + x, 0) : 0;
+      return '<details class="rv"><summary><span class="rv-main"><span class="l-date"><span class="tag-resv">预定</span>' + fmtD(o.date) + "</span>" +
+        "<b>" + esc(who || "（没写客人名字）") + "</b>" + '<span class="l-sub">' + esc(serTxt(serQty([o]))) + "</span>" +
+        (pk ? '<span class="pick-tag">要找' + esc(whoFrom(o)) + "拿 " + pk + " 根</span>" : "") +
+        (o.partner_settlement_id ? '<span class="pick-tag done">已从' + esc(whoFrom(o)) + "拿货 · 已结账</span>" : S.moves.some((m) => m.order_id === o.id && m.type === "in") ? '<span class="pick-tag done">已从' + esc(whoFrom(o)) + "拿货 · 还没结账</span>" : "") + "</span>" +
+        '<span class="l-amt">' + (t == null ? '<span class="pill warn">未定价</span>' : money(t)) + "</span></summary>" +
+        '<div class="rv-body"><div class="l-desc">' + (o.payment ? payBadgeO(o) : "") + linesHtml(o, null, RS[o.id] ? Object.assign({ __who: o.pick_from || "" }, RS[o.id]) : null) + "</div>" + (custLine(o) ? '<span class="l-sub">' + esc(custLine(o)) + "</span>" : "") + (o.note ? '<span class="l-sub">' + esc(o.note) + "</span>" : "") +
+        '<div class="l-actions"><button class="btn small primary" type="button" data-settle="' + esc(o.id) + '">结算</button><button class="btn small" type="button" data-edit-order="' + esc(o.id) + '">编辑</button><button class="btn small ghost danger" type="button" data-void-order="' + esc(o.id) + '">取消预定</button></div></div></details>'; }).join("");
+
+  }
+  function renderSetDot() { const s0 = S.sync, at = s0 && (s0.synced_at || (s0.history && s0.history[0] && s0.history[0].at)); const old = !at || Date.now() - new Date(at).getTime() > 7 * 864e5; $("set-dot").hidden = !S.loaded || !old; }
+  function render() { renderSetDot(); renderFuResv(); if (view === "finance") renderOrderSearch(); renderHealth(); resolveNames(); if (view === "inventory" && !STANDALONE) renderLog(); if (view === "finance") renderFinance(); else if (view === "customers") renderCustomers(); else if (view === "partner") renderPartnerPage(); else if (view === "purchases") renderPurchases(); else renderInventory(); renderBackup(); renderCart(); }
+  const VIEWS = { inventory: ["inv-view", "nav-inv", "库存"], purchases: ["po-view", "nav-po", "订货"], finance: ["fin-view", "nav-fin", "财务"], customers: ["cu-view", "nav-cu", "客户"], partner: ["ptx-view", "nav-ptx", "合伙人"], settings: ["set-view", "nav-set", "设置"] };
   function route() {
+    window.scrollTo(0, 0); // 换页从顶上开始看
     let h = location.hash.slice(1);
     if (!VIEWS[h]) { try { h = localStorage.getItem("mk-view") || ""; } catch (_) { h = ""; } }
     view = VIEWS[h] ? h : "inventory";
