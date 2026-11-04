@@ -244,7 +244,7 @@ label.chip input { width: auto; margin: 0; accent-color: var(--accent); }
 .stepper input { text-align: center; font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; padding: 4px; }
 .l-amt { display: grid; justify-items: end; gap: 4px; }
 .l-amt .pill { font-family: var(--font-body); font-size: .72rem; font-weight: 500; }
-.picks { display: grid; gap: 6px; max-height: 40vh; overflow: auto; }
+.picks { display: grid; gap: 6px; }
 .stmts { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 12px; }
 @media (max-width: 680px) { .stmts { grid-template-columns: minmax(0, 1fr); } }
 .stmt { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 14px 16px; display: grid; gap: 0; align-content: start; min-width: 0; }
@@ -314,7 +314,7 @@ label.chip input { width: auto; margin: 0; accent-color: var(--accent); }
 .t-more { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .8rem; color: var(--muted); }
 .flabel { font-size: .78rem; color: var(--muted); }
 .sub-amt { font-family: var(--font-display); font-size: 1.3rem; font-weight: 600; padding-top: 4px; font-variant-numeric: tabular-nums; }
-.alloc { display: grid; max-height: 46vh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.alloc { display: grid; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .al-row { display: grid; grid-template-columns: minmax(0, 1fr) 76px; gap: 8px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); cursor: text; }
 .al-row:last-child { border-bottom: 0; }
 .al-row[hidden] { display: none; }
@@ -394,6 +394,46 @@ body.has-cart .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
 .owe .pt-blk + .pt-blk { border-top: 1px dashed var(--warn); padding-top: 8px; }
 #f-owe { display: block; padding: 4px 14px; }
 .pt-list { display: grid; }
+.owe-line { all: unset; box-sizing: border-box; flex: 1; min-width: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; width: 100%; padding: 10px 0; cursor: pointer; }
+.owe-line:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+#f-owe .owe-line + .owe-line { border-top: 1px dashed var(--warn); }
+.owe-line b { font-family: var(--font-display); font-size: 1.3rem; }
+.ptx-b .owe-line { padding: 0; }
+.lg-sum { margin: 0; font-size: 1rem; } .lg-sum b { font-family: var(--font-display); font-size: 1.7rem; margin-left: 4px; }
+.lg { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 10px; }
+.lg-d { padding: 6px 12px; font-size: .76rem; font-weight: 700; letter-spacing: .04em; color: var(--muted); background: var(--bg); }
+.lg-d:not(:first-child) { border-top: 1px solid var(--line); }
+.lg-r { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 9px 12px; }
+.lg-r + .lg-r { border-top: 1px dashed var(--line); }
+.lg-main { min-width: 0; display: grid; gap: 3px; }
+.lg-h { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.lg-sec { display: grid; gap: 6px; }
+.lg-sh { display: flex; align-items: center; gap: 8px; }
+.lg-sh small { color: var(--muted); font-size: .8rem; flex: 1; }
+.lg-sh > b { font-variant-numeric: tabular-nums; }
+.lg-l { display: flex; justify-content: space-between; gap: 12px; padding: 5px 12px; font-size: .88rem; }
+.lg-l b { flex: none; font-variant-numeric: tabular-nums; }
+.lg .lg-d { display: flex; justify-content: space-between; align-items: center; }
+.lg-tot { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 10px 12px; border-radius: 10px; background: var(--bg); font-size: .9rem; }
+.lg-tot b { text-align: right; font-variant-numeric: tabular-nums; }
+.lg-tot .g { border-top: 1px solid var(--fg); padding-top: 6px; font-weight: 700; font-size: 1rem; }
+.k-in { background: var(--warn-soft); color: var(--warn); }
+.lg-pend { border-style: dashed; background: var(--bg); }
+.lg-pend .lg-l { color: var(--muted); }
+.pend-n { color: var(--muted); font-size: .8rem; }
+.k-out { background: var(--accent-soft); color: var(--accent); }
+.lg-h small { color: var(--muted); font-size: .76rem; }
+.lg-k { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: .78rem; font-weight: 700; line-height: 1.6; }
+.k-pick, .k-give { background: var(--warn-soft); color: var(--warn); }
+.k-take { background: var(--accent-soft); color: var(--accent); }
+.k-swap { background: var(--pay-bank-bg); color: var(--pay-bank-fg); }
+.k-po { background: var(--bad-soft); color: var(--bad); }
+.k-resv { background: transparent; color: var(--muted); border: 1px dashed var(--muted); padding: 0 8px; }
+.lg-lines { display: grid; font-size: .84rem; overflow-wrap: anywhere; }
+.lg-amt { flex: none; display: grid; justify-items: end; gap: 2px; text-align: right; }
+.lg-amt b { font-variant-numeric: tabular-nums; font-size: .98rem; color: var(--warn); }
+.lg-amt.neg b { color: var(--accent); }
+.lg-amt small { font-size: .72rem; color: var(--bad); }
 .pt-row + .pt-row { border-top: 1px dashed var(--warn); }
 .pt-top { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
 .pt-name { all: unset; flex: 1; min-width: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; cursor: pointer; }
@@ -1967,38 +2007,11 @@ details.restock > summary::-webkit-details-marker { display: none; }
     $("f-qty").textContent = L ? T.qty + " 根" : "–";
     $("f-paysum").innerHTML = L ? paySum(FB.list.flatMap((d) => d.orders.flatMap(({ o, b }) => payParts(o, b.rev)))) : "";
     $("f-sers").textContent = L ? ([serTxt(PQ), T.fee ? "含配送费 " + money(T.fee) : "", T.n ? T.n + " 单" : ""].filter(Boolean).join(" · ") || "这段时间还没有卖出。") : "";
-    const poAmt = r2(S.purchases.filter((x) => inPeriod(x.date)).reduce((a, x) => a + poPaid(x), 0)), poOwe = r2(openPOs("").reduce((a, x) => a + poOweAmt(x), 0));
-    if (L && (poAmt || poOwe)) $("f-sers").textContent += "\n" + PERIOD_LABEL[period] + "订货 " + money(poAmt) + "（进了库存，卖出时才算进成本）" + (poOwe ? " · 订货还没付 " + money(poOwe) : "");
 
-    /* partner: shows only when something is owed */
-    const ITEMS = partnerItems(""), XS = openXfers(""), byWho = {};
-    const slot = (w) => byWho[w] || (byWho[w] = { got: [], pend: [], xs: [], pos: [] });
-    for (const x of openPOs("")) slot(poWho(x)).pos.push(x);
-    for (const g of ITEMS) slot(whoFrom(g.o))[g.pending ? "pend" : "got"].push(g);
-    for (const t of XS) slot(xWho(t)).xs.push(t);
-    const names = Object.keys(byWho), many = names.length > 1;
-    $("f-owe").hidden = !L || !names.length;
-    const sumTxt = (gs) => esc(serTxt(addQty(gs))) + " · " + money(r2(gs.reduce((a, g) => a + g.cost, 0))) + (gs.some((g) => !g.known) ? "＋" : "");
-    $("f-owe").innerHTML = names.length ? '<div class="pt-list">' + names.map((w) => { const x = byWho[w], W = esc(w);
-        const owe = r2(x.got.concat(x.pend).reduce((a, g) => a + g.cost, 0) + x.pos.reduce((a, p) => a + poOweAmt(p), 0)), recv = r2(x.xs.reduce((a, t) => a + xferNet(t), 0)), net = r2(owe - recv);
-        const head = net > 0 ? "你欠 " + W + " <em>" + money(net) + "</em>" : net < 0 ? W + " 欠你 <em>" + money(-net) + "</em>" : "跟 " + W + " 两清";
-        const takes = x.xs.filter((t) => xferNet(t) > 0), gives = x.xs.filter((t) => xferNet(t) < 0), open = ptOpen.has(w);
-        const fl = (ls) => ls.map((l) => '<span class="pt-fl"><span>' + esc(seriesOf(itemBy(l.sku)) + " " + nm(l.sku, l.name)) + "</span><b>×" + esc(l.qty) + "</b></span>").join("");
-        const amt = (v) => '<span class="pt-amt">' + v + "</span>";
-        const detail =
-          (x.got.length ? "<li><span>你从他那拿的货（已拿）</span>" + fl(x.got.flatMap((g) => g.moves)) + amt("你欠他 " + money(r2(x.got.reduce((a, g) => a + g.cost, 0)))) + "</li>" : "") +
-          x.pos.map((p) => '<li><span>' + fmtD(p.date) + " · 订货单（还没付款）</span>" + '<span class="pt-fl"><span>' + esc(poLinesTxt(p)) + "</span></span>" +
-            '<span class="pt-xfoot">' + amt("你欠他 " + money(poOweAmt(p))) + '<button class="btn small" type="button" data-owe="po-pay" data-id="' + esc(p.id) + '">结款</button></span></li>').join("") +
-          (x.pend.length ? "<li><span>你从他那拿的货（预定，还没拿）</span>" + fl(x.pend.flatMap((g) => g.moves)) + amt("你欠他 " + money(r2(x.pend.reduce((a, g) => a + g.cost, 0))) + "（还没拿货）") + "</li>" : "") +
-          x.xs.slice().sort(moveSort).map((t) => { const n = xferNet(t), o = t.out || [], i = t.in || [];
-            return '<li class="pt-x"><span>' + fmtD(t.date) + " · " + (o.length && i.length ? "换货" : o.length ? "他从你这拿走" : "他给你的货") + "</span>" +
-              (o.length ? (i.length ? '<span class="pt-sub">你给他：</span>' : "") + fl(o) : "") + (i.length ? (o.length ? '<span class="pt-sub">他给你：</span>' : "") + fl(i) : "") +
-              '<span class="pt-xfoot">' + amt(n > 0 ? "他欠你 " + money(n) : "抵 " + money(-n)) +
-              '<button class="btn small ghost danger" type="button" data-owe="void-xfer" data-id="' + esc(t.id) + '">撤销这笔</button></span></li>'; }).join("");
-        return '<div class="pt-row' + (open ? " open" : "") + '"><div class="pt-top"><button class="pt-name" type="button" data-pt-toggle="' + W + '" aria-expanded="' + open + '"><b>' + head + '</b><span class="pt-more">' + (open ? "收起" : "明细") + "</span></button>" +
-          '<button class="btn small primary" type="button" data-owe="settle" data-who="' + W + '"' + (db ? "" : " disabled") + ">结账</button></div>" +
-          (open ? '<div class="pt-detail"><ul>' + detail + "</ul>" +
-            '<span class="actions" style="margin:6px 0 0"><button class="btn small" type="button" data-owe="copy" data-who="' + W + '">复制给' + W + '的明细</button><button class="btn small ghost" type="button" data-owe="xfer" data-who="' + W + '">记往来</button></span></div>' : "") + "</div>"; }).join("") + "</div>" : "";
+    /* 合伙人的账：财务里每人只占一行，点「看账」打开按日期排的对账单 */
+    const OW = partnerNames().concat(openPOs("").map(poWho)).filter((w, k, a) => a.indexOf(w) === k).map((w) => [w, ledgerNet(w), pendingPicks(w).length]).filter((x) => Math.abs(x[1]) >= 0.01 || x[2]);
+    $("f-owe").hidden = !L || !OW.length;
+    $("f-owe").innerHTML = OW.map(([w, n, pn]) => '<button class="owe-line" type="button" data-lg-open="' + esc(w) + '"><span>' + esc(owedTxt(w, n)) + (Math.abs(n) >= 0.01 ? " <b>" + money(Math.abs(n)) + "</b>" : "") + (pn ? ' <small class="pend-n">· ' + pn + " 笔预定还没拿</small>" : "") + '</span><span class="pt-more">看账 ›</span></button>').join("");
     const miss = $("f-missing"), bad = T.miss + T.unk;
     miss.hidden = !L || !bad;
     miss.textContent = bad ? "有 " + (T.miss ? T.miss + " 单还没填单价" : "") + (T.miss && T.unk ? "、" : "") + (T.unk ? T.unk + " 单有香型缺进价" : "") + "，这些单没算进收入和利润。在下面「每日明细」点开那一天，按「编辑」补上。" : "";
@@ -2695,7 +2708,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
     return { RS, groups };
   }
   /* everything owed (picked up, not settled) or about to be owed (reserved, not picked up yet), optionally for one partner */
-  const partnerItems = (who) => pickups().filter((g) => !g.sid).concat(resvAlloc().groups).filter((g) => !who || whoFrom(g.o) === who);
+  const partnerItems = (who) => pickups().filter((g) => !g.sid).filter((g) => !who || whoFrom(g.o) === who);
+  /* 预定了、还没从合伙人那拿到的货：只提醒，不算进应付；拿到货（或客人结算）时才变成调入 */
+  const pendingPicks = (who) => resvAlloc().groups.filter((g) => !who || whoFrom(g.o) === who);
   /* a reservation's pending pick-up becomes a real one (stock in, cost recorded) when it is settled with the partner */
   async function recordPrePick(g, date) {
     const bid = g.oid + "-pick", at = new Date().toISOString(), ex = S.expenses.find((x) => x.batch_id === bid), eid = ex ? ex.id : bid + "-cost";
@@ -2715,6 +2730,59 @@ details.restock > summary::-webkit-details-marker { display: none; }
   const xLines = (ls) => (ls || []).map((l) => seriesOf(itemBy(l.sku)) + " " + nm(l.sku, l.name) + " ×" + l.qty).join("、");
   const xferKind = (t) => ((t.out || []).length && (t.in || []).length ? "swap" : (t.out || []).length ? "take" : "give");
   const xWho = (t) => t.partner || "合伙人";
+  /* 跟一个合伙人的对账单：分「调入」（从他那拿的货）、「调出」（他从你这拿走的货）、「订货（未付）」三栏，
+     每栏按日期往下排，只写口味和根数，不带客户、订单金额。换货拆成一进一出。合计：调入 + 订货 − 调出 = 应付 */
+  const lnArr = (ls, tag) => (ls || []).map((l) => { const it = itemBy(l.sku); return { k: seriesOf(it) + (isGeneric(it) ? "（口味没记）" : " " + nm(l.sku, l.name)) + (tag || ""), q: Number(l.qty) || 0 }; });
+  function ledgerFrom(gs, xs, ps, pend) {
+    const by = {};
+    const W = (w) => by[w] || (by[w] = { inn: [], out: [], po: [], pend: [], tin: 0, tout: 0, tpo: 0, tpend: 0, unk: false });
+    for (const g of pend || []) { const x = W(whoFrom(g.o)); x.pend.push({ date: g.date, at: g.at || "", oid: g.oid, lines: lnArr(g.moves) }); x.tpend += g.cost; }
+    for (const g of gs || []) { const x = W(whoFrom(g.o)); x.inn.push({ date: g.date, at: g.at || "", lines: lnArr(g.moves) }); x.tin += g.cost; if (!g.known) x.unk = true; }
+    for (const t of xs || []) { const x = W(xWho(t));
+      if ((t.in || []).length) { x.inn.push({ date: t.date, at: t.at || "", lines: lnArr(t.in) }); x.tin += xLineVal(t.in); }
+      if ((t.out || []).length) { x.out.push({ date: t.date, at: t.at || "", lines: lnArr(t.out) }); x.tout += xLineVal(t.out); } }
+    for (const q of ps || []) { const x = W(poWho(q)); x.po.push({ date: q.date, at: q.at || "", id: q.id, amt: poOweAmt(q), lines: (q.lines || []).map((l) => ({ k: isSerLine(l) ? l.series + "（口味到货再分）" : seriesOf(itemBy(l.sku)) + " " + nm(l.sku, l.name), q: Number(l.qty) || 0 })) }); x.tpo += poOweAmt(q); }
+    const byT = (a, b) => (a.date || "").localeCompare(b.date || "") || (a.at || "").localeCompare(b.at || "");
+    for (const x of Object.values(by)) { x.inn.sort(byT); x.out.sort(byT); x.po.sort(byT); x.pend.sort(byT); x.tpend = r2(x.tpend); x.tin = r2(x.tin); x.tout = r2(x.tout); x.tpo = r2(x.tpo); x.net = r2(x.tin + x.tpo - x.tout); }
+    return by;
+  }
+  /* 同一天同一个口味合并成一行 */
+  function byDay(entries) {
+    const days = [], idx = {};
+    for (const e of entries) { const d = e.date || ""; let day = idx[d]; if (!day) { day = idx[d] = { date: d, lines: [], m: {} }; days.push(day); }
+      for (const l of e.lines) { if (day.m[l.k]) day.m[l.k].q += l.q; else { day.m[l.k] = { k: l.k, q: l.q }; day.lines.push(day.m[l.k]); } } }
+    return days;
+  }
+  const ledgerOf = (w) => ledgerFrom(partnerItems(w), openXfers(w), openPOs(w), pendingPicks(w))[w] || null;
+  const ledgerNet = (w) => { const x = ledgerOf(w); return x ? x.net : 0; };
+  const owedTxt = (w, n) => (n > 0 ? "应付 " + w : n < 0 ? "应收 " + w : "跟 " + w + " 两清");
+  function ledgerSheet(w) {
+    const x = ledgerOf(w);
+    if (!x || (!x.inn.length && !x.out.length && !x.po.length && !x.pend.length)) { toast("跟" + w + "没有没结的账。"); return; }
+    const W = esc(w);
+    const days = (list) => '<ul class="lg">' + byDay(list).map((d) => '<li class="lg-d">' + esc(fmtD(d.date)) + "</li>" + d.lines.map((l) => '<li class="lg-l"><span>' + esc(l.k) + "</span><b>×" + l.q + "</b></li>").join("")).join("") + "</ul>";
+    const sec = (cls, label, sub, amt, inner) => '<section class="lg-sec"><div class="lg-sh"><span class="lg-k ' + cls + '">' + label + "</span><small>" + sub + "</small><b>" + amt + "</b></div>" + inner + "</section>";
+    const html = '<p class="lg-sum">' + esc(owedTxt(w, x.net)) + " <b>" + money(Math.abs(x.net)) + "</b></p>" +
+      (x.inn.length ? sec("k-in", "调入", "从" + W + "拿的货", money(x.tin) + (x.unk ? "＋" : ""), days(x.inn)) : "") +
+      (x.out.length ? sec("k-out", "调出", W + "拿走的货", money(x.tout), days(x.out)) : "") +
+      (x.po.length ? sec("k-po", "订货", "还没付", money(x.tpo), '<ul class="lg">' + x.po.map((q) => '<li class="lg-d"><span>' + esc(fmtD(q.date)) + '</span><span><b>' + money(q.amt) + '</b> <button class="linkbtn" type="button" data-lg="po-pay" data-id="' + esc(q.id) + '">结款</button></span></li>' +
+        q.lines.map((l) => '<li class="lg-l"><span>' + esc(l.k) + "</span><b>×" + l.q + "</b></li>").join("")).join("") + "</ul>") : "") +
+      (x.pend.length ? sec("k-resv", "预定", "还没拿 · 不算进应付", "", '<ul class="lg lg-pend">' + x.pend.map((q) => '<li class="lg-d"><span>' + esc(fmtD(q.date)) + '</span><button class="linkbtn" type="button" data-lg="picked" data-id="' + esc(q.oid) + '">已拿到</button></li>' +
+        q.lines.map((l) => '<li class="lg-l"><span>' + esc(l.k) + "</span><b>×" + l.q + "</b></li>").join("")).join("") + "</ul>") : "") +
+      '<div class="lg-tot">' + (x.tin ? "<span>调入</span><b>+" + money(x.tin) + "</b>" : "") + (x.tpo ? "<span>订货</span><b>+" + money(x.tpo) + "</b>" : "") + (x.tout ? "<span>调出</span><b>−" + money(x.tout) + "</b>" : "") +
+        '<span class="g">' + esc(owedTxt(w, x.net)) + '</span><b class="g">' + money(Math.abs(x.net)) + "</b></div>" +
+      (x.unk ? '<p class="hint">＋ 有的货拿货价还没填，金额可能偏少。</p>' : "") +
+      '<div class="actions"><button class="btn small" type="button" data-lg="copy">复制发给' + W + '</button><button class="btn small ghost" type="button" data-lg="xfer">记往来</button></div>';
+    openSheet(w + " · 对账单", html, async () => { setTimeout(() => partnerSettleForm(w), 0); return ""; }, () => {
+      $("sheet-save").textContent = "结账";
+      sheetOn("click", (e) => { const b = e.target.closest("[data-lg]"); if (!b) return; const a = b.dataset.lg;
+        if (a === "copy") copyText(statementText(partnerItems(w), w + " · 对账单（截至 " + fmtD(today()) + "）", null, openXfers(w), openPOs(w), pendingPicks(w)));
+        else if (a === "picked") { const g = pendingPicks(w).find((z) => z.oid === b.dataset.id); if (!g) return;
+          arm(b, "确认已拿到？", async () => { try { needDb(); await recordPrePick(g, today()); toast("已记成调入，算进应付 " + w + "。"); closeSheet(); setTimeout(() => ledgerSheet(w), 300); } catch (e2) { toast(e2.userMsg || errText(e2)); } }); }
+        else if (a === "xfer") { closeSheet(); xferForm(w); }
+        else if (a === "po-pay") { closeSheet(); poPayForm(b.dataset.id); } });
+    });
+  }
   function xferText(t) {
     const w = xWho(t), k = xferKind(t), net = xferNet(t);
     if (k === "take") return w + " 从你这拿货：" + xLines(t.out) + " · " + w + " 欠你 " + money(net);
@@ -3007,9 +3075,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const html =
       '<div class="field"><label for="f-date">结账日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
       '<div class="actions"><button type="button" class="btn ghost small" id="f-all">全选</button><button type="button" class="btn ghost small" id="f-none">全不选</button></div>' +
-      (open.length ? '<p class="xs-h">你从合伙人拿的货（你欠他）</p><div class="picks">' + open.map((g, k) => '<label class="check"><input type="checkbox" id="f-g-' + k + '"' + (on(whoFrom(g.o)) ? " checked" : "") + "><span>" + fmtD(g.date) + " · " + esc(whoFrom(g.o)) + " · " + esc(qtyText(g.qty)) + " · " + (g.known ? money(g.cost) : "未填拿货价") + (g.pending ? "（预定" + ((g.o.note || "").split(/[（(，,·]/)[0].trim() ? " · " + esc((g.o.note || "").split(/[（(，,·]/)[0].trim()) : "") + "，还没拿货；结账时记成已拿货）" : "") + "</span></label>").join("") + "</div>" : "") +
-      (pos.length ? '<p class="xs-h">订货单（还没付款，你欠他）</p><div class="picks">' + pos.map((x, k) => '<label class="check"><input type="checkbox" id="f-po-' + k + '"' + (on(poWho(x)) ? " checked" : "") + "><span>" + fmtD(x.date) + " · " + esc(poWho(x)) + " · " + esc(poLinesTxt(x)) + " · " + money(poOweAmt(x)) + "</span></label>").join("") + "</div>" : "") +
-      (xs.length ? '<p class="xs-h">合伙人往来</p><div class="picks">' + xs.map((t, k) => '<label class="check"><input type="checkbox" id="f-x-' + k + '"' + (on(xWho(t)) ? " checked" : "") + "><span>" + fmtD(t.date) + " · " + esc(xferText(t)) + "</span></label>").join("") + "</div>" : "") +
+      (open.length ? '<p class="xs-h">调入 · 随客户订单拿的货</p><div class="picks">' + open.map((g, k) => '<label class="check"><input type="checkbox" id="f-g-' + k + '"' + (on(whoFrom(g.o)) ? " checked" : "") + "><span>" + fmtD(g.date) + " · " + esc(whoFrom(g.o)) + " · " + esc(qtyText(g.qty)) + " · " + (g.known ? money(g.cost) : "未填拿货价") + (g.pending ? "（预定" + ((g.o.note || "").split(/[（(，,·]/)[0].trim() ? " · " + esc((g.o.note || "").split(/[（(，,·]/)[0].trim()) : "") + "，还没拿货；结账时记成已拿货）" : "") + "</span></label>").join("") + "</div>" : "") +
+      (pos.length ? '<p class="xs-h">订货 · 还没付</p><div class="picks">' + pos.map((x, k) => '<label class="check"><input type="checkbox" id="f-po-' + k + '"' + (on(poWho(x)) ? " checked" : "") + "><span>" + fmtD(x.date) + " · " + esc(poWho(x)) + " · " + esc(poLinesTxt(x)) + " · " + money(poOweAmt(x)) + "</span></label>").join("") + "</div>" : "") +
+      (xs.length ? '<p class="xs-h">往来 · 调入 / 调出 / 换货</p><div class="picks">' + xs.map((t, k) => '<label class="check"><input type="checkbox" id="f-x-' + k + '"' + (on(xWho(t)) ? " checked" : "") + "><span>" + fmtD(t.date) + " · " + esc(xferText(t)) + "</span></label>").join("") + "</div>" : "") +
       '<p class="total" id="f-net">–</p>' +
       '<div class="grid2"><div class="field"><label for="f-paid" id="f-paid-l">实际金额 $</label><input id="f-paid" type="number" min="0" step="0.01" inputmode="decimal" placeholder="和上面一样就空着"></div>' +
       '<div class="field"><label for="f-pay">付款方式</label><select id="f-pay"><option value="">未选择</option>' + PAY.map((p) => "<option>" + p + "</option>").join("") + "</select></div></div>" +
@@ -3033,8 +3101,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }, () => {
       const upd = () => { const { gs, ts, ps, pick, poSum, net } = netOf(), w = whoTxt();
         const tk = r2(ts.reduce((a, t) => a + Math.max(0, xferNet(t)), 0)), gv = r2(ts.reduce((a, t) => a + Math.max(0, -xferNet(t)), 0)), W = esc(w);
-        const parts = [pick ? "你从" + W + "拿的货 " + money(pick) : "", poSum ? "订货 " + money(poSum) : "", gv ? W + "给你的货 " + money(gv) : ""].filter(Boolean).join(" + ");
-        $("f-net").innerHTML = !gs.length && !ts.length && !ps.length ? "没选" : (parts || "$0") + (tk ? " − " + W + "从你这拿的货 " + money(tk) : "") + "<br><b>" + (net > 0 ? "= 你付" + W + " " + money(net) : net < 0 ? "= " + W + "付你 " + money(-net) : "= 两清") + "</b>";
+        const parts = [pick + gv ? "调入 " + money(r2(pick + gv)) : "", poSum ? "订货 " + money(poSum) : ""].filter(Boolean).join(" + ");
+        $("f-net").innerHTML = !gs.length && !ts.length && !ps.length ? "没选" : (parts || "$0") + (tk ? " − 调出 " + money(tk) : "") + "<br><b>= " + esc(owedTxt(w, net)) + " " + money(Math.abs(net)) + "</b>";
         $("f-paid-l").textContent = net < 0 ? "实际收到 $" : "实际付款 $"; };
       $("f-all").addEventListener("click", () => { open.forEach((g, k) => { $("f-g-" + k).checked = true; }); xs.forEach((t, k) => { $("f-x-" + k).checked = true; }); pos.forEach((x, k) => { $("f-po-" + k).checked = true; }); upd(); });
       $("f-none").addEventListener("click", () => { open.forEach((g, k) => { $("f-g-" + k).checked = false; }); xs.forEach((t, k) => { $("f-x-" + k).checked = false; }); pos.forEach((x, k) => { $("f-po-" + k).checked = false; }); upd(); });
@@ -3052,38 +3120,21 @@ details.restock > summary::-webkit-details-marker { display: none; }
       toast("已撤销这次结账，这些拿货回到未结账。");
     } catch (e) { toast(e.userMsg || errText(e)); }
   }
-  function statementText(gs, title, paid, xs, pos) {
-    pos = pos || [];
-    /* per partner: what I took from him, what he took from me / gave me, then the net — wording always says who gives whom */
-    xs = xs || [];
-    const line = (m) => { const it = itemBy(m.sku); return "  " + seriesOf(it) + (isGeneric(it) ? "（口味没记）" : " " + nm(m.sku, m.name)) + " ×" + m.qty + (m.cost != null ? "  " + money(Number(m.cost)) : "  （拿货价没填）"); };
-    const xline = (l) => "  " + seriesOf(itemBy(l.sku)) + " " + nm(l.sku, l.name) + " ×" + l.qty + "  " + money(r2((Number(l.qty) || 0) * (Number(l.unit) || 0)));
-    const byWho = {};
-    for (const g of gs) { const w = whoFrom(g.o); (byWho[w] = byWho[w] || { gs: [], xs: [], ps: [] }).gs.push(g); }
-    for (const t of xs) { const w = xWho(t); (byWho[w] = byWho[w] || { gs: [], xs: [], ps: [] }).xs.push(t); }
-    for (const x of pos) { const w = poWho(x); (byWho[w] = byWho[w] || { gs: [], xs: [], ps: [] }).ps.push(x); }
-    const byDate = (list) => list.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.at || "").localeCompare(b.at || ""));
-    const block = (w, x) => {
-      const out = ["【" + w + "】"];
-      if (x.gs.length) {
-        const dd = {}; for (const g of byDate(x.gs)) { const k = (g.date || "") + (g.pending ? "|p" : ""); (dd[k] = dd[k] || []).push(...g.moves); }
-        out.push("你从" + w + "拿的货（你欠他）：");
-        for (const [k, ms] of Object.entries(dd)) out.push(fmtD(k.split("|")[0]) + (k.endsWith("|p") ? "（预定，还没拿货）" : ""), ...ms.map(line));
-        out.push("小计 " + qtyText(addQty(x.gs)) + "，" + money(r2(x.gs.reduce((a, g) => a + g.cost, 0))));
-      }
-      const takes = byDate(x.xs.filter((t) => xferKind(t) === "take")), gives = byDate(x.xs.filter((t) => xferKind(t) === "give")), swaps = byDate(x.xs.filter((t) => xferKind(t) === "swap"));
-      if (takes.length) { out.push(w + "从你这拿的货（他欠你）："); for (const t of takes) out.push(fmtD(t.date), ...t.out.map(xline)); out.push("小计 " + money(r2(takes.reduce((a, t) => a + xferNet(t), 0)))); }
-      if (gives.length) { out.push(w + "给你的货（抵他欠你的）："); for (const t of gives) out.push(fmtD(t.date), ...t.in.map(xline)); out.push("小计 " + money(r2(-gives.reduce((a, t) => a + xferNet(t), 0)))); }
-      if (swaps.length) { out.push("换货："); for (const t of swaps) { const n = xferNet(t); out.push(fmtD(t.date) + "  你给" + w + "：" + xLines(t.out) + "；" + w + "给你：" + xLines(t.in) + (n ? "（差 " + money(Math.abs(n)) + "，" + (n > 0 ? w + "欠你" : "你欠" + w) + "）" : "（两边相等）")); } }
-      if (x.ps.length) { out.push("在" + w + "订的货（还没付款）："); for (const q of byDate(x.ps)) out.push(fmtD(q.date) + "  " + poLinesTxt(q) + "  " + money(poOweAmt(q))); }
-      const owe = r2(x.gs.reduce((a, g) => a + g.cost, 0) + x.ps.reduce((a, q) => a + poOweAmt(q), 0)), recv = r2(x.xs.reduce((a, t) => a + xferNet(t), 0)), net = r2(owe - recv);
-      out.push(net > 0 ? "结算：你付" + w + " " + money(net) : net < 0 ? "结算：" + w + "付你 " + money(-net) : "结算：两清");
-      return { text: out.join("\n"), net };
-    };
-    const blocks = Object.entries(byWho).map(([w, x]) => block(w, x));
-    const net = r2(blocks.reduce((a, b) => a + b.net, 0));
-    return title + "\n" + blocks.map((b) => b.text).join("\n\n") +
-      (paid != null && Math.abs(paid) !== Math.abs(net) ? "\n实际" + (net < 0 ? "收到 " : "付了 ") + money(Math.abs(paid)) : "");
+  function statementText(gs, title, paid, xs, pos, pend) {
+    const by = ledgerFrom(gs, xs, pos, pend), out = [title];
+    const days = (list) => byDay(list).flatMap((d) => [fmtD(d.date)].concat(d.lines.map((l) => "  " + l.k + " ×" + l.q)));
+    let net = 0;
+    for (const [w, x] of Object.entries(by)) {
+      out.push("");
+      if (x.inn.length) out.push("【调入 · 从" + w + "拿的货】", ...days(x.inn), "调入合计 " + money(x.tin) + (x.unk ? "（有拿货价没填）" : ""), "");
+      if (x.out.length) out.push("【调出 · " + w + "拿走的货】", ...days(x.out), "调出合计 " + money(x.tout), "");
+      if (x.po.length) { out.push("【订货 · 还没付】"); for (const q of x.po) { out.push(fmtD(q.date) + "  " + money(q.amt)); for (const l of q.lines) out.push("  " + l.k + " ×" + l.q); } out.push("订货合计 " + money(x.tpo), ""); }
+      if (x.pend.length) out.push("【预定 · 还没拿，不算进合计】", ...days(x.pend), "");
+      out.push([x.tin ? "调入 " + money(x.tin) : "", x.tpo ? "+ 订货 " + money(x.tpo) : "", x.tout ? "− 调出 " + money(x.tout) : ""].filter(Boolean).join(" ").replace(/^\+ /, "") + " = " + owedTxt(w, x.net) + " " + money(Math.abs(x.net)));
+      net += x.net;
+    }
+    net = r2(net);
+    return out.join("\n") + (paid != null && Math.abs(paid) !== Math.abs(net) ? "\n实际" + (net < 0 ? "收到 " : "付了 ") + money(Math.abs(paid)) : "");
   }
 
   async function copyText(t) {
@@ -3150,6 +3201,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   $("pt-settle").addEventListener("click", partnerSettleForm);
   $("resv-pick").addEventListener("click", (e) => { if (e.target.closest("#resv-pick-copy")) copyText("要找合伙人拿：\n" + (window.__resvPickText || "")); });
   $("f-owe").addEventListener("click", (e) => {
+    const lo = e.target.closest("[data-lg-open]"); if (lo) { ledgerSheet(lo.dataset.lgOpen); return; }
     const tg = e.target.closest("[data-pt-toggle]"); if (tg) { const w = tg.dataset.ptToggle; if (ptOpen.has(w)) ptOpen.delete(w); else ptOpen.add(w); renderFinance(); return; }
     const t = e.target.closest("[data-owe]"); if (!t) return;
     if (t.dataset.owe === "settle") partnerSettleForm(t.dataset.who || "");
@@ -3346,7 +3398,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const D = derive(), RV = reservedQty(), st = (i) => Math.max(0, D.st[i.sku] || 0) - (RV[i.sku] || 0), take = ptDir === "take";
     /* who owes whom, only where it isn't settled */
     const rows = S.loaded ? partnerNames().map((w) => [w, ptBal(w)]).filter((x) => Math.abs(x[1]) >= 0.01) : [];
-    $("ptx-bal").innerHTML = !S.loaded ? "" : rows.length ? rows.map(([w, b]) => '<div class="ptx-b"><span>' + (b > 0 ? esc(w) + " 欠你 <b>" + money(b) + "</b>" : "你欠 " + esc(w) + " <b>" + money(-b) + "</b>") + '</span><button class="btn small" type="button" data-ptx-settle="' + esc(w) + '">结账</button></div>').join("") : '<div class="ptx-b"><span>跟合伙人都两清了。</span></div>';
+    $("ptx-bal").innerHTML = !S.loaded ? "" : rows.length ? rows.map(([w, b]) => '<div class="ptx-b"><button class="owe-line" type="button" data-lg-open="' + esc(w) + '"><span>' + esc(owedTxt(w, -b)) + " <b>" + money(Math.abs(b)) + "</b>" + '</span><span class="pt-more">看账 ›</span></button><button class="btn small" type="button" data-ptx-settle="' + esc(w) + '">结账</button></div>').join("") : '<div class="ptx-b"><span>跟合伙人都两清了。</span></div>';
     $("ptx-dir").querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.pd === ptDir)));
     $("ptx-sec").classList.toggle("give", !take);
     $("ptx-h").textContent = take ? "点他拿走的口味" : "点你拿的口味";
@@ -3384,7 +3436,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   $("ptx-dir").addEventListener("click", (e) => { const c = e.target.closest("[data-pd]"); if (!c || c.dataset.pd === ptDir) return; ptDir = c.dataset.pd; try { localStorage.setItem(PD_KEY, ptDir); } catch (_) {} renderPartnerPage(); });
   $("ptx-tabs").addEventListener("click", (e) => { const c = e.target.closest("[data-pt-tab]"); if (!c) return; ptTab = c.dataset.ptTab; ptQuery = ""; $("ptx-q").value = ""; renderPartnerPage(); });
   $("ptx-q").addEventListener("input", (e) => { ptQuery = e.target.value; renderPartnerPage(); });
-  $("ptx-bal").addEventListener("click", (e) => { const b = e.target.closest("[data-ptx-settle]"); if (b) partnerSettleForm(b.dataset.ptxSettle); });
+  $("ptx-bal").addEventListener("click", (e) => { const lo = e.target.closest("[data-lg-open]"); if (lo) { ledgerSheet(lo.dataset.lgOpen); return; } const b = e.target.closest("[data-ptx-settle]"); if (b) partnerSettleForm(b.dataset.ptxSettle); });
   $("ptx-log").addEventListener("click", (e) => {
     if (e.target.closest("[data-ptx-more]")) { ptLogN += 20; renderPartnerPage(); return; }
     const v = e.target.closest("[data-void-xfer]"); if (v) arm(v, "确认撤销？", () => voidXfer(v.dataset.voidXfer));
