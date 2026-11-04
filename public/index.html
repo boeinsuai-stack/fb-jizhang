@@ -81,6 +81,8 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 2.4rem; line
 .btn:focus-visible, .chip:focus-visible, .switch a:focus-visible, .row-main:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pchips { margin-top: 6px; }
+.pchips .chip { padding: 6px 14px; font-size: .88rem; }
 .chip { font: inherit; font-size: .82rem; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
 .chip[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: transparent; font-weight: 500; }
 
@@ -990,12 +992,29 @@ details.restock > summary::-webkit-details-marker { display: none; }
   function openSheet(title, html, onSubmit, onMount) {
     $("sheet-title").textContent = title;
     $("sheet-form").innerHTML = html + '<p class="err" id="sheet-err" hidden></p><div class="sheet-actions"><button type="button" class="btn ghost" data-close="1">取消</button><button type="submit" class="btn primary" id="sheet-save">保存</button></div>';
+    enhancePartnerInputs();
     sheetCleanup.forEach((u) => u()); sheetCleanup = [];
     sheetSubmit = onSubmit;
     $("sheet").hidden = false;
     if (onMount) onMount();
     const first = $("sheet-form").querySelector("input, select, textarea");
     if (first) first.focus();
+  }
+  /* 合伙人输入框：下面放常用合伙人按钮，点一下就填上（iPhone 浏览器不太显示下拉候选，还会把它当成「姓名」去填你自己的名字） */
+  function enhancePartnerInputs() {
+    const names = partnerNames().slice(0, 6);
+    $("sheet-form").querySelectorAll('input[list="f-pnames"]').forEach((inp) => {
+      inp.setAttribute("autocorrect", "off"); inp.setAttribute("autocapitalize", "off"); inp.setAttribute("spellcheck", "false");
+      inp.name = "pf" + Math.random().toString(36).slice(2, 8);
+      if (!names.length) return;
+      const box = document.createElement("div"); box.className = "chips pchips";
+      box.innerHTML = names.map((n) => '<button type="button" class="chip" data-pname="' + esc(n) + '">' + esc(n) + "</button>").join("");
+      inp.insertAdjacentElement("afterend", box);
+      const sync = () => box.querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.pname === inp.value.trim())));
+      inp.addEventListener("input", () => { inp.dataset.touched = "1"; sync(); });
+      box.addEventListener("click", (e) => { const c = e.target.closest("[data-pname]"); if (!c) return; inp.value = c.dataset.pname; inp.dispatchEvent(new Event("input", { bubbles: true })); });
+      inp.__syncChips = sync; sync();
+    });
   }
   /* form-level listeners belong to one sheet; drop them when it closes so they don't fire on the next form */
   let sheetCleanup = [];
@@ -1067,7 +1086,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   /* who a pick-up came from: stored on the order as pick_from; the most recent name is the default */
   const partnerNames = () => { const ev = S.orders.map((o) => [o.at || "", o.pick_from]).concat(S.transfers.map((t) => [t.at || "", t.partner])).sort((a, b) => b[0].localeCompare(a[0])), seen = []; for (const [, x] of ev) { const n = (x || "").trim(); if (n && !seen.includes(n)) seen.push(n); } return seen; };
   const defaultPartner = () => { const o = S.orders.filter((x) => (x.pick_from || "").trim()).sort((a, b) => (b.at || "").localeCompare(a.at || ""))[0]; return o ? o.pick_from.trim() : partnerNames()[0] || ""; };
-  const pnameField = (val, hidden) => '<div class="field" id="f-pfrom-wrap"' + (hidden ? " hidden" : "") + '><label for="f-pfrom">找谁拿（合伙人名字）</label><input id="f-pfrom" list="f-pnames" autocomplete="off" placeholder="可以不填，之后在财务里补" value="' + esc(val || "") + '"><datalist id="f-pnames">' + partnerNames().map((n) => '<option value="' + esc(n) + '">').join("") + "</datalist></div>";
+  const pnameField = (val, hidden) => '<div class="field" id="f-pfrom-wrap"' + (hidden ? " hidden" : "") + '><label for="f-pfrom">找谁拿（合伙人）</label><input id="f-pfrom" list="f-pnames" autocomplete="off" placeholder="可以不填，之后在财务里补" value="' + esc(val || "") + '"><datalist id="f-pnames">' + partnerNames().map((n) => '<option value="' + esc(n) + '">').join("") + "</datalist></div>";
   const whoFrom = (o) => (o && o.pick_from) || "合伙人";
   async function commitSale(oid, lines, date, at, pfrom) {
     const Dn = derive(), RVx = reservedQty(oid);
@@ -1126,7 +1145,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   /* the one customer field shown up front: a name, optional */
   function custNameHtml(o) {
     o = o || {};
-    return '<div class="field"><label for="f-cust">客户名字（可不填）</label><input id="f-cust" list="dl-cust" autocomplete="off" placeholder="Marketplace 上的名字" value="' + esc(o.customer || "") + '"></div>' +
+    return '<div class="field"><label for="f-cust">客户（可不填）</label><input id="f-cust" list="dl-cust" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Marketplace 上的称呼" value="' + esc(o.customer || "") + '"></div>' +
       '<p class="hint" id="f-cust-hint" hidden></p>' + dlHtml("dl-cust", uniqVals((x) => x.customer));
   }
   /* the rest lives in the folded "更多" section */
@@ -1221,6 +1240,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const RVn = reservedQty(), short = Object.entries(want).map(([sku, q]) => [sku, Math.max(0, q - Math.max(0, (D.st[sku] || 0) - (RVn[sku] || 0)))]).filter((x) => x[1] > 0);
       const ph = $("f-pickhint"), resv = $("f-resv") && $("f-resv").checked;
       ph.hidden = !short.length; $("f-pfrom-wrap").hidden = !short.length;
+      const pf = $("f-pfrom"); if (short.length && !pf.value && !pf.dataset.touched) { pf.value = defaultPartner(); if (pf.__syncChips) pf.__syncChips(); } // 自动带上最近一次找的合伙人
       ph.textContent = short.length ? "手上不够，要找合伙人拿：" + short.map(([sku, q]) => nm(sku) + " ×" + q).join("、") + (resv ? "。预定先记着，结算时会记成合伙人拿货。" : "。保存时会自动记成合伙人拿货。") : "";
     }
     function updQuote() {
@@ -2141,7 +2161,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const avail = S.items.filter((i) => !isGeneric(i)).sort((a, b) => ((a.status === "停售") - (b.status === "停售")) || bySku(a, b));
     let n = 0;
     const html =
-      '<div class="field"><label for="f-cust">客户名字</label><input id="f-cust" list="dl-cust" autocomplete="off" placeholder="Marketplace 上的名字" value="' + esc((f && f.customer) || preName || "") + '"></div>' +
+      '<div class="field"><label for="f-cust">客户</label><input id="f-cust" list="dl-cust" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Marketplace 上的称呼" value="' + esc((f && f.customer) || preName || "") + '"></div>' +
       '<p class="hint" id="f-cust-hint" hidden></p>' + dlHtml("dl-cust", uniqVals((x) => x.customer).concat(S.followups.map((x) => x.customer).filter(Boolean)).filter((v, k, a) => a.indexOf(v) === k)) +
       '<div class="field"><label>想要的口味（可以不选）</label></div><div id="f-lines"></div>' +
       '<div><button type="button" class="btn ghost small" id="f-addline">+ 再加一种</button></div>' +
@@ -3188,13 +3208,16 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const RV = reservedQty(), all = S.items.filter((i) => !isGeneric(i)), st = (i) => Math.max(0, D.st[i.sku] || 0) - (RV[i.sku] || 0);
     const live = all.filter((i) => st(i) > 0);
     $("qo-live-n").textContent = S.loaded ? "（" + live.length + "）" : "";
-    $("qo-tabs").querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.qt === qoTab && !qoQuery.trim())));
+    $("qo-tabs").querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.qt === qoTab && (qoTab !== "live" || !qoQuery.trim()))));
     const ql = qoQuery.trim().toLowerCase();
-    let list = ql ? all.filter((i) => ql.split(/\s+/).every((t) => [i.sku, i.variant, i.name, i.series].join(" ").toLowerCase().includes(t)))
+    $("qo-q").placeholder = qoTab === "live" ? "搜口味（英文、中文都行）" : "在 " + qoTab + " 里搜口味";
+    const hit = (i) => ql.split(/\s+/).every((t) => [i.sku, i.variant, i.name, i.series].join(" ").toLowerCase().includes(t));
+    const inTab = qoTab !== "live" && ql; // 选了某个系列再搜：只在这个系列里找
+    let list = ql ? all.filter((i) => hit(i) && (!inTab || seriesOf(i) === qoTab))
       : qoTab === "live" ? live : all.filter((i) => seriesOf(i) === qoTab);
     const rank = (i) => (st(i) > 0 ? 0 : i.status === "停售" ? 2 : 1);
     list = list.slice().sort((a, b) => rank(a) - rank(b) || (rank(a) === 0 ? st(b) - st(a) : 0) || bySku(a, b));
-    const showSer = qoTab === "live" || !!ql;
+    const showSer = qoTab === "live";
     let recent = [];
     if (qoTab === "live" && !ql) {
       const since = ymd(new Date(Date.now() - 45 * 864e5)), cnt = {};
@@ -3219,7 +3242,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
         '<div class="t-more"><span>要别的口味？</span>' + allSeries().map((sr) => '<button type="button" class="chip" data-qt-go="' + esc(sr) + '">全部 ' + esc(sr) + "</button>").join("") + "<span>或者在上面搜</span></div>";
       renderCart(); return;
     }
-    $("qo-tiles").innerHTML = list.length ? list.map(tile).join("") : '<div class="empty">' + (ql ? "没有匹配的口味。" : "这个系列还没有口味。") + "</div>";
+    const elsewhere = inTab && !list.length ? all.filter(hit).length : 0;
+    $("qo-tiles").innerHTML = list.length ? list.map(tile).join("") : '<div class="empty">' + (ql ? (inTab ? qoTab + " 里没有匹配的口味。" + (elsewhere ? ' <button type="button" class="linkbtn" data-qt-go="live">在全部系列里找（' + elsewhere + " 个）</button>" : "") : "没有匹配的口味。") : "这个系列还没有口味。") + "</div>";
     renderCart();
   }
   function renderCart() {
