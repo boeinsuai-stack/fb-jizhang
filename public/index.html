@@ -512,6 +512,7 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 .serp.head { font-size: .74rem; color: var(--muted); border-bottom: 0; padding-bottom: 0; }
 .serp b { overflow-wrap: anywhere; }
 .serp small { display: block; font-size: .72rem; color: var(--warn); font-weight: 400; }
+.ol-pick.done { color: var(--accent); background: var(--accent-soft); }
 .ol-pick { font-style: normal; font-size: .74rem; font-weight: 600; color: var(--warn); background: var(--warn-soft); border-radius: 999px; padding: 1px 7px; margin-left: 6px; white-space: nowrap; }
 .pick-tag.done { color: var(--accent); background: var(--accent-soft); }
 .pick-tag { justify-self: start; font-size: .74rem; font-weight: 600; color: var(--warn); background: var(--warn-soft); border-radius: 999px; padding: 1px 8px; margin-top: 2px; }
@@ -1046,6 +1047,22 @@ details.restock > summary::-webkit-details-marker { display: none; }
     for (const l of ls) { const it = itemBy(l.sku), sr = seriesOf(it); if (!g[sr]) { g[sr] = []; ord.push(sr); } g[sr].push({ gen: isGeneric(it), t: nm(l.sku, l.name), q: l.qty, pk: short ? short[l.sku] || 0 : 0 }); }
     return ord.map((sr) => '<span class="ol-ser">' + esc(sr) + "</span>" + '<ul class="ol">' + g[sr].map((x) => "<li><span>" + esc(x.gen ? "口味" + (extra || "没记") : x.t) + (x.pk ? '<i class="ol-pick">找' + esc(short.__who || "合伙人") + "拿 " + x.pk + "</i>" : "") + "</span><b>×" + esc(x.q) + "</b></li>").join("") + "</ul>").join("");
   };
+  /* 分开找几个人拿的单：每一行后面一个小标签「找雷子拿」，手上的货在前，同一个人的排在一起（同一系列里）。
+     src = [{ label: "找杭子拿", cls: ""|"done", qty: {sku: 根数} }]；不加区头、不加色条 */
+  const skuQty = (ms) => { const t = {}; for (const m of ms || []) t[m.sku] = (t[m.sku] || 0) + (Number(m.qty) || 0); return t; };
+  function linesBySrc(o, src, extra) {
+    const ls = o.lines || [];
+    src = (src || []).filter((x) => Object.values(x.qty).some((q) => q > 0));
+    if (!src.length || !ls.length) return linesHtml(o, extra);
+    const used = {}; for (const x of src) for (const [k, q] of Object.entries(x.qty)) used[k] = (used[k] || 0) + q;
+    const rows = [];
+    for (const l of ls) { const q = Math.max(0, (Number(l.qty) || 0) - (used[l.sku] || 0)); if (q) rows.push({ l, q, tag: "" }); }
+    for (const x of src) for (const [sku, q] of Object.entries(x.qty)) if (q > 0) rows.push({ l: ls.find((l) => l.sku === sku) || { sku, name: nm(sku) }, q, tag: x.label, cls: x.cls || "" });
+    const g = {}, ord = [];
+    for (const r of rows) { const it = itemBy(r.l.sku), sr = seriesOf(it); if (!g[sr]) { g[sr] = []; ord.push(sr); } g[sr].push(Object.assign(r, { gen: isGeneric(it), t: nm(r.l.sku, r.l.name) })); }
+    return ord.map((sr) => '<span class="ol-ser">' + esc(sr) + "</span>" + '<ul class="ol">' + g[sr].map((x) => "<li><span>" + esc(x.gen ? "口味" + (extra || "没记") : x.t) +
+      (x.tag ? '<i class="ol-pick' + (x.cls ? " " + x.cls : "") + '">' + esc(x.tag) + "</i>" : "") + "</span><b>×" + esc(x.q) + "</b></li>").join("") + "</ul>").join("");
+  }
   /* order lines grouped by series, e.g. "Bar Pro：葡萄冰 ×1、芒果冰 ×1；Ali：香蕉 ×2" (generic pickup lines read "Bar Pro ×2") */
   const linesText = (o) => {
     const ls = o.lines || []; if (!ls.length) return "代送（只收配送费）";
@@ -1331,7 +1348,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     let n = 0;
     const splitter = pickSplitter(null);
     const html =
-      '<label class="check"><input type="checkbox" id="f-resv"' + (reserve ? " checked" : "") + '><span>只是预定（还没付款，之后在财务里「结算」）</span></label>' +
+      '<label class="check"><input type="checkbox" id="f-resv"' + (reserve ? " checked" : "") + '><span>只是预定（还没付款，之后在「客户」页顶部「结算」）</span></label>' +
       '<div class="lines-head"><span>香型</span><span>数量</span><span>单价 $</span><span></span></div>' +
       '<div id="f-lines"></div>' +
       '<div><button type="button" class="btn ghost small" id="f-addline">+ 再加一种香型</button></div>' +
@@ -1411,7 +1428,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const P = readPay(!resv, orderTotal({ lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
       await db.collection("orders").doc(oid).set(Object.assign({ status: resv ? "reserved" : "paid", date, at, lines, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, { payment: P.payment }, dropNulls({ pay_cash: P.pay_cash, pay_other: P.pay_other }), dropNulls(readCust(null)),
         lump != null ? { lump_total: lump } : {}, pfrom ? { pick_from: pfrom } : {}, pk.pick_split ? { pick_split: pk.pick_split } : {}));
-      if (resv) { if (onDone) onDone(); return "已记预定 " + lines.reduce((a, l) => a + l.qty, 0) + " 根。客人付款后到财务里点「结算」。"; }
+      if (resv) { if (onDone) onDone(); return "已记预定 " + lines.reduce((a, l) => a + l.qty, 0) + " 根。客人付款后到「客户」页顶部的预定里点「结算」。"; }
       const msg = "已记一笔卖出" + await commitSale(oid, lines, date, at, pfrom, pk.pick_split);
       if (onDone) onDone();
       return msg;
@@ -2163,7 +2180,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
         return '<div class="ord"><div class="ord-top"><div class="ord-what">' + payBadgeO(o) + (isPartner(o) ? ' <span class="tag">合伙人拿货</span>' : "") + belowPill(o) + "</div>" +
           '<span class="ord-btns"><button class="btn small ghost" type="button" data-edit-order="' + esc(o.id) + '">编辑</button>' +
           '<button class="btn small ghost danger" type="button" data-void-order="' + esc(o.id) + '">撤销</button></span></div>' +
-          '<div class="ord-lines">' + linesHtml(o, Array.isArray(o.photos) && o.photos.length ? "见照片" : "没记") + "</div>" +
+          '<div class="ord-lines">' + ((PKG[o.id] || []).length > 1 ? linesBySrc(o, PKG[o.id].map((g) => ({ label: "找" + gWho(g) + "拿", qty: skuQty(g.moves) })), Array.isArray(o.photos) && o.photos.length ? "见照片" : "没记") : linesHtml(o, Array.isArray(o.photos) && o.photos.length ? "见照片" : "没记")) + "</div>" +
           (PKG[o.id] ? PKG[o.id].map((g, gi, A) => { const n = g.moves.reduce((a, m) => a + (Number(m.qty) || 0), 0), u = g.known && n ? r2(g.cost / n) : null;
             return '<div class="ord-pick"><span>找 <b>' + esc(gWho(g)) + "</b> 拿 " + n + " 根 · 拿货成本 " + (g.known ? money(g.cost) + (g.moves.length === 1 && u != null ? "（" + money(u) + "/根）" : "") : '<span class="pill warn">未填</span>') + (g.sid ? " · 已结账" : "") + "</span>" +
               (gi === A.length - 1 ? '<button class="btn small" type="button" data-pt-cost="' + esc(o.id) + '">编辑</button>' : "") + "</div>"; }).join("") : "") +
@@ -4059,7 +4076,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const hay = (o) => [o.customer, o.suburb, o.note, o.pick_from, dq(o.date), ...(o.lines || []).map((l) => { const it = itemBy(l.sku); return [l.sku, l.name, it && it.variant, it && it.series].join(" "); })].join(" ").toLowerCase();
     const hits = S.orders.filter((o) => q.split(/\s+/).every((t) => hay(o).includes(t))).sort(moveSort);
     box.innerHTML = hits.length ? hits.slice(0, 60).map((o) => { const t = orderTotal(o);
-      return '<div class="lrow"><div><span class="l-date">' + fmtD(o.date) + (isReserved(o) ? " · 预定" : "") + (o.pick_from ? " · 找" + esc(o.pick_from) + "拿" : "") + "</span>" +
+      return '<div class="lrow"><div><span class="l-date">' + fmtD(o.date) + (isReserved(o) ? " · 预定" : "") + ((() => { const ws = [...new Set(S.moves.filter((m) => m.order_id === o.id && m.type === "in" && /-pick$/.test(m.batch_id || "")).map((m) => m.partner || whoFrom(o)).concat(Object.keys(Object.values(o.pick_split || {}).reduce((a, b) => Object.assign(a, b), {}))))]; return ws.length ? " · 找" + esc(ws.join("、")) + "拿" : o.pick_from ? " · 找" + esc(o.pick_from) + "拿" : ""; })()) + "</span>" +
         '<span class="l-desc"><b>' + esc(o.customer || "（没写名字）") + "</b> · " + esc(linesText(o)) + "</span></div>" +
         '<div class="l-amt">' + (t == null ? '<span class="pill warn">未定价</span>' : money(t)) + (o.payment ? payBadgeO(o) : "") + "</div>" +
         '<div class="l-actions"><button class="btn small" type="button" data-oq-edit="' + esc(o.id) + '">查看/编辑</button></div></div>'; }).join("") +
@@ -4095,7 +4112,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
         (pk ? '<span class="pick-tag">要找' + Object.entries(RW[o.id] || {}).map(([w, n]) => esc(w) + "拿 " + n + " 根").join("、") + "</span>" : "") +
         (PKO[o.id] ? PKO[o.id].map((g) => '<span class="pick-tag done">已从' + esc(gWho(g)) + "拿货 · " + (g.sid ? "已结账" : "还没结账") + "</span>").join("") : "") + "</span>" +
         '<span class="l-amt">' + (t == null ? '<span class="pill warn">未定价</span>' : money(t)) + "</span></summary>" +
-        '<div class="rv-body"><div class="l-desc">' + (o.payment ? payBadgeO(o) : "") + linesHtml(o, null, RS[o.id] ? Object.assign({ __who: Object.keys(RW[o.id] || {}).join("/") || o.pick_from || "" }, RS[o.id]) : null) + "</div>" + (custLine(o) ? '<span class="l-sub">' + esc(custLine(o)) + "</span>" : "") + (o.note ? '<span class="l-sub">' + esc(o.note) + "</span>" : "") +
+        '<div class="rv-body"><div class="l-desc">' + (o.payment ? payBadgeO(o) : "") + linesBySrc(o, RA.groups.filter((g) => g.oid === o.id).map((g) => ({ label: "找" + gWho(g) + "拿", qty: skuQty(g.moves) }))
+          .concat((PKO[o.id] || []).map((g) => ({ label: "找" + gWho(g) + "拿", cls: "done", qty: skuQty(g.moves) })))) + "</div>" + (custLine(o) ? '<span class="l-sub">' + esc(custLine(o)) + "</span>" : "") + (o.note ? '<span class="l-sub">' + esc(o.note) + "</span>" : "") +
         '<div class="l-actions"><button class="btn small primary" type="button" data-settle="' + esc(o.id) + '">结算</button><button class="btn small" type="button" data-edit-order="' + esc(o.id) + '">编辑</button><button class="btn small ghost danger" type="button" data-void-order="' + esc(o.id) + '">取消预定</button></div></div></details>'; }).join("");
 
   }
