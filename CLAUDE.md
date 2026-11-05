@@ -10,6 +10,9 @@
   - mcp → 只实现 `Google Drive / create_file`，用 Google Identity Services token（drive.file）
   - 同步状态小圆点：包住 DocumentReference.set/update/delete 和 WriteBatch.commit，用 waitForPendingWrites 判断已保存
 - `public/firebase-config.js`：Firebase 配置 + APP_CONFIG（只放指纹，不放邮箱）
+- `public/vendor/`：Firebase compat SDK 10.12.2（app/auth/firestore）和 xlsx 0.18.5，从 npm 包复制（去掉 sourceMappingURL）。
+  **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
+- `public/sw.js`：安装时预存 App + vendor；页面网络优先、3 秒超时用缓存；vendor 缓存优先；字体先用缓存
 - 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一
 
 ## 中转站（App ↔ Claude 版 的同步，2026-11 起）
@@ -27,6 +30,11 @@
   - 写入：一个 batch 里先写 `relay_undo/<清单id>`（before/after），再写数据、log（`l-c-…`，「（Claude 版同步）」）、`meta/relay_applied`
   - 撤销：标题下「已写入 N 条 · 撤销」，24 小时内可点；把 before 写回
   - 授权过期或旧授权没有读取权限时，右上角显示「中转站待更新 ↻」，点一下 = 重新授权 + 上传 + 检查改动
+
+## 一单分开找不同合伙人拿（2026-11-05）
+- 拿货流水 movements 可带 `partner`；订单可带 `pick_split {sku:{人:根数}}`（还没拿的部分怎么分）
+- 分开拿的单结账记在订单 `partner_settlements {人: 结账id}`；只找一个人的单照旧 `partner_settlement_id`
+- 没有这些字段的旧数据按订单 `pick_from` 算。代码：gWho、oSidFor、oSids、splitPick、pickSplitter；pickups()/resvAlloc() 按「单+人」分组
 
 ## 规则
 - 公开仓库：不要提交邮箱、人名、金额、客户数据、备份文件

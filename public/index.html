@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -90,6 +90,15 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 2.4rem; line
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .pchips { margin-top: 6px; }
+.split { display: grid; gap: 8px; }
+.split > .btn { justify-self: start; }
+#f-split { display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 10px; padding: 4px 12px; }
+.srow, .pcrow { display: grid; gap: 6px; padding: 8px 0; }
+.srow + .srow, .pcrow + .pcrow { border-top: 1px solid var(--line); }
+.srow { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.srow .sname small { display: block; color: var(--muted); font-size: .74rem; }
+.srow .chip, .pcw .chip { padding: 6px 12px; font-size: .86rem; }
+.pcw { margin-top: -2px; }
 .pchips .chip { padding: 6px 14px; font-size: .88rem; }
 .chip { font: inherit; font-size: .82rem; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
 .chip[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: transparent; font-weight: 500; }
@@ -915,7 +924,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="vendor/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -1163,19 +1172,72 @@ details.restock > summary::-webkit-details-marker { display: none; }
   const defaultPartner = () => { const o = S.orders.filter((x) => (x.pick_from || "").trim()).sort((a, b) => (b.at || "").localeCompare(a.at || ""))[0]; return o ? o.pick_from.trim() : partnerNames()[0] || ""; };
   const pnameField = (val, hidden) => '<div class="field" id="f-pfrom-wrap"' + (hidden ? " hidden" : "") + '><label for="f-pfrom">找谁拿（合伙人）</label><input id="f-pfrom" list="f-pnames" autocomplete="off" placeholder="可以不填，之后在财务里补" value="' + esc(val || "") + '"><datalist id="f-pnames">' + partnerNames().map((n) => '<option value="' + esc(n) + '">').join("") + "</datalist></div>";
   const whoFrom = (o) => (o && o.pick_from) || "合伙人";
-  async function commitSale(oid, lines, date, at, pfrom) {
+  /* 一单可以分别找不同的合伙人拿：拿货流水上记 partner（没记的沿用订单的 pick_from）；一组拿货 = 同一单 + 同一个人 */
+  const gWho = (g) => g.who || whoFrom(g.o);
+  /* 结账记号：分开拿的单按人记在 partner_settlements；以前的单只有 partner_settlement_id（对应 pick_from 那个人） */
+  const oSidFor = (o, who) => !o ? null : ((o.partner_settlements || {})[who] || (who === whoFrom(o) ? o.partner_settlement_id : null) || null);
+  const oSids = (o) => !o ? [] : [...new Set([o.partner_settlement_id].concat(Object.values(o.partner_settlements || {})).filter(Boolean))];
+  /* 要拿的 qty 根按 pick_split 分给各人，剩下的归 main → {人: 根数} */
+  function splitPick(split, main, sku, qty) {
+    const out = {}; let left = qty;
+    for (const [w, n] of Object.entries((split || {})[sku] || {})) { const t = Math.min(left, Number(n) || 0); if (t > 0) { out[w] = (out[w] || 0) + t; left -= t; } }
+    if (left > 0) { const m = main || "合伙人"; out[m] = (out[m] || 0) + left; }
+    return out;
+  }
+  /* 「分开拿：每根找不同的人」：在「找谁拿」下面，每根一行，点人名 */
+  function pickSplitter(init) {
+    const sel = {};
+    if (init) for (const [sku, by] of Object.entries(init)) { sel[sku] = []; for (const [w, n] of Object.entries(by)) for (let i = 0; i < n; i++) sel[sku].push(w); }
+    let open = !!(init && Object.keys(init).length), short = [];
+    const main = () => ($("f-pfrom") ? $("f-pfrom").value.trim() : "");
+    const html = '<div class="split" id="f-split-wrap" hidden><button type="button" class="btn ghost small" id="f-split-tog"></button><div id="f-split"></div></div>';
+    function paint() {
+      const wrap = $("f-split-wrap"); if (!wrap) return;
+      const tot = short.reduce((a, x) => a + x[1], 0), m = main(), names = partnerNames().slice(0, 4);
+      if (m && !names.includes(m)) names.unshift(m);
+      wrap.hidden = tot < 2 || names.length < 2 || ($("f-pfrom-wrap") && $("f-pfrom-wrap").hidden);
+      $("f-split-tog").textContent = open ? "收起：都找上面这个人拿" : "分开拿：每根找不同的人";
+      $("f-split").hidden = !open;
+      if (!open || wrap.hidden) return;
+      $("f-split").innerHTML = short.map(([sku, q]) => Array.from({ length: q }, (_, i) => { const w = (sel[sku] || [])[i] || m;
+        return '<div class="srow"><span class="sname">' + esc(nm(sku)) + (q > 1 ? "<small>第 " + (i + 1) + " 根</small>" : "") + '</span><span class="chips">' +
+          names.map((n) => '<button type="button" class="chip" data-sp="' + esc(sku) + '" data-si="' + i + '" data-sw="' + esc(n) + '" aria-pressed="' + (n === w) + '">' + esc(n) + "</button>").join("") + "</span></div>"; }).join("")).join("");
+    }
+    function bind() {
+      sheetOn("click", (e) => {
+        if (e.target.closest("#f-split-tog")) { open = !open; if (!open) for (const k of Object.keys(sel)) delete sel[k]; paint(); return; }
+        const b = e.target.closest("[data-sp]"); if (!b) return;
+        (sel[b.dataset.sp] = sel[b.dataset.sp] || [])[+b.dataset.si] = b.dataset.sw; paint();
+      });
+      sheetOn("input", (e) => { if (e.target.id === "f-pfrom") paint(); });
+    }
+    function setShort(x) { short = x; paint(); }
+    /* → { pick_from, pick_split（只有真的分给了两个以上的人才有） } */
+    function read() {
+      const m = main() || null;
+      if (!open || ($("f-split-wrap") && $("f-split-wrap").hidden)) return { pick_from: m, pick_split: null };
+      const by = {}, ws = new Set();
+      for (const [sku, q] of short) for (let i = 0; i < q; i++) { const w = (sel[sku] || [])[i] || m || "合伙人"; ws.add(w); (by[sku] = by[sku] || {})[w] = (by[sku][w] || 0) + 1; }
+      if (ws.size <= 1) return { pick_from: [...ws][0] || m, pick_split: null };
+      return { pick_from: m || [...ws][0], pick_split: by };
+    }
+    return { html, bind, setShort, read, paint };
+  }
+  async function commitSale(oid, lines, date, at, pfrom, split) {
     const Dn = derive(), RVx = reservedQty(oid);
     const picks = lines.map((l) => ({ l, qty: Math.max(0, l.qty - Math.max(0, (Dn.st[l.sku] || 0) - (RVx[l.sku] || 0))) })).filter((x) => x.qty > 0);
     await Promise.all(lines.map((l) => db.collection("movements").doc(oid + "-" + l.sku).set({ type: "out", sku: l.sku, name: l.name, qty: l.qty, date, at, order_id: oid })));
     if (!picks.length) return "，库存已扣。";
-    const bid = oid + "-pick";
-    { const o = S.orders.find((x) => x.id === oid), name = (pfrom != null ? pfrom : (o && o.pick_from) || "") || null;
-      if (name && (!o || o.pick_from !== name)) await db.doc("orders/" + oid).update({ pick_from: name }); }
+    const bid = oid + "-pick", o0 = S.orders.find((x) => x.id === oid), name = (pfrom != null ? pfrom : (o0 && o0.pick_from) || "") || null;
+    if (name && (!o0 || o0.pick_from !== name)) await db.doc("orders/" + oid).update({ pick_from: name });
+    { const spl = split !== undefined ? split : (o0 && o0.pick_split) || null, parts = [];
+      for (const x of picks) for (const [w, n] of Object.entries(splitPick(spl, name, x.l.sku, x.qty))) parts.push({ l: x.l, qty: n, who: w === "合伙人" && !name ? null : w });
+      picks.length = 0; picks.push(...parts); }
     const priced = picks.map((x) => { const c = numOrNull((itemBy(x.l.sku) || {}).cost_aud); return c == null ? null : r2(c * x.qty); });
     const total = priced.every((c) => c != null) ? r2(priced.reduce((a, c) => a + c, 0)) : null;
     const exPrev = S.expenses.find((x) => x.batch_id === bid), eid = total ? (exPrev ? exPrev.id : bid + "-cost") : null;
-    const mid = (sku) => bid + "-" + sku + (S.moves.some((m) => m.id === bid + "-" + sku) ? "-" + Date.now().toString(36) : "");
-    await Promise.all(picks.map((x, k) => db.collection("movements").doc(mid(x.l.sku)).set({ type: "in", sku: x.l.sku, name: x.l.name, qty: x.qty, date, at, order_id: oid, batch_id: bid, cost: total ? priced[k] : null, expense_id: eid, note: "按单向合伙人拿货" })));
+    const used = new Set(), mid = (sku) => { let id = bid + "-" + sku; if (used.has(id) || S.moves.some((m) => m.id === id)) id += "-" + Date.now().toString(36) + used.size; used.add(id); return id; };
+    await Promise.all(picks.map((x, k) => db.collection("movements").doc(mid(x.l.sku)).set(Object.assign({ type: "in", sku: x.l.sku, name: x.l.name, qty: x.qty, date, at, order_id: oid, batch_id: bid, cost: total ? priced[k] : null, expense_id: eid, note: "按单向合伙人拿货" }, x.who ? { partner: x.who } : {}))));
     if (eid && exPrev) await db.doc("expenses/" + exPrev.id).update({ amount: r2((Number(exPrev.amount) || 0) + total) });
     else if (eid) await db.collection("expenses").doc(eid).set({ date, at, amount: total, category: "进货成本", note: "按单拿货 " + picks.map((x) => nm(x.l.sku, x.l.name) + " ×" + x.qty).join("、"), batch_id: bid });
     return eid ? "，拿货成本 " + money(total) + " 已记入支出。" : "，拿货已记；有香型没填拿货价，成本可以之后补。";
@@ -1267,6 +1329,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const avail = S.items.filter((i) => !isGeneric(i)).sort((a, b) => ((a.status === "停售") - (b.status === "停售")) || bySku(a, b));
     if (!avail.length) { toast("还没有在售的香型，先「新增香型」。"); return; }
     let n = 0;
+    const splitter = pickSplitter(null);
     const html =
       '<label class="check"><input type="checkbox" id="f-resv"' + (reserve ? " checked" : "") + '><span>只是预定（还没付款，之后在财务里「结算」）</span></label>' +
       '<div class="lines-head"><span>香型</span><span>数量</span><span>单价 $</span><span></span></div>' +
@@ -1283,7 +1346,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
         '<div class="field"><label for="f-note">备注</label><input id="f-note" placeholder="取货方式、其他说明"></div>' +
         custMoreHtml(custPre) +
       "</div></details>" +
-      '<p class="callout" id="f-pickhint" hidden></p>' + pnameField("", true);
+      '<p class="callout" id="f-pickhint" hidden></p>' + pnameField("", true) + splitter.html;
     function addLine(sku, qty) {
       const k = n++;
       const row = document.createElement("div");
@@ -1316,6 +1379,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const ph = $("f-pickhint"), resv = $("f-resv") && $("f-resv").checked;
       ph.hidden = !short.length; $("f-pfrom-wrap").hidden = !short.length;
       const pf = $("f-pfrom"); if (short.length && !pf.value && !pf.dataset.touched) { pf.value = defaultPartner(); if (pf.__syncChips) pf.__syncChips(); } // 自动带上最近一次找的合伙人
+      splitter.setShort(short);
       ph.textContent = short.length ? "手上不够，要找合伙人拿：" + short.map(([sku, q]) => nm(sku) + " ×" + q).join("、") + (resv ? "。预定先记着，结算时会记成合伙人拿货。" : "。保存时会自动记成合伙人拿货。") : "";
     }
     function updQuote() {
@@ -1343,16 +1407,17 @@ details.restock > summary::-webkit-details-marker { display: none; }
       if (lump != null) spreadLump(lines, lump).forEach((u, k) => { lines[k].unit_price = u; });
       const fee = numOrNull($("f-fee").value);
       const oid = rid("o"), at = new Date().toISOString(), resv = $("f-resv").checked;
-      const pfrom = $("f-pfrom-wrap").hidden ? null : $("f-pfrom").value.trim();
+      const pk = $("f-pfrom-wrap").hidden ? { pick_from: null, pick_split: null } : splitter.read(), pfrom = pk.pick_from;
       const P = readPay(!resv, orderTotal({ lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
       await db.collection("orders").doc(oid).set(Object.assign({ status: resv ? "reserved" : "paid", date, at, lines, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, { payment: P.payment }, dropNulls({ pay_cash: P.pay_cash, pay_other: P.pay_other }), dropNulls(readCust(null)),
-        lump != null ? { lump_total: lump } : {}, pfrom ? { pick_from: pfrom } : {}));
+        lump != null ? { lump_total: lump } : {}, pfrom ? { pick_from: pfrom } : {}, pk.pick_split ? { pick_split: pk.pick_split } : {}));
       if (resv) { if (onDone) onDone(); return "已记预定 " + lines.reduce((a, l) => a + l.qty, 0) + " 根。客人付款后到财务里点「结算」。"; }
-      const msg = "已记一笔卖出" + await commitSale(oid, lines, date, at, pfrom);
+      const msg = "已记一笔卖出" + await commitSale(oid, lines, date, at, pfrom, pk.pick_split);
       if (onDone) onDone();
       return msg;
     }
     openSheet(reserve ? "记一笔预定" : "记一笔卖出", html, submit, () => {
+      splitter.bind();
       if (preset.length) preset.forEach((x) => addLine(x.sku, x.qty)); else addLine("");
       $("f-addline").addEventListener("click", () => { addLine(""); recalc(); });
       $("f-lines").addEventListener("click", (e) => {
@@ -1368,6 +1433,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   }
 
   function orderEditForm(id) {
+    let splitter = null;
     const o = S.orders.find((x) => x.id === id); if (!o) return;
     const lines = o.lines || [];
     const html =
@@ -1380,12 +1446,13 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="field"><label for="f-pay">付款方式</label><select id="f-pay">' + payOptions(o.payment) + "</select></div></div>" +
       mixRowHtml(o) +
       '<div class="field"><label for="f-note">备注</label><input id="f-note" value="' + esc(o.note || "") + '"></div>' +
-      (isReserved(o) && lines.length ? pnameField(o.pick_from || "", false) : "") +
+      (isReserved(o) && lines.length ? pnameField(o.pick_from || "", false) + (splitter = pickSplitter(o.pick_split || null)).html : "") +
       (lines.length ? lumpHtml(o.lump_total != null, o.lump_total) : "") +
       '<p class="total">合计<b id="f-total">–</b></p>' +
       '<p class="hint">数量改不了：要改数量，请撤销这单再重新记。</p>';
     const readLines = () => lines.map((l, k) => ({ qty: Number(l.qty) || 0, price: numOrNull($("f-price-" + k).value) }));
     openSheet(isReserved(o) ? "编辑预定" : "编辑订单", html, async () => {
+      const pk = $("f-pfrom") && splitter ? splitter.read() : null;
       needDb();
       const lump = lines.length ? readLump() : null;
       const newLines = lines.map((l, k) => { const p = lump != null ? null : numOrNull($("f-price-" + k).value); if (p != null && p < 0) throw userError("单价不能是负数。"); return { sku: l.sku, name: l.name, qty: l.qty, unit_price: p }; });
@@ -1393,7 +1460,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const fee = numOrNull($("f-fee").value);
       const date = $("f-date").value || o.date;
       const P = readPay(!isReserved(o), orderTotal({ lines: newLines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
-      await db.doc("orders/" + id).update(Object.assign({ date, lines: newLines, lump_total: lump, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, P, readCust(o), $("f-pfrom") ? { pick_from: $("f-pfrom").value.trim() || null } : {}));
+      await db.doc("orders/" + id).update(Object.assign({ date, lines: newLines, lump_total: lump, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, P, readCust(o), pk ? { pick_from: pk.pick_from || null, pick_split: pk.pick_split || null } : {}));
       if (date !== o.date) {
         await Promise.all(S.moves.filter((m) => m.order_id === id).map((m) => db.doc("movements/" + m.id).update({ date })));
         const px = S.expenses.find((x) => x.batch_id === id + "-pick");
@@ -1403,6 +1470,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }, () => {
       const upd = () => { lumpSync(); const fee = Number($("f-fee").value) || 0; $("f-total").textContent = lines.length ? totalText(readLines(), fee) : money(fee); mixSync(lines.length ? formTotalNum(readLines(), fee) : fee); };
       wireCust(id);
+      if ($("f-pfrom") && splitter) { splitter.bind(); splitter.setShort(Object.entries(resvAlloc().RS[id] || {})); }
       sheetOn("input", upd); sheetOn("change", upd); upd();
     });
   }
@@ -1411,8 +1479,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
     try {
       needDb();
       const o = S.orders.find((x) => x.id === id);
-      if (o && o.partner_settlement_id && !isReserved(o)) throw userError("这单的拿货已经跟合伙人结过账，先在财务底部「和合伙人的结账记录」里撤销那次结账。");
-      if (o && isReserved(o) && o.partner_settlement_id) {
+      if (o && oSids(o).length && !isReserved(o)) throw userError("这单的拿货已经跟合伙人结过账，先在财务底部「和合伙人的结账记录」里撤销那次结账。");
+      if (o && isReserved(o) && oSids(o).length) {
         /* paid the partner already: the sticks stay as stock, only the reservation goes */
         await Promise.all(S.moves.filter((m) => m.order_id === id && m.type === "in").map((m) => db.doc("movements/" + m.id).update({ order_id: null, note: "预定取消，拿到的货留作库存" })));
         await db.doc("orders/" + id).delete();
@@ -2085,7 +2153,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const wd = (x) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(x || ""); return m ? "周" + WD[new Date(+m[1], +m[2] - 1, +m[3]).getDay()] : ""; };
     const flav = (o) => { const ls = o.lines || []; if (!ls.length) return "代送 · 只收配送费"; const gen = ls.some((l) => isGeneric(itemBy(l.sku))), hasPh = Array.isArray(o.photos) && o.photos.length; return linesText(o) + (gen ? (hasPh ? "（口味见照片）" : "（口味没记）") : ""); };
     const kv = (k, v, cls) => '<div class="kv' + (cls ? " " + cls : "") + '"><span>' + k + "</span><b>" + v + "</b></div>";
-    const PKG = {}; for (const g of pickups()) PKG[g.oid] = g;
+    const PKG = {}; for (const g of pickups()) (PKG[g.oid] = PKG[g.oid] || []).push(g);
     if (!dayTouched || !dayOpen) dayOpen = new Set(FB.list.length ? [FB.list[0].date] : []);
     $("f-daily").innerHTML = !FB.list.length ? '<div class="empty card">' + (L ? "这个时间范围里还没有账目。" : "正在读取账目…") + "</div>" : FB.list.map((d) => {
       const flag = d.miss + d.unk, tc = r2(d.costAll + d.opex + d.shrink), done = !flag, net = r2(d.rev - tc);
@@ -2096,9 +2164,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
           '<span class="ord-btns"><button class="btn small ghost" type="button" data-edit-order="' + esc(o.id) + '">编辑</button>' +
           '<button class="btn small ghost danger" type="button" data-void-order="' + esc(o.id) + '">撤销</button></span></div>' +
           '<div class="ord-lines">' + linesHtml(o, Array.isArray(o.photos) && o.photos.length ? "见照片" : "没记") + "</div>" +
-          (PKG[o.id] ? (() => { const g = PKG[o.id], n = g.moves.reduce((a, m) => a + (Number(m.qty) || 0), 0), u = g.known && n ? r2(g.cost / n) : null;
-            return '<div class="ord-pick"><span>找 <b>' + esc(whoFrom(o)) + "</b> 拿 " + n + " 根 · 拿货成本 " + (g.known ? money(g.cost) + (g.moves.length === 1 && u != null ? "（" + money(u) + "/根）" : "") : '<span class="pill warn">未填</span>') + (g.sid ? " · 已结账" : "") + "</span>" +
-              ('<button class="btn small" type="button" data-pt-cost="' + esc(o.id) + '">编辑</button>') + "</div>"; })() : "") +
+          (PKG[o.id] ? PKG[o.id].map((g, gi, A) => { const n = g.moves.reduce((a, m) => a + (Number(m.qty) || 0), 0), u = g.known && n ? r2(g.cost / n) : null;
+            return '<div class="ord-pick"><span>找 <b>' + esc(gWho(g)) + "</b> 拿 " + n + " 根 · 拿货成本 " + (g.known ? money(g.cost) + (g.moves.length === 1 && u != null ? "（" + money(u) + "/根）" : "") : '<span class="pill warn">未填</span>') + (g.sid ? " · 已结账" : "") + "</span>" +
+              (gi === A.length - 1 ? '<button class="btn small" type="button" data-pt-cost="' + esc(o.id) + '">编辑</button>' : "") + "</div>"; }).join("") : "") +
           (sub ? '<span class="l-sub">' + sub + "</span>" : "") + ph +
           '<div class="ogrid">' + kv("收入", b.rev == null ? '<span class="pill warn">未填单价</span>' : money(b.rev)) + kv("其中配送费", mc(b.fee)) +
           kv("成本", b.cost == null ? '<span class="pill warn">缺进价</span>' : money(b.cost)) + kv("利润", b.gross == null ? "–" : money(b.gross), b.gross < 0 ? "neg" : "") + "</div></div>";
@@ -2130,7 +2198,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
         return '<div class="lrow"><div><span class="l-date">' + fmtD(o.date) + " · 收入 · " + (isPartner(o) ? "合伙人拿货卖出" : "卖出") + "</span>" +
           '<div class="l-desc">' + payBadgeO(o) + belowPill(o) + linesHtml(o) + "</div>" + (sub ? '<span class="l-sub">' + sub + "</span>" : "") + "</div>" +
           '<div class="l-amt in">' + (t == null ? '<span class="pill warn">未填单价</span>' : "+" + money(t)) + "</div>" +
-          '<div class="l-actions"><button class="btn small" type="button" data-edit-order="' + esc(o.id) + '">编辑</button>' + (o.partner_settlement_id ? '<span class="mv-side">拿货已结账</span>' : '<button class="btn small ghost danger" type="button" data-void-order="' + esc(o.id) + '">撤销这单</button>') + "</div></div>";
+          '<div class="l-actions"><button class="btn small" type="button" data-edit-order="' + esc(o.id) + '">编辑</button>' + (oSids(o).length ? '<span class="mv-side">拿货已结账</span>' : '<button class="btn small ghost danger" type="button" data-void-order="' + esc(o.id) + '">撤销这单</button>') + "</div></div>";
       }
       const x = r.x;
       return '<div class="lrow"><div><span class="l-date">' + fmtD(x.date) + " · 支出 · " + esc(x.category || "其他") + (x.category === "进货成本" ? "（算库存）" : "") + "</span>" +
@@ -2682,16 +2750,18 @@ details.restock > summary::-webkit-details-marker { display: none; }
   /* every partner pick-up, whether recorded here or created automatically when a sale ran short of stock */
   function pickups() {
     const by = {};
+    const OB = {}; for (const o of S.orders) OB[o.id] = o;
     for (const m of S.moves) {
       if (m.type !== "in" || !m.order_id || !/-pick$/.test(m.batch_id || "")) continue;
-      const g = by[m.order_id] || (by[m.order_id] = { oid: m.order_id, date: m.date, at: m.at, moves: [], qty: {}, cost: 0, known: true });
+      const who = m.partner || whoFrom(OB[m.order_id]), key = m.order_id + "|" + who;
+      const g = by[key] || (by[key] = { oid: m.order_id, who, date: m.date, at: m.at, moves: [], qty: {}, cost: 0, known: true });
       g.moves.push(m);
       const sr = seriesOf(itemBy(m.sku)); g.qty[sr] = (g.qty[sr] || 0) + (Number(m.qty) || 0);
       if (m.cost == null) g.known = false; else g.cost += Number(m.cost);
     }
     return Object.values(by).map((g) => {
       const o = S.orders.find((x) => x.id === g.oid) || null;
-      return Object.assign(g, { o, cost: r2(g.cost), sid: (o && o.partner_settlement_id) || null, photos: o && Array.isArray(o.photos) ? o.photos : [] });
+      return Object.assign(g, { o, cost: r2(g.cost), sid: oSidFor(o, g.who), photos: o && Array.isArray(o.photos) ? o.photos : [] });
     }).sort(moveSort);
   }
   /* reservations, earliest first, take stock on hand; a reservation first uses sticks already picked up for it.
@@ -2708,23 +2778,28 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const take = Math.min(q - mine, left[l.sku]), sh = q - mine - take; left[l.sku] -= take;
       if (sh > 0) (RS[o.id] = RS[o.id] || {})[l.sku] = sh;
     }
-    const groups = Object.entries(RS).map(([oid, need]) => {
-      const o = S.orders.find((x) => x.id === oid);
-      const moves = Object.entries(need).map(([sku, q]) => { const c = numOrNull((itemBy(sku) || {}).cost_aud); return { id: null, sku, name: nm(sku), qty: q, cost: c == null ? null : r2(c * q) }; });
-      const qty = {}; for (const m of moves) { const sr = seriesOf(itemBy(m.sku)); qty[sr] = (qty[sr] || 0) + m.qty; }
-      return { oid, o, date: o.date, at: o.at, moves, qty, cost: r2(moves.reduce((a, m) => a + (m.cost || 0), 0)), known: moves.every((m) => m.cost != null), sid: null, pending: true };
-    });
-    return { RS, groups };
+    const groups = [], RW = {};
+    for (const [oid, need] of Object.entries(RS)) {
+      const o = S.orders.find((x) => x.id === oid), per = {};
+      for (const [sku, q] of Object.entries(need)) for (const [w, n] of Object.entries(splitPick(o.pick_split, o.pick_from, sku, q))) (per[w] = per[w] || {})[sku] = n;
+      for (const [w, need2] of Object.entries(per)) {
+        const moves = Object.entries(need2).map(([sku, q]) => { const c = numOrNull((itemBy(sku) || {}).cost_aud); return { id: null, sku, name: nm(sku), qty: q, cost: c == null ? null : r2(c * q) }; });
+        const qty = {}; for (const m of moves) { const sr = seriesOf(itemBy(m.sku)); qty[sr] = (qty[sr] || 0) + m.qty; }
+        (RW[oid] = RW[oid] || {})[w] = moves.reduce((a, m) => a + m.qty, 0);
+        groups.push({ oid, o, who: w, date: o.date, at: o.at, moves, qty, cost: r2(moves.reduce((a, m) => a + (m.cost || 0), 0)), known: moves.every((m) => m.cost != null), sid: null, pending: true });
+      }
+    }
+    return { RS, RW, groups };
   }
   /* everything owed (picked up, not settled) or about to be owed (reserved, not picked up yet), optionally for one partner */
-  const partnerItems = (who) => pickups().filter((g) => !g.sid).filter((g) => !who || whoFrom(g.o) === who);
+  const partnerItems = (who) => pickups().filter((g) => !g.sid).filter((g) => !who || gWho(g) === who);
   /* 预定了、还没从合伙人那拿到的货：只提醒，不算进应付；拿到货（或客人结算）时才变成调入 */
-  const pendingPicks = (who) => resvAlloc().groups.filter((g) => !who || whoFrom(g.o) === who);
+  const pendingPicks = (who) => resvAlloc().groups.filter((g) => !who || gWho(g) === who);
   /* a reservation's pending pick-up becomes a real one (stock in, cost recorded) when it is settled with the partner */
   async function recordPrePick(g, date) {
     const bid = g.oid + "-pick", at = new Date().toISOString(), ex = S.expenses.find((x) => x.batch_id === bid), eid = ex ? ex.id : bid + "-cost";
     const all = g.moves.every((m) => m.cost != null);
-    await Promise.all(g.moves.map((m) => db.collection("movements").doc(bid + "-" + m.sku + "-r" + Date.now().toString(36)).set({ type: "in", sku: m.sku, name: m.name, qty: m.qty, date, at, order_id: g.oid, batch_id: bid, cost: m.cost, expense_id: all ? eid : null, note: "预定找合伙人拿货" })));
+    await Promise.all(g.moves.map((m) => db.collection("movements").doc(bid + "-" + m.sku + "-r" + Date.now().toString(36)).set({ type: "in", sku: m.sku, name: m.name, qty: m.qty, date, at, order_id: g.oid, batch_id: bid, cost: m.cost, expense_id: all ? eid : null, note: "预定找合伙人拿货", partner: g.who && g.who !== "合伙人" ? g.who : null })));
     if (all) {
       if (ex) await db.doc("expenses/" + ex.id).update({ amount: r2((Number(ex.amount) || 0) + g.cost) });
       else await db.collection("expenses").doc(eid).set({ date, at, amount: g.cost, category: "进货成本", note: "合伙人拿货（预定）" + qtyText(g.qty), batch_id: bid });
@@ -2745,8 +2820,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
   function ledgerFrom(gs, xs, ps, pend) {
     const by = {};
     const W = (w) => by[w] || (by[w] = { inn: [], out: [], po: [], pend: [], tin: 0, tout: 0, tpo: 0, tpend: 0, unk: false });
-    for (const g of pend || []) { const x = W(whoFrom(g.o)); x.pend.push({ date: g.date, at: g.at || "", oid: g.oid, lines: lnArr(g.moves) }); x.tpend += g.cost; }
-    for (const g of gs || []) { const x = W(whoFrom(g.o)); x.inn.push({ date: g.date, at: g.at || "", lines: lnArr(g.moves) }); x.tin += g.cost; if (!g.known) x.unk = true; }
+    for (const g of pend || []) { const x = W(gWho(g)); x.pend.push({ date: g.date, at: g.at || "", oid: g.oid, lines: lnArr(g.moves) }); x.tpend += g.cost; }
+    for (const g of gs || []) { const x = W(gWho(g)); x.inn.push({ date: g.date, at: g.at || "", lines: lnArr(g.moves) }); x.tin += g.cost; if (!g.known) x.unk = true; }
     for (const t of xs || []) { const x = W(xWho(t));
       if ((t.in || []).length) { x.inn.push({ date: t.date, at: t.at || "", lines: lnArr(t.in) }); x.tin += xLineVal(t.in); }
       if ((t.out || []).length) { x.out.push({ date: t.date, at: t.at || "", lines: lnArr(t.out) }); x.tout += xLineVal(t.out); } }
@@ -2947,28 +3022,47 @@ details.restock > summary::-webkit-details-marker { display: none; }
   }
 
   function pickCostForm(oid) {
-    const g = pickups().find((x) => x.oid === oid); if (!g) return;
-    const locked = !!g.sid;
-    const html = pnameField((g.o && g.o.pick_from) || "", false) + '<div class="fixed-line rcv-head"><span>香型</span><span>数量</span><span>拿货价 $/根</span></div>' +
-      g.moves.map((m, k) => '<div class="fixed-line"><span>' + esc(nm(m.sku, m.name)) + "</span><span>×" + esc(m.qty) + '</span><input id="f-uc-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" placeholder="未填" aria-label="' + esc(nm(m.sku, m.name)) + ' 拿货价" value="' + (m.cost == null ? "" : esc(r2(m.cost / m.qty))) + '"' + (locked ? " disabled" : "") + "></div>").join("") +
-      '<p class="total">拿货成本<b id="f-total">–</b></p><p class="hint">' + (locked ? "这笔已经结账，只能改名字；要改拿货价，先撤销那次结账。" : "只改这一笔，不影响默认拿货价；财务里的成本会一起更新。") + "</p>";
-    const read = () => g.moves.map((m, k) => numOrNull($("f-uc-" + k).value));
+    const gs = pickups().filter((x) => x.oid === oid); if (!gs.length) return;
+    const o = gs[0].o, anyLocked = gs.some((g) => g.sid), allLocked = gs.every((g) => g.sid), names = partnerNames().slice(0, 4);
+    for (const g of gs) if (!names.includes(gWho(g))) names.push(gWho(g));
+    /* 一行 = 一笔拿货流水（或拆开后的一根）；r.m 是原来那笔流水 */
+    let rows = []; for (const g of gs) for (const m of g.moves) rows.push({ m, q: Number(m.qty) || 0, who: gWho(g), u: m.cost == null ? null : r2(m.cost / (Number(m.qty) || 1)), locked: !!g.sid });
+    const rowHtml = (r, k) => '<div class="pcrow"><div class="fixed-line"><span>' + esc(nm(r.m.sku, r.m.name)) + "</span><span>×" + r.q + (r.q > 1 && !r.locked && names.length > 1 ? ' <button type="button" class="btn ghost small" data-pc-split="' + k + '">拆开</button>' : "") + '</span><input id="f-uc-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" placeholder="未填" aria-label="' + esc(nm(r.m.sku, r.m.name)) + ' 拿货价" value="' + (r.u == null ? "" : esc(r.u)) + '"' + (r.locked ? " disabled" : "") + "></div>" +
+      (names.length > 1 ? '<div class="chips pcw">' + names.map((n) => '<button type="button" class="chip" data-pc="' + k + '" data-pw="' + esc(n) + '" aria-pressed="' + (n === r.who) + '"' + (r.locked ? " disabled" : "") + ">" + esc(n) + "</button>").join("") + "</div>" : "") + "</div>";
+    const html = (allLocked ? "" : pnameField((o && o.pick_from) || "", false)) + '<div class="fixed-line rcv-head"><span>香型 · 找谁拿</span><span>数量</span><span>拿货价 $/根</span></div><div id="f-pcrows"></div>' +
+      '<p class="total">拿货成本<b id="f-total">–</b></p><p class="hint">' + (allLocked ? "这单的拿货已经结账，要改先撤销那次结账。" : (anyLocked ? "灰色的那部分已经结账，改不了。" : "") + "每一行可以选不同的人；多根同一个口味点「拆开」可以一根一根选。只改这一单，不影响默认拿货价。") + "</p>";
+    const keep = () => { rows.forEach((r, k) => { const el = $("f-uc-" + k); if (el) r.u = numOrNull(el.value); }); };
+    const paint = () => { $("f-pcrows").innerHTML = rows.map(rowHtml).join(""); upd(); };
+    const upd = () => { keep(); $("f-total").textContent = rows.some((r) => r.u == null) ? "未填全" : money(r2(rows.reduce((a, r) => a + r.u * r.q, 0))); };
     openSheet("编辑找合伙人拿货", html, async () => {
-      needDb();
-      const us = read(); if (us.some((u) => u != null && u < 0)) throw userError("拿货价不能是负数。");
-      const all = us.every((u) => u != null), total = r2(g.moves.reduce((a, m, k) => a + (us[k] || 0) * m.qty, 0));
+      needDb(); keep();
+      if (allLocked) return "这单已经结账，没有改动。";
+      if (rows.some((r) => r.u != null && r.u < 0)) throw userError("拿货价不能是负数。");
+      const all = rows.every((r) => r.u != null), total = r2(rows.reduce((a, r) => a + (r.u || 0) * r.q, 0));
       const bid = oid + "-pick", ex = S.expenses.find((x) => x.batch_id === bid), eid = ex ? ex.id : bid + "-cost";
-      const pname = $("f-pfrom").value.trim() || null;
-      if (g.o && (g.o.pick_from || null) !== pname) await db.doc("orders/" + g.o.id).update({ pick_from: pname });
-      if (locked) return pname ? "已改成找 " + pname + " 拿。" : "已保存。";
-      await Promise.all(g.moves.map((m, k) => db.doc("movements/" + m.id).update({ cost: us[k] == null ? null : r2(us[k] * m.qty), expense_id: all ? eid : null })));
+      const pname = $("f-pfrom") ? $("f-pfrom").value.trim() || null : null;
+      /* 同一笔流水拆出来的几行：同人同价的并回一行；第一行改原来那笔，其余新建 */
+      const byM = new Map(); for (const r of rows) { if (r.locked) continue; const L = byM.get(r.m) || []; const same = L.find((x) => x.who === r.who && x.u === r.u); if (same) same.q += r.q; else L.push({ who: r.who, u: r.u, q: r.q }); byM.set(r.m, L); }
+      const jobs = [], t36 = Date.now().toString(36);
+      for (const [m, L] of byM) L.forEach((x, j) => {
+        const f = { qty: x.q, cost: x.u == null ? null : r2(x.u * x.q), expense_id: all ? eid : null, partner: x.who === "合伙人" ? null : x.who };
+        if (j === 0) jobs.push(db.doc("movements/" + m.id).update(f));
+        else { const c = Object.assign({}, m, f); delete c.id; jobs.push(db.collection("movements").doc(m.id + "-s" + j + t36).set(c)); }
+      });
+      await Promise.all(jobs);
+      if (!anyLocked && o && pname !== (o.pick_from || null)) await db.doc("orders/" + o.id).update({ pick_from: pname });
       if (all && ex) await db.doc("expenses/" + ex.id).update({ amount: total });
-      else if (all) await db.collection("expenses").doc(eid).set({ date: g.date, at: g.at || new Date().toISOString(), amount: total, category: "进货成本", note: "合伙人拿货 " + qtyText(g.qty), batch_id: bid });
+      else if (all) await db.collection("expenses").doc(eid).set({ date: gs[0].date, at: gs[0].at || new Date().toISOString(), amount: total, category: "进货成本", note: "合伙人拿货 " + qtyText(addQty(gs)), batch_id: bid });
       else if (ex) await db.doc("expenses/" + ex.id).delete();
-      return (pname ? "找 " + pname + " 拿，" : "") + (all ? "拿货成本 " + money(total) + "。" : "还有没填的拿货价。");
+      const ws = [...new Set(rows.map((r) => r.who))];
+      return "找 " + ws.join("、") + " 拿，" + (all ? "拿货成本 " + money(total) + "。" : "还有没填的拿货价。");
     }, () => {
-      const upd = () => { const us = read(); $("f-total").textContent = us.some((u) => u == null) ? "未填全" : money(us.reduce((a, u, k) => a + u * g.moves[k].qty, 0)); };
-      sheetOn("input", upd); upd();
+      paint();
+      sheetOn("input", (e) => { if (e.target.id === "f-pfrom") { const v = e.target.value.trim(); if (v) { keep(); rows.forEach((r) => { if (!r.locked) r.who = v; }); paint(); } } else upd(); });
+      sheetOn("click", (e) => {
+        const sp = e.target.closest("[data-pc-split]"); if (sp) { keep(); const k = +sp.dataset.pcSplit, r = rows[k]; rows.splice(k, 1, ...Array.from({ length: r.q }, () => Object.assign({}, r, { q: 1 }))); paint(); return; }
+        const b = e.target.closest("[data-pc]"); if (b && !b.disabled) { keep(); rows[+b.dataset.pc].who = b.dataset.pw; paint(); }
+      });
     });
   }
 
@@ -3084,7 +3178,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const html =
       '<div class="field"><label for="f-date">结账日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
       '<div class="actions"><button type="button" class="btn ghost small" id="f-all">全选</button><button type="button" class="btn ghost small" id="f-none">全不选</button></div>' +
-      (open.length ? '<p class="xs-h">调入 · 随客户订单拿的货</p><div class="picks">' + open.map((g, k) => '<label class="check"><input type="checkbox" id="f-g-' + k + '"' + (on(whoFrom(g.o)) ? " checked" : "") + "><span>" + fmtD(g.date) + " · " + esc(whoFrom(g.o)) + " · " + esc(qtyText(g.qty)) + " · " + (g.known ? money(g.cost) : "未填拿货价") + (g.pending ? "（预定" + ((g.o.note || "").split(/[（(，,·]/)[0].trim() ? " · " + esc((g.o.note || "").split(/[（(，,·]/)[0].trim()) : "") + "，还没拿货；结账时记成已拿货）" : "") + "</span></label>").join("") + "</div>" : "") +
+      (open.length ? '<p class="xs-h">调入 · 随客户订单拿的货</p><div class="picks">' + open.map((g, k) => '<label class="check"><input type="checkbox" id="f-g-' + k + '"' + (on(gWho(g)) ? " checked" : "") + "><span>" + fmtD(g.date) + " · " + esc(gWho(g)) + " · " + esc(qtyText(g.qty)) + " · " + (g.known ? money(g.cost) : "未填拿货价") + (g.pending ? "（预定" + ((g.o.note || "").split(/[（(，,·]/)[0].trim() ? " · " + esc((g.o.note || "").split(/[（(，,·]/)[0].trim()) : "") + "，还没拿货；结账时记成已拿货）" : "") + "</span></label>").join("") + "</div>" : "") +
       (pos.length ? '<p class="xs-h">订货 · 还没付</p><div class="picks">' + pos.map((x, k) => '<label class="check"><input type="checkbox" id="f-po-' + k + '"' + (on(poWho(x)) ? " checked" : "") + "><span>" + fmtD(x.date) + " · " + esc(poWho(x)) + " · " + esc(poLinesTxt(x)) + " · " + money(poOweAmt(x)) + "</span></label>").join("") + "</div>" : "") +
       (xs.length ? '<p class="xs-h">往来 · 调入 / 调出 / 换货</p><div class="picks">' + xs.map((t, k) => '<label class="check"><input type="checkbox" id="f-x-' + k + '"' + (on(xWho(t)) ? " checked" : "") + "><span>" + fmtD(t.date) + " · " + esc(xferText(t)) + "</span></label>").join("") + "</div>" : "") +
       '<p class="total" id="f-net">–</p>' +
@@ -3094,16 +3188,22 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<p class="hint">结账只是标记这些账已经两边算清，不会再记一次成本（拿货时已经记过）。</p>';
     const selG = () => open.filter((g, k) => $("f-g-" + k).checked), selX = () => xs.filter((t, k) => $("f-x-" + k).checked), selP = () => pos.filter((x, k) => $("f-po-" + k).checked);
     const netOf = () => { const gs = selG(), ts = selX(), ps = selP(); const pick = r2(gs.reduce((a, g) => a + g.cost, 0)), poSum = r2(ps.reduce((a, x) => a + poOweAmt(x), 0)), owe = r2(pick + poSum), recv = r2(ts.reduce((a, t) => a + xferNet(t), 0)); return { gs, ts, ps, pick, poSum, owe, recv, net: r2(owe - recv) }; };
-    const whoTxt = () => { const { gs, ts, ps } = netOf(); const ws = [...new Set(gs.map((g) => whoFrom(g.o)).concat(ts.map(xWho)).concat(ps.map(poWho)))]; return ws.length === 1 ? ws[0] : "合伙人"; };
+    const whoTxt = () => { const { gs, ts, ps } = netOf(); const ws = [...new Set(gs.map(gWho).concat(ts.map(xWho)).concat(ps.map(poWho)))]; return ws.length === 1 ? ws[0] : "合伙人"; };
     openSheet(who ? "跟" + who + "结账" : "跟合伙人结账", html, async () => {
       needDb();
       const { gs, ts, ps, net } = netOf(); if (!gs.length && !ts.length && !ps.length) throw userError("至少勾一笔。");
       const paidIn = numOrNull($("f-paid").value); if (paidIn != null && paidIn < 0) throw userError("金额不能是负数。");
       const sid = rid("s"), date = $("f-date").value || today(), paid = paidIn == null ? net : (net < 0 ? -paidIn : paidIn);
       for (const g of gs.filter((g) => g.pending)) await recordPrePick(g, date);
-      const whos = [...new Set(gs.map((g) => whoFrom(g.o)).concat(ts.map(xWho)).concat(ps.map(poWho)))];
+      const whos = [...new Set(gs.map(gWho).concat(ts.map(xWho)).concat(ps.map(poWho)))];
       await db.collection("settlements").doc(sid).set({ date, at: new Date().toISOString(), order_ids: gs.map((g) => g.oid), transfer_ids: ts.map((t) => t.id), po_ids: ps.map((x) => x.id), qty: addQty(gs), amount: net, partner: whos.join("、"), paid, payment: $("f-pay").value || null, note: $("f-note").value.trim() });
-      await Promise.all(gs.map((g) => db.doc("orders/" + g.oid).update({ partner_settlement_id: sid })).concat(ts.map((t) => db.doc("transfers/" + t.id).update({ partner_settlement_id: sid })))
+      /* 只找一个人拿的单照旧记 partner_settlement_id；分开找几个人拿的单按人记 partner_settlements */
+      const byO = {}; for (const g of gs) (byO[g.oid] = byO[g.oid] || []).push(g);
+      const allW = (oid) => new Set(pickups().filter((g) => g.oid === oid).concat(resvAlloc().groups.filter((g) => g.oid === oid)).map(gWho));
+      const oMarks = Object.entries(byO).map(([oid, list]) => { const o = S.orders.find((x) => x.id === oid) || {}, ws = allW(oid); list.forEach((g) => ws.add(gWho(g)));
+        if (ws.size <= 1 && !o.partner_settlements) return db.doc("orders/" + oid).update({ partner_settlement_id: sid });
+        const mp = Object.assign({}, o.partner_settlements || {}); list.forEach((g) => { mp[gWho(g)] = sid; }); return db.doc("orders/" + oid).update({ partner_settlements: mp }); });
+      await Promise.all(oMarks.concat(ts.map((t) => db.doc("transfers/" + t.id).update({ partner_settlement_id: sid })))
         .concat(ps.map((x) => db.doc("purchases/" + x.id).update({ paid: true, paid_date: date, settlement_id: sid, payment: $("f-pay").value || null }))));
       const w = whos.join("、");
       return "已跟" + w + "结账：" + (paid > 0 ? "你付" + w + " " + money(paid) : paid < 0 ? w + "付你 " + money(-paid) : "两清") + "。";
@@ -3123,7 +3223,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
     try {
       needDb();
       const ids = S.orders.filter((o) => o.partner_settlement_id === sid).map((o) => o.id);
-      await Promise.all(ids.map((id) => db.doc("orders/" + id).update({ partner_settlement_id: null })).concat(S.transfers.filter((t) => t.partner_settlement_id === sid).map((t) => db.doc("transfers/" + t.id).update({ partner_settlement_id: null })))
+      const sp = S.orders.filter((o) => Object.values(o.partner_settlements || {}).includes(sid)).map((o) => { const mp = Object.assign({}, o.partner_settlements); for (const k of Object.keys(mp)) if (mp[k] === sid) delete mp[k]; return db.doc("orders/" + o.id).update({ partner_settlements: mp }); });
+      await Promise.all(ids.map((id) => db.doc("orders/" + id).update({ partner_settlement_id: null })).concat(sp).concat(S.transfers.filter((t) => t.partner_settlement_id === sid).map((t) => db.doc("transfers/" + t.id).update({ partner_settlement_id: null })))
         .concat(S.purchases.filter((x) => x.settlement_id === sid).map((x) => db.doc("purchases/" + x.id).update({ paid: false, paid_date: null, settlement_id: null }))));
       await db.doc("settlements/" + sid).delete();
       toast("已撤销这次结账，这些拿货回到未结账。");
@@ -3454,7 +3555,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   let ptLogWho = "";
   function historyRows() {
     const rows = [];
-    for (const g of pickups()) rows.push({ t: "in", date: g.date, at: g.at || "", who: whoFrom(g.o), lines: lnArr(g.moves), amt: g.cost, done: g.sid ? "已结" : "", src: "随单" });
+    for (const g of pickups()) rows.push({ t: "in", date: g.date, at: g.at || "", who: gWho(g), lines: lnArr(g.moves), amt: g.cost, done: g.sid ? "已结" : "", src: "随单" });
     for (const t of S.transfers) { const k = xferKind(t);
       rows.push({ t: k === "take" ? "out" : k === "give" ? "in" : "swap", date: t.date, at: t.at || "", who: xWho(t), x: t, id: t.id, lines: k === "take" ? lnArr(t.out) : k === "give" ? lnArr(t.in) : [], amt: Math.abs(xferNet(t)), done: t.partner_settlement_id ? "已结" : t.closed ? "两清" : "" }); }
     for (const q of S.purchases) if (q.supplier || q.paid === false) rows.push({ t: "po", date: q.date, at: q.at || "", who: poWho(q), id: q.id, amt: poOweAmt(q), done: poUnpaid(q) ? "" : "已付" + (q.paid_date ? " " + fmtD(q.paid_date) : ""),
@@ -3911,7 +4012,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const need = {}; for (const l of o.lines || []) if (l.sku) need[l.sku] = (need[l.sku] || 0) + (Number(l.qty) || 0);
       const keys = new Set(Object.keys(need).concat(Object.keys(got)));
       for (const k of keys) if ((need[k] || 0) !== (got[k] || 0)) out.push({ text: "订单（" + who(o) + "）的 " + nm(k) + " 卖了 " + (need[k] || 0) + " 根，库存却扣了 " + (got[k] || 0) + " 根。" });
-      if (o.partner_settlement_id && !(ST[o.partner_settlement_id] && (ST[o.partner_settlement_id].order_ids || []).includes(o.id))) out.push({ text: "订单（" + who(o) + "）标着已和合伙人结账，但找不到那次结账。" });
+      if (oSids(o).some((sx) => !(ST[sx] && (ST[sx].order_ids || []).includes(o.id)))) out.push({ text: "订单（" + who(o) + "）标着已和合伙人结账，但找不到那次结账。" });
     }
     for (const x of S.expenses) {
       if (!x.batch_id) continue;
@@ -3927,7 +4028,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       if (t.partner_settlement_id && !(ST[t.partner_settlement_id] && (ST[t.partner_settlement_id].transfer_ids || []).includes(t.id))) out.push({ text: "和 " + xWho(t) + " 的往来（" + fmtD(t.date) + "）标着已结账，但找不到那次结账。" });
     }
     for (const x of S.settles) {
-      for (const id of x.order_ids || []) if (!O[id] || O[id].partner_settlement_id !== x.id) out.push({ text: "结账（" + fmtD(x.date) + "）里有一单已经不在或没标成已结账。" });
+      for (const id of x.order_ids || []) if (!O[id] || !oSids(O[id]).includes(x.id)) out.push({ text: "结账（" + fmtD(x.date) + "）里有一单已经不在或没标成已结账。" });
       for (const id of x.transfer_ids || []) if (!T[id] || T[id].partner_settlement_id !== x.id) out.push({ text: "结账（" + fmtD(x.date) + "）里有一笔往来已经不在或没标成已结账。" });
     }
     const D = derive(), wake = [];
@@ -3980,7 +4081,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }).join("");
 
     const resv = S.orders.filter(isReserved).sort(moveSort);
-    const RS = resvAlloc().RS;
+    const RA = resvAlloc(), RS = RA.RS, RW = RA.RW, PKO = {}; for (const g of pickups()) (PKO[g.oid] = PKO[g.oid] || []).push(g);
     $("resv-pick").hidden = true;
     $("resv-sec").hidden = !resv.length;
     const rvN = resv.reduce((a, o) => a + (o.lines || []).reduce((b, l) => b + (Number(l.qty) || 0), 0), 0);
@@ -3991,10 +4092,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const pk = RS[o.id] ? Object.values(RS[o.id]).reduce((a, x) => a + x, 0) : 0;
       return '<details class="rv"><summary><span class="rv-main"><span class="l-date"><span class="tag-resv">预定</span>' + fmtD(o.date) + "</span>" +
         "<b>" + esc(who || "（没写客人名字）") + "</b>" + '<span class="l-sub">' + esc(serTxt(serQty([o]))) + "</span>" +
-        (pk ? '<span class="pick-tag">要找' + esc(whoFrom(o)) + "拿 " + pk + " 根</span>" : "") +
-        (o.partner_settlement_id ? '<span class="pick-tag done">已从' + esc(whoFrom(o)) + "拿货 · 已结账</span>" : S.moves.some((m) => m.order_id === o.id && m.type === "in") ? '<span class="pick-tag done">已从' + esc(whoFrom(o)) + "拿货 · 还没结账</span>" : "") + "</span>" +
+        (pk ? '<span class="pick-tag">要找' + Object.entries(RW[o.id] || {}).map(([w, n]) => esc(w) + "拿 " + n + " 根").join("、") + "</span>" : "") +
+        (PKO[o.id] ? PKO[o.id].map((g) => '<span class="pick-tag done">已从' + esc(gWho(g)) + "拿货 · " + (g.sid ? "已结账" : "还没结账") + "</span>").join("") : "") + "</span>" +
         '<span class="l-amt">' + (t == null ? '<span class="pill warn">未定价</span>' : money(t)) + "</span></summary>" +
-        '<div class="rv-body"><div class="l-desc">' + (o.payment ? payBadgeO(o) : "") + linesHtml(o, null, RS[o.id] ? Object.assign({ __who: o.pick_from || "" }, RS[o.id]) : null) + "</div>" + (custLine(o) ? '<span class="l-sub">' + esc(custLine(o)) + "</span>" : "") + (o.note ? '<span class="l-sub">' + esc(o.note) + "</span>" : "") +
+        '<div class="rv-body"><div class="l-desc">' + (o.payment ? payBadgeO(o) : "") + linesHtml(o, null, RS[o.id] ? Object.assign({ __who: Object.keys(RW[o.id] || {}).join("/") || o.pick_from || "" }, RS[o.id]) : null) + "</div>" + (custLine(o) ? '<span class="l-sub">' + esc(custLine(o)) + "</span>" : "") + (o.note ? '<span class="l-sub">' + esc(o.note) + "</span>" : "") +
         '<div class="l-actions"><button class="btn small primary" type="button" data-settle="' + esc(o.id) + '">结算</button><button class="btn small" type="button" data-edit-order="' + esc(o.id) + '">编辑</button><button class="btn small ghost danger" type="button" data-void-order="' + esc(o.id) + '">取消预定</button></div></div></details>'; }).join("");
 
   }
