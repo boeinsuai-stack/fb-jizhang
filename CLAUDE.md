@@ -9,6 +9,9 @@
   - user → Firebase Auth（邮箱/密码）；用户按邮箱 SHA-256 指纹映射显示名和旧 ID
   - mcp → 只实现 `Google Drive / create_file`，用 Google Identity Services token（drive.file）
   - 同步状态小圆点：包住 DocumentReference.set/update/delete 和 WriteBatch.commit，用 waitForPendingWrites 判断已保存
+  - **没网也能记账（2026-11-08）**：Firestore 写入的 promise 要等云端确认，没网时永远不完成 → 包装后改成「写进本地缓存就完成」
+    （读一次 cache 排在写入后面当标记 + 等一拍让 onSnapshot 跑完）。云端拒收另外计数，右上角红字显示。不要去掉这层
+  - 登录：1.5 秒内 Firebase 还没确认登录，就用 localStorage `fb-last-user`（上次登录的人）先打开；确认后换人则刷新
 - `public/firebase-config.js`：Firebase 配置 + APP_CONFIG（只放指纹，不放邮箱）
 - `public/vendor/`：Firebase compat SDK 10.12.2（app/auth/firestore）和 xlsx 0.18.5，从 npm 包复制（去掉 sourceMappingURL）。
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
@@ -40,7 +43,13 @@
 - 公开仓库：不要提交邮箱、人名、金额、客户数据、备份文件
 - 记账流程要快：快速下单在最上面，记一笔不能强制填客户信息
 - 定价策略不进 App
-- 改完先用 Playwright + 模拟 Firebase 跑一遍（打开、记一笔卖出、检查订单/流水/操作记录各 +1）再推送
+- 改完先跑 `python3 tests/test_offline_resv.py`（Playwright + /usr/bin/google-chrome + tests/mockfb.js，手机尺寸）再推送；新功能把测试加进 tests/
+  - tests/mockfb.js 照真 Firestore 离线时的样子：本地马上更新，`__MOCK_OFFLINE` 时 set/update 的 promise 永远不完成。**不要改成立刻返回成功**，那样测不出离线问题
+  - 测试数据里合伙人用「合伙人甲/乙」，不要用真名
+
+## 编辑预定（feat11，2026-11-09）
+- 预定的「编辑」= saleForm(null, true, null, null, 订单)：口味/数量/行都能改。已从合伙人拿到、但口味换掉或数量减少的流水：order_id 清空、备注「预定改了，拿到的货留作库存」，拿货支出不动
+- 已卖出的单仍走 orderEditForm（数量锁住）
 
 ## 已知问题
-- 每个集合只加载 1000 条（`limit(1000)`），库存流水预计 2027-01 底超限 → 需要月度结账改造
+- 每个集合 `limit(1000)` 且没有 orderBy：Firestore 按文档 ID 排序取前 1000 条，ID 里带日期 → 超过之后**丢的是最新的记录**，没有提示。库存流水预计 2027-01 底超限，12 月前要改（按月结账 / 只读最近 N 个月 + 期初结余）

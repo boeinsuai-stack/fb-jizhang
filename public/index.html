@@ -1340,30 +1340,32 @@ details.restock > summary::-webkit-details-marker { display: none; }
     return a.join(" · ");
   }
 
-  function saleForm(pre, reserve, onDone, custPre) {
+  function saleForm(pre, reserve, onDone, custPre, edit) {
     const D = derive();
+    /* edit = 一个还没结算的预定：用下单同一张表，口味、数量、行都能改（预定还没出库，改了不影响库存） */
+    if (edit) { pre = (edit.lines || []).map((l) => ({ sku: l.sku, qty: Number(l.qty) || 1, price: l.unit_price })); reserve = true; custPre = edit; }
     const preset = Array.isArray(pre) ? pre : pre ? [{ sku: pre, qty: 1 }] : [];
     const avail = S.items.filter((i) => !isGeneric(i)).sort((a, b) => ((a.status === "停售") - (b.status === "停售")) || bySku(a, b));
     if (!avail.length) { toast("还没有在售的香型，先「新增香型」。"); return; }
     let n = 0;
-    const splitter = pickSplitter(null);
+    const splitter = pickSplitter(edit ? edit.pick_split || null : null);
     const html =
-      '<label class="check"><input type="checkbox" id="f-resv"' + (reserve ? " checked" : "") + '><span>只是预定（还没付款，之后在「客户」页顶部「结算」）</span></label>' +
+      (edit ? '<input type="checkbox" id="f-resv" checked hidden>' : '<label class="check"><input type="checkbox" id="f-resv"' + (reserve ? " checked" : "") + '><span>只是预定（还没付款，之后在「客户」页顶部「结算」）</span></label>') +
       '<div class="lines-head"><span>香型</span><span>数量</span><span>单价 $</span><span></span></div>' +
       '<div id="f-lines"></div>' +
       '<div><button type="button" class="btn ghost small" id="f-addline">+ 再加一种香型</button></div>' +
-      lumpHtml(false, null) +
-      '<div class="grid2"><div class="field"><label for="f-pay">付款方式</label><select id="f-pay">' + payOptions("") + "</select></div>" +
-      '<div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0"></div></div>' +
-      mixRowHtml(null) +
+      lumpHtml(!!edit && edit.lump_total != null, edit ? edit.lump_total : null) +
+      '<div class="grid2"><div class="field"><label for="f-pay">付款方式</label><select id="f-pay">' + payOptions(edit ? edit.payment : "") + "</select></div>" +
+      '<div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="' + esc(edit && edit.delivery_fee ? edit.delivery_fee : "") + '"></div></div>' +
+      mixRowHtml(edit || null) +
       custNameHtml(custPre) +
       '<p class="total">合计<b id="f-total">–</b></p>' +
       '<details class="more" id="f-more"><summary id="f-more-sum">更多：日期、备注、客户资料</summary><div class="more-body">' +
-        '<div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
-        '<div class="field"><label for="f-note">备注</label><input id="f-note" placeholder="取货方式、其他说明"></div>' +
+        '<div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + esc((edit && edit.date) || today()) + '"></div>' +
+        '<div class="field"><label for="f-note">备注</label><input id="f-note" placeholder="取货方式、其他说明" value="' + esc(edit ? edit.note || "" : "") + '"></div>' +
         custMoreHtml(custPre) +
       "</div></details>" +
-      '<p class="callout" id="f-pickhint" hidden></p>' + pnameField("", true) + splitter.html;
+      '<p class="callout" id="f-pickhint" hidden></p>' + pnameField(edit ? edit.pick_from || "" : "", true) + splitter.html;
     function addLine(sku, qty) {
       const k = n++;
       const row = document.createElement("div");
@@ -1392,7 +1394,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       updQuote();
       const want = {};
       $("f-lines").querySelectorAll(".line").forEach((row) => { const k = row.dataset.line, sku = $("f-sku-" + k).value; if (sku) want[sku] = (want[sku] || 0) + (Number($("f-qty-" + k).value) || 0); });
-      const RVn = reservedQty(), short = Object.entries(want).map(([sku, q]) => [sku, Math.max(0, q - Math.max(0, (D.st[sku] || 0) - (RVn[sku] || 0)))]).filter((x) => x[1] > 0);
+      const RVn = reservedQty(edit ? edit.id : undefined), short = Object.entries(want).map(([sku, q]) => [sku, Math.max(0, q - Math.max(0, (D.st[sku] || 0) - (RVn[sku] || 0)))]).filter((x) => x[1] > 0);
       const ph = $("f-pickhint"), resv = $("f-resv") && $("f-resv").checked;
       ph.hidden = !short.length; $("f-pfrom-wrap").hidden = !short.length;
       const pf = $("f-pfrom"); if (short.length && !pf.value && !pf.dataset.touched) { pf.value = defaultPartner(); if (pf.__syncChips) pf.__syncChips(); } // 自动带上最近一次找的合伙人
@@ -1423,6 +1425,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       if (!lines.length) throw userError("至少选一种香型（在搜索结果里点一下）。");
       if (lump != null) spreadLump(lines, lump).forEach((u, k) => { lines[k].unit_price = u; });
       const fee = numOrNull($("f-fee").value);
+      if (edit) return saveResvEdit(lines, lump, fee, date);
       const oid = rid("o"), at = new Date().toISOString(), resv = $("f-resv").checked;
       const pk = $("f-pfrom-wrap").hidden ? { pick_from: null, pick_split: null } : splitter.read(), pfrom = pk.pick_from;
       const P = readPay(!resv, orderTotal({ lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
@@ -1433,16 +1436,36 @@ details.restock > summary::-webkit-details-marker { display: none; }
       if (onDone) onDone();
       return msg;
     }
-    openSheet(reserve ? "记一笔预定" : "记一笔卖出", html, submit, () => {
+    async function saveResvEdit(lines, lump, fee, date) {
+      const id = edit.id;
+      const pk = $("f-pfrom-wrap").hidden ? { pick_from: edit.pick_from || null, pick_split: null } : splitter.read();
+      const P = readPay(false, orderTotal({ lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
+      await db.doc("orders/" + id).update(Object.assign({ date, lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, P, readCust(edit), { pick_from: pk.pick_from || null, pick_split: pk.pick_split || null }));
+      /* 已经从合伙人那拿到的货：这个口味换掉了或数量减少了，就留作库存（跟取消预定一样） */
+      const want = {}, got = {};
+      for (const l of lines) want[l.sku] = (want[l.sku] || 0) + l.qty;
+      const mine = S.moves.filter((m) => m.order_id === id && m.type === "in");
+      for (const m of mine) got[m.sku] = (got[m.sku] || 0) + (Number(m.qty) || 0);
+      const free = mine.filter((m) => got[m.sku] > (want[m.sku] || 0)), freeN = free.reduce((a, m) => a + (Number(m.qty) || 0), 0);
+      await Promise.all(free.map((m) => db.doc("movements/" + m.id).update({ order_id: null, note: "预定改了，拿到的货留作库存" })));
+      if (date !== edit.date) {
+        await Promise.all(S.moves.filter((m) => m.order_id === id && !free.includes(m)).map((m) => db.doc("movements/" + m.id).update({ date })));
+        const px = S.expenses.find((x) => x.batch_id === id + "-pick");
+        if (px) await db.doc("expenses/" + px.id).update({ date });
+      }
+      if (onDone) onDone();
+      return "预定已更新" + (freeN ? "；已经拿到的 " + freeN + " 根留在库存里。" : "。");
+    }
+    openSheet(edit ? "编辑预定" : reserve ? "记一笔预定" : "记一笔卖出", html, submit, () => {
       splitter.bind();
-      if (preset.length) preset.forEach((x) => addLine(x.sku, x.qty)); else addLine("");
+      if (preset.length) preset.forEach((x) => { addLine(x.sku, x.qty); if (x.price != null) $("f-price-" + (n - 1)).value = x.price; }); else addLine("");
       $("f-addline").addEventListener("click", () => { addLine(""); recalc(); });
       $("f-lines").addEventListener("click", (e) => {
         const k = e.target.dataset && e.target.dataset.rm; if (k == null) return;
         if ($("f-lines").children.length > 1) { e.target.closest(".line").remove(); recalc(); }
       });
       wirePicker(avail, D, (k) => { setDefaultPrice(k); recalc(); });
-      wireCust(null);
+      wireCust(edit ? edit.id : null);
       sheetOn("input", recalc); sheetOn("change", recalc);
       $("f-resv").addEventListener("change", () => { $("sheet-title").textContent = $("f-resv").checked ? "记一笔预定" : "记一笔卖出"; recalc(); });
       recalc();
@@ -1452,6 +1475,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   function orderEditForm(id) {
     let splitter = null;
     const o = S.orders.find((x) => x.id === id); if (!o) return;
+    if (isReserved(o)) return saleForm(null, true, null, null, o);
     const lines = o.lines || [];
     const html =
       '<div class="field"><label for="f-date">卖出日期</label><input id="f-date" type="date" value="' + esc(o.date || today()) + '"></div>' +

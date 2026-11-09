@@ -3,3 +3,4 @@ firestore.rules
 node_modules/
 .firebase/
 *.log
+tests/shots/

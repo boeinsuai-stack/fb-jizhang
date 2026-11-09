@@ -43,10 +43,22 @@
     box.hidden = false;
     if (msg) box.querySelector("p").textContent = msg;
   }
+  // 没网或信号很差时，Firebase 确认登录最长要等 30 秒，这段时间 App 一片空白。
+  // 手机里记着上次是谁登录的：1.5 秒还没确认，就先用他打开（数据从手机缓存读，记账先存手机）。
+  let started = null, lastU = null;
+  const startWith = (u) => { if (started) return; started = u; resolveUser(u); };
+  try { lastU = JSON.parse(localStorage.getItem("fb-last-user") || "null"); } catch (_) {}
+  if (lastU && lastU.uid) setTimeout(() => startWith(lastU), 1500);
   auth.onAuthStateChanged((u) => {
-    if (u) { if (box) box.hidden = true; resolveUser(u); }
-    else if (document.body) showLogin();
-    else document.addEventListener("DOMContentLoaded", () => showLogin());
+    if (u) {
+      try { localStorage.setItem("fb-last-user", JSON.stringify({ uid: u.uid, email: u.email || "", displayName: u.displayName || "" })); } catch (_) {}
+      if (box) box.hidden = true;
+      if (started && started.uid !== u.uid) { location.reload(); return; }
+      startWith(u);
+    } else {
+      try { localStorage.removeItem("fb-last-user"); } catch (_) {}
+      if (document.body) showLogin(); else document.addEventListener("DOMContentLoaded", () => showLogin());
+    }
   });
 
   /* ---------- user：谁在用 ---------- */
@@ -126,7 +138,8 @@
     }
     const off = !navigator.onLine;
     let t, c;
-    if (pending > 0 && off) { t = "没网 · " + pending + " 笔待上传"; c = "#d08a2e"; }
+    if (failed) { t = failed + " 笔云端没收下（" + failMsg + "）· 发给 Claude 看"; c = "#b23b3b"; }
+    else if (pending > 0 && off) { t = "没网 · " + pending + " 笔待上传"; c = "#d08a2e"; }
     else if (pending > 0) { t = "保存中…"; c = "#9aa3ad"; }
     else if (off) { t = "没网 · 先存在手机里"; c = "#d08a2e"; }
     else { t = "已保存到云端" + (lastSaved ? " " + hhmm(lastSaved) : ""); c = "#2fa36b"; }
@@ -155,10 +168,21 @@
     return p;
   }
   // 包住所有写入操作（App 原代码不用改）
+  // 没网也能记账：Firestore 的 set/update/delete 要等云端确认才算完成，没网时永远等不到，
+  // App 的「保存」就一直卡着，后面几笔也写不进去。改成：写进手机（本地缓存）就算完成；
+  // 云端确认交给右上角的「已保存到云端」。读一次本地缓存排在这笔写入后面，读完说明写入已经进了手机、
+  // 页面也已经收到更新（再等一拍让 onSnapshot 跑完），跟有网时一样。
+  const localDone = () => fs.doc("meta/people").get({ source: "cache" }).catch(() => {}).then(() => new Promise((r) => setTimeout(r, 0)));
+  let failed = 0, failMsg = "";
+  function local(p) {
+    let settled = false;
+    p.catch((e) => { if (!settled) return; failed++; failMsg = (e && (e.code || e.message)) || String(e); paintBadge(); console.error("云端没收下这笔", e); });
+    return Promise.race([p, localDone()]).finally(() => { settled = true; });
+  }
   const DR = firebase.firestore.DocumentReference.prototype;
-  for (const m of ["set", "update", "delete"]) { const orig = DR[m]; DR[m] = function (...a) { return trackWrite(orig.apply(this, a)); }; }
+  for (const m of ["set", "update", "delete"]) { const orig = DR[m]; DR[m] = function (...a) { return local(trackWrite(orig.apply(this, a))); }; }
   const WB = firebase.firestore.WriteBatch.prototype, origCommit = WB.commit;
-  WB.commit = function (...a) { return trackWrite(origCommit.apply(this, a)); };
+  WB.commit = function (...a) { return local(trackWrite(origCommit.apply(this, a))); };
   window.addEventListener("online", paintBadge);
   window.addEventListener("offline", paintBadge);
 
