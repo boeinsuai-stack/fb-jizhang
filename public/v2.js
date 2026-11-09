@@ -207,7 +207,19 @@
     const vals = (m) => Object.values(m);
     const recompute = () => { P = project({ items: getItems(), orders: vals(R.orders), purchases: vals(R.purchases), transfers: vals(R.transfers), movements: vals(R.movements), expenses: vals(R.expenses), batches: vals(R.batches), settlements: vals(R.settlements) }); return P; };
     const kick = () => { if (queued) return; queued = true; Promise.resolve().then(() => { queued = false; recompute(); onChange(P, got.size === Object.keys(COL).length); }); };
-    const unsubs = Object.entries(COL).map(([k, c]) => db.collection(c).onSnapshot((s) => { const m = {}; for (const d of s.docs) m[d.id] = Object.assign({ id: d.id }, d.data()); R[k] = m; got.add(k); kick(); }, (e) => console.warn("v2 读取出错", c, e)));
+    // 本机刚写的记录先「挂着」：手机本地数据库的通知是异步的，可能晚到一拍、还是写之前的样子；
+    // 写入完成之后再收到一次通知，才确定通知里已经有它，才放下。否则旧通知会把刚写的盖掉。
+    const pend = {}, snapN = {};
+    for (const k of Object.keys(COL)) { pend[k] = {}; snapN[k] = 0; }
+    const unsubs = Object.entries(COL).map(([k, c]) => db.collection(c).onSnapshot((s) => {
+      snapN[k]++;
+      const m = {}; for (const d of s.docs) m[d.id] = Object.assign({ id: d.id }, d.data());
+      for (const [id, w] of Object.entries(pend[k])) {
+        if (w.doneAt != null && snapN[k] > w.doneAt) { delete pend[k][id]; continue; }
+        if (w.doc) m[id] = Object.assign({ id }, w.doc); else delete m[id];
+      }
+      R[k] = m; got.add(k); kick();
+    }, (e) => console.warn("v2 读取出错", c, e)));
     // 当前「旧样子」，按集合 id 索引
     const view = () => { const p = P || recompute(); const ix = (a) => { const o = {}; for (const x of a) o[x.id] = x; return o; }; return { orders: ix(p.orders), purchases: ix(p.purchases), transfers: ix(p.transfers), movements: ix(p.moves), expenses: ix(p.expenses), settlements: ix(p.settles) }; };
     // 这条旧样子的记录归谁：order:/purchase:/transfer:/batch: 或 null（独立）
@@ -238,7 +250,13 @@
     const clean = (d) => { if (!d) return d; const x = clone(d); delete x._v; delete x.id; for (const k of Object.keys(x)) if (x[k] === undefined) delete x[k]; return x; };
     // 在内存里先改好，再写库（写库本身在手机里马上完成）
     const ops = [];
-    const put = (k, id, doc) => { if (doc) { R[k][id] = Object.assign({ id }, doc); ops.push(db.collection(COL[k]).doc(id).set(doc)); } else if (R[k][id]) { delete R[k][id]; ops.push(db.collection(COL[k]).doc(id).delete()); } };
+    const put = (k, id, doc) => {
+      if (!doc && !R[k][id]) return;
+      const w = { doc: doc || null, doneAt: null }; pend[k][id] = w;
+      if (doc) R[k][id] = Object.assign({ id }, doc); else delete R[k][id];
+      const p = doc ? db.collection(COL[k]).doc(id).set(doc) : db.collection(COL[k]).doc(id).delete();
+      ops.push(p.then(() => { if (pend[k][id] === w) w.doneAt = snapN[k]; }));
+    };
     function write(c, id, op, data) {
       if (!V1.includes(c)) throw new Error("v2 不认识的集合 " + c);
       const cur = view();
