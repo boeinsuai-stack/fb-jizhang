@@ -5,7 +5,7 @@
    - 字体：有就存，没网时用存过的（拿不到就用系统字体，不影响使用）
    数据由 Firestore 离线缓存负责：没网时照常记账，联网后自动上传 */
 const CACHE = "fb-app-v16";
-const SHELL = ["./", "index.html", "shim.js", "firebase-config.js", "manifest.webmanifest", "icons/icon-192.png", "icons/apple-touch-icon.png",
+const SHELL = ["./", "index.html", "v2.js", "shim.js", "firebase-config.js", "manifest.webmanifest", "icons/icon-192.png", "icons/apple-touch-icon.png",
   "vendor/firebasejs/10.12.2/firebase-app-compat.js", "vendor/firebasejs/10.12.2/firebase-auth-compat.js", "vendor/firebasejs/10.12.2/firebase-firestore-compat.js",
   "vendor/xlsx/0.18.5/xlsx.full.min.js"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });

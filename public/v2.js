@@ -104,6 +104,9 @@
       for (const tid of s.transfer_ids || []) if (tBy[tid]) tBy[tid].partner_settlement_id = s.id;
       for (const pid of s.po_ids || []) if (pBy[pid]) pBy[pid].settlement_id = s.id;
     }
+    // 跟 Firebase 一样按编号排序（App 有些列表靠这个顺序）
+    const byId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    for (const a of [orders, purchases, transfers, moves, expenses, settles]) a.sort(byId);
     return { items: (v2.items || []).map(clone), orders, purchases, transfers, moves, expenses, settles, customers: (v2.customers || []).map(clone), followups: (v2.followups || []).map(clone) };
   }
 
@@ -189,6 +192,98 @@
     return v2;
   }
 
-  const api = { migrate, project, r2 };
+  // ---------- App 里用：读 v2、写 v2（翻译层） ----------
+  // 业务代码照旧按「旧样子」读写（订单、流水、支出……）。这里：
+  //  读：订阅 v2_* 集合 → project() → 旧样子交给页面。
+  //  写：业务代码对旧样子某条记录的 set/update/delete → 找到它的源头（哪张订单/订货/往来/批次，或者它本身就是独立的事）
+  //      → 在源头这一组上应用这次写入 → 用 migrate() 重新生成源头 → 只写源头那一条（加上真正独立的流水/支出）。
+  //  流水、支出这些复制品从不落库。
+  const V1 = ["orders", "movements", "expenses", "purchases", "transfers", "settlements"];
+  const COL = { orders: "v2_orders", purchases: "v2_purchases", transfers: "v2_transfers", movements: "v2_movements", expenses: "v2_expenses", batches: "v2_batches", settlements: "v2_settlements" };
+  const OWNER_COL = { order: "orders", purchase: "purchases", transfer: "transfers", batch: "batches" };
+  function createStore(db, getItems, onChange) {
+    const R = { orders: {}, purchases: {}, transfers: {}, movements: {}, expenses: {}, batches: {}, settlements: {} };
+    const got = new Set(); let P = null, queued = false;
+    const vals = (m) => Object.values(m);
+    const recompute = () => { P = project({ items: getItems(), orders: vals(R.orders), purchases: vals(R.purchases), transfers: vals(R.transfers), movements: vals(R.movements), expenses: vals(R.expenses), batches: vals(R.batches), settlements: vals(R.settlements) }); return P; };
+    const kick = () => { if (queued) return; queued = true; Promise.resolve().then(() => { queued = false; recompute(); onChange(P, got.size === Object.keys(COL).length); }); };
+    const unsubs = Object.entries(COL).map(([k, c]) => db.collection(c).onSnapshot((s) => { const m = {}; for (const d of s.docs) m[d.id] = Object.assign({ id: d.id }, d.data()); R[k] = m; got.add(k); kick(); }, (e) => console.warn("v2 读取出错", c, e)));
+    // 当前「旧样子」，按集合 id 索引
+    const view = () => { const p = P || recompute(); const ix = (a) => { const o = {}; for (const x of a) o[x.id] = x; return o; }; return { orders: ix(p.orders), purchases: ix(p.purchases), transfers: ix(p.transfers), movements: ix(p.moves), expenses: ix(p.expenses), settlements: ix(p.settles) }; };
+    // 这条旧样子的记录归谁：order:/purchase:/transfer:/batch: 或 null（独立）
+    function ownerAfter(c, id, d, cur) {
+      if (c === "orders") return "order:" + id;
+      if (c === "purchases") return "purchase:" + id;
+      if (c === "transfers") return "transfer:" + id;
+      if (c === "movements") {
+        if (d.order_id && (cur.orders[d.order_id] || d.order_id === pendingOwner)) {
+          if (d.type === "out" && id === d.order_id + "-" + d.sku) return "order:" + d.order_id;
+          if (d.type === "in" && id.startsWith(d.order_id + "-pick-")) return "order:" + d.order_id;
+        }
+        if (d.po_id && d.receipt_id) return "purchase:" + d.po_id;
+        if (d.transfer_id) return "transfer:" + d.transfer_id;
+        if ((d.batch_id || "").startsWith("b-")) return "batch:" + d.batch_id;
+        return null;
+      }
+      if (c === "expenses") {
+        if (/-pick$/.test(d.batch_id || "") && id === d.batch_id + "-cost") return "order:" + d.batch_id.slice(0, -5);
+        if (d.po_id) return "purchase:" + d.po_id;
+        if ((d.batch_id || "").startsWith("b-") && id === d.batch_id + "-cost") return "batch:" + d.batch_id;
+        return null;
+      }
+      return null;
+    }
+    let pendingOwner = null;
+    const ownerBefore = (c, id, d) => (d && d._v ? d._v : null) || (c === "orders" ? "order:" + id : c === "purchases" ? "purchase:" + id : c === "transfers" ? "transfer:" + id : (c === "movements" || c === "expenses") && d && (d.batch_id || "").startsWith("b-") ? "batch:" + d.batch_id : null);
+    const clean = (d) => { if (!d) return d; const x = clone(d); delete x._v; delete x.id; for (const k of Object.keys(x)) if (x[k] === undefined) delete x[k]; return x; };
+    // 在内存里先改好，再写库（写库本身在手机里马上完成）
+    const ops = [];
+    const put = (k, id, doc) => { if (doc) { R[k][id] = Object.assign({ id }, doc); ops.push(db.collection(COL[k]).doc(id).set(doc)); } else if (R[k][id]) { delete R[k][id]; ops.push(db.collection(COL[k]).doc(id).delete()); } };
+    function write(c, id, op, data) {
+      if (!V1.includes(c)) throw new Error("v2 不认识的集合 " + c);
+      const cur = view();
+      const before = cur[c][id] ? clone(cur[c][id]) : null;
+      let after = op === "delete" ? null : op === "update" ? Object.assign({}, before || {}, clean(data)) : clean(data);
+      if (op === "update" && !before) return Promise.reject(new Error("要修改的记录不存在：" + c + "/" + id));
+      if (after) delete after._v;
+      if (c === "settlements") { put("settlements", id, after ? clean(after) : null); recompute(); return flush(); }
+      if (c === "orders") pendingOwner = id;
+      const oB = ownerBefore(c, id, before), oA = after ? ownerAfter(c, id, after, cur) : null;
+      pendingOwner = null;
+      const owners = [...new Set([oB, oA].filter(Boolean))];
+      // 独立的流水/支出：直接写
+      if (!owners.length) { put(c, id, after ? clean(after) : null); recompute(); return flush(); }
+      if (!oA && oB) put(c, id, after ? clean(after) : null); // 从某个源头里拿出来，变成独立的
+      for (const own of owners) {
+        const [k, oid] = own.split(/:(.*)/), oc = OWNER_COL[k];
+        // 这一组的旧样子：源头本身 + 归它的流水、支出
+        const old = { items: {}, orders: {}, purchases: {}, transfers: {}, movements: {}, expenses: {}, settlements: {} };
+        for (const it of getItems()) old.items[it.sku] = it;
+        if (k !== "batch") { const src = cur[oc][oid]; if (src) old[oc][oid] = clean(src); }
+        const mine = (x) => x._v === own || (k === "batch" && x.batch_id === oid);
+        for (const m of Object.values(cur.movements)) if (mine(m)) old.movements[m.id] = clean(m);
+        for (const x of Object.values(cur.expenses)) if (mine(x)) old.expenses[x.id] = clean(x);
+        // 应用这次写入
+        if (c === oc && id === oid) { if (after) old[oc][oid] = clean(after); else delete old[oc][oid]; }
+        else if (c === "movements" || c === "expenses") { if (oA === own && after) old[c][id] = clean(after); else if (oB === own) delete old[c][id]; }
+        const v = migrate(old);
+        // 源头
+        if (k === "batch") { const b = v.batches.find((x) => x.id === oid); put("batches", oid, b ? clean(b) : null); }
+        else { const src = (v[oc] || []).find((x) => x.id === oid); put(oc, oid, src ? clean(src) : null); }
+        // 这一组里没被源头收回的 = 独立的流水/支出
+        const idsM = new Set(Object.keys(old.movements).concat(Object.values(cur.movements).filter(mine).map((m) => m.id)));
+        const idsE = new Set(Object.keys(old.expenses).concat(Object.values(cur.expenses).filter(mine).map((x) => x.id)));
+        const freeM = {}, freeE = {}; for (const m of v.movements) freeM[m.id] = m; for (const x of v.expenses) freeE[x.id] = x;
+        for (const mid of idsM) put("movements", mid, freeM[mid] ? clean(freeM[mid]) : null);
+        for (const xid of idsE) put("expenses", xid, freeE[xid] ? clean(freeE[xid]) : null);
+      }
+      recompute();
+      return flush();
+    }
+    function flush() { const all = ops.splice(0); kick(); return Promise.all(all).then(() => undefined); }
+    return { write, view: () => P || recompute(), refresh: kick, R, stop: () => unsubs.forEach((u) => u && u()) };
+  }
+
+  const api = { migrate, project, createStore, COL, V1, r2 };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.FBV2 = api;
 })(typeof window !== "undefined" ? window : globalThis);

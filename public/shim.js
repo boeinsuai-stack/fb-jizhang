@@ -186,7 +186,8 @@
      账本里的记录（SYNCED）每次写入都自动带上 _u = 云端收到的时间。另一台手机只需要问云端
      「_u 比我上次看到的晚的有哪些」，不用每次把全部记录重读一遍（重读按条数收费，记录越多越贵）。
      删除不真删，而是留一个 { _deleted: true } 标记：这样删除也有 _u，另一台手机能同步到。App 里看不到这些标记。 */
-  const SYNCED = new Set(["items", "movements", "orders", "expenses", "purchases", "settlements", "transfers", "customers", "followups", "log"]);
+  const SYNCED = new Set(["items", "movements", "orders", "expenses", "purchases", "settlements", "transfers", "customers", "followups", "log",
+    "v2_orders", "v2_purchases", "v2_transfers", "v2_movements", "v2_expenses", "v2_batches", "v2_settlements"]);
   const FV = firebase.firestore.FieldValue;
   const synced = (ref) => !!ref && !!ref.parent && !ref.parent.parent && SYNCED.has(ref.parent.id);
   const tomb = () => ({ _deleted: true, _u: FV.serverTimestamp() });

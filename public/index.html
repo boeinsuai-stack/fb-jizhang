@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3397,10 +3397,14 @@ details.restock > summary::-webkit-details-marker { display: none; }
       onSnapshot: (...a) => ref.onSnapshot(...a),
     };
   }
+  /* v2（每件事只记一次）：旧样子的订单/流水/支出/订货/往来/结账交给翻译层 FBV2.createStore，只写源头 */
+  let v2store = null;
+  const isV2 = (c) => !!v2store && window.FBV2.V1.includes(c);
+  const v2ref = (c, id) => ({ set: (d) => v2store.write(c, id, "set", d), update: (d) => v2store.write(c, id, "update", d), delete: () => v2store.write(c, id, "delete"), onSnapshot: () => () => {} });
   function wrapDb(raw) {
     return {
-      doc: (p) => { const [c, id] = p.split("/"); return c === "meta" ? raw.doc(p) : wrapRef(c, id, raw.doc(p)); },
-      collection: (c) => { const col = raw.collection(c); return { doc: (id) => wrapRef(c, id, col.doc(id)), limit: (n) => col.limit(n), onSnapshot: (...a) => col.onSnapshot(...a) }; },
+      doc: (p) => { const [c, id] = p.split("/"); return c === "meta" ? raw.doc(p) : wrapRef(c, id, isV2(c) ? v2ref(c, id) : raw.doc(p)); },
+      collection: (c) => { const col = raw.collection(c); return { doc: (id) => wrapRef(c, id, isV2(c) ? v2ref(c, id) : col.doc(id)), limit: (n) => col.limit(n), onSnapshot: (...a) => col.onSnapshot(...a) }; },
     };
   }
   const nameCache = {};
@@ -4172,20 +4176,30 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const onErr = (e) => { if (e && e.code !== "revoked") { $("banner").textContent = "数据暂时读取失败，请刷新页面。"; $("banner").hidden = false; } };
     const mark = (k) => { S.loaded |= k; };
     const all = (snap) => snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
-    db.collection("items").limit(1000).onSnapshot((s) => { S.items = all(s).map((i) => Object.assign({ sku: i.id }, i)); mark(1); render(); }, onErr);
-    db.collection("movements").limit(1000).onSnapshot((s) => { S.moves = all(s); mark(2); render(); }, onErr);
-    db.collection("orders").limit(1000).onSnapshot((s) => { S.orders = all(s); mark(4); render(); }, onErr);
-    db.collection("expenses").limit(1000).onSnapshot((s) => { S.expenses = all(s); mark(8); render(); }, onErr);
-    db.collection("purchases").limit(1000).onSnapshot((s) => { S.purchases = all(s); render(); }, onErr);
-    db.collection("settlements").limit(1000).onSnapshot((s) => { S.settles = all(s); render(); }, onErr);
-    db.collection("transfers").limit(1000).onSnapshot((s) => { S.transfers = all(s); render(); }, onErr);
+    /* 数据结构版本：云端 meta/schema.version === 2 才用 v2（迁移确认后才写这个标记）；版本变了就刷新页面，两台手机一起换 */
+    let schemaV = 1;
+    try { const sc = await rawDb.doc("meta/schema").get(); if (sc && sc.exists && (sc.data() || {}).version === 2) schemaV = 2; } catch (_) {}
+    rawDb.doc("meta/schema").onSnapshot((sc) => { const v = sc && sc.exists && (sc.data() || {}).version === 2 ? 2 : 1; if (v !== schemaV) location.reload(); }, () => {});
+    if (schemaV === 2 && window.FBV2) {
+      v2store = window.FBV2.createStore(rawDb, () => S.items, (P, ready) => {
+        S.orders = P.orders; S.moves = P.moves; S.expenses = P.expenses; S.purchases = P.purchases; S.settles = P.settles; S.transfers = P.transfers;
+        if (ready) mark(2 | 4 | 8); render();
+      });
+    }
+    db.collection("items").limit(1000).onSnapshot((s) => { S.items = all(s).map((i) => Object.assign({ sku: i.id }, i)); mark(1); if (v2store) v2store.refresh(); render(); }, onErr);
+    if (!v2store) db.collection("movements").limit(1000).onSnapshot((s) => { S.moves = all(s); mark(2); render(); }, onErr);
+    if (!v2store) db.collection("orders").limit(1000).onSnapshot((s) => { S.orders = all(s); mark(4); render(); }, onErr);
+    if (!v2store) db.collection("expenses").limit(1000).onSnapshot((s) => { S.expenses = all(s); mark(8); render(); }, onErr);
+    if (!v2store) db.collection("purchases").limit(1000).onSnapshot((s) => { S.purchases = all(s); render(); }, onErr);
+    if (!v2store) db.collection("settlements").limit(1000).onSnapshot((s) => { S.settles = all(s); render(); }, onErr);
+    if (!v2store) db.collection("transfers").limit(1000).onSnapshot((s) => { S.transfers = all(s); render(); }, onErr);
     db.collection("customers").limit(1000).onSnapshot((s) => { S.customers = all(s); render(); }, onErr);
     db.collection("followups").limit(1000).onSnapshot((s) => { S.followups = all(s); render(); }, onErr);
     rawDb.collection("log").orderBy("at", "desc").limit(200).onSnapshot((s) => { S.log = all(s); if (view === "inventory") { resolveNames(); renderLog(); } }, () => {});
     /* one-time: everything recorded before the audit trail existed was the owner's — stamp it and seed the log */
     (async () => {
       try {
-        if (!userCap || !meId || !(await userCap.isOwner())) return;
+        if (!userCap || !meId || v2store || !(await userCap.isOwner())) return;
         const flag = await rawDb.doc("meta/backfill").get();
         if (flag && flag.exists && (flag.data() || {}).done) return;
         await new Promise((ok) => { const t = setInterval(() => { if ((S.loaded & 15) === 15) { clearInterval(t); ok(); } }, 300); });
