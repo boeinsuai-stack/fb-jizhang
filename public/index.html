@@ -808,6 +808,14 @@ details.restock > summary::-webkit-details-marker { display: none; }
     <p class="msg" id="bk-msg" hidden></p>
   </div>
     </section>
+    <section id="mig-sec" hidden>
+      <h2>数据结构升级</h2>
+      <div class="card" style="padding:14px 16px;display:grid;gap:10px">
+        <p class="hint" id="mig-status"></p>
+        <div class="actions"><button class="btn small" id="mig-check" type="button">检查迁移</button><button class="btn small primary" id="mig-go" type="button" hidden>确认迁移</button><button class="btn small" id="mig-late" type="button" hidden>补进新结构</button><button class="btn small danger" id="mig-back" type="button" hidden>退回旧结构</button></div>
+        <div id="mig-out"></div>
+      </div>
+    </section>
     <section>
       <h2>使用说明</h2>
   <p class="note">底价和参考口味只给你自己看，不要对买家公开。客人要几种口味：在上面「快速下单」里点口味凑成一单，再点底部「下单」。手上不够的会自动记成找合伙人拿。点「＋」进货（成本先算库存）。</p>
@@ -4161,6 +4169,113 @@ details.restock > summary::-webkit-details-marker { display: none; }
   window.addEventListener("hashchange", route);
   route();
 
+  /* ---------- v2 迁移（只有 owner 看得到）：检查 → 确认迁移 → （需要时）退回旧结构 ---------- */
+  const MIG_V1 = { orders: "orders", movements: "moves", expenses: "expenses", purchases: "purchases", transfers: "transfers", settlements: "settles" };
+  let migPlan = null, migSchema = null;
+  const migClean = (x) => { const o = JSON.parse(JSON.stringify(x)); delete o.id; delete o._v; return o; };
+  const migKey = (x) => { const o = migClean(x); delete o.by_at; return JSON.stringify(o, Object.keys(o).sort()); };
+  function migNumbers() { // 用 App 自己的算法算几个关键数字
+    const D = derive(), F = finBook(() => true), o = { "库存（根）": Object.values(D.st).reduce((a, v) => a + v, 0), "卖出单数": F.T.n, "收入": F.T.rev, "成本": F.T.cost, "净赚": F.T.net, "进货付出": F.T.buy };
+    for (const w of partnerNames()) o["跟 " + w + "（应付为正）"] = ledgerNet(w);
+    return o;
+  }
+  async function migInit() {
+    try { if (!userCap || !(await userCap.isOwner())) return; } catch (_) { return; }
+    $("mig-sec").hidden = false;
+    try { const sc = await rawDb.doc("meta/schema").get(); migSchema = sc && sc.exists ? sc.data() : null; } catch (_) {}
+    if (v2store) {
+      $("mig-check").hidden = true; $("mig-back").hidden = false;
+      $("mig-status").textContent = "现在用的是新结构（每件事只记一次）" + (migSchema && migSchema.migrated_at ? "，" + fmtDT(migSchema.migrated_at) + " 迁移" : "") + "。";
+      migLateCheck();
+    } else $("mig-status").textContent = "现在用的是旧结构。先点「检查迁移」：把全部记录转成新结构再算回来，逐条比对，不改任何数据。";
+  }
+  function migCheck() {
+    if ((S.loaded & 15) !== 15) { toast("数据还没读完，稍等再点。"); return; }
+    const old = { items: {}, customers: {}, followups: {} };
+    for (const [c, k] of Object.entries(MIG_V1)) { old[c] = {}; for (const x of S[k]) old[c][x.id] = migClean(x); }
+    for (const i of S.items) old.items[i.sku] = migClean(i);
+    for (const x of S.customers) old.customers[x.id] = migClean(x);
+    for (const x of S.followups) old.followups[x.id] = migClean(x);
+    const v2 = window.FBV2.migrate(old), P = window.FBV2.project(v2);
+    const rows = [], bad = [];
+    for (const [c, k] of Object.entries(MIG_V1)) {
+      const A = old[c], B = {}; for (const x of P[k]) B[x.id] = x;
+      let same = 0; for (const id of new Set(Object.keys(A).concat(Object.keys(B)))) { if (A[id] && B[id] && migKey(A[id]) === migKey(B[id])) same++; else bad.push(c + "/" + id + (A[id] ? (B[id] ? " 内容不同" : " 新结构算不出来") : " 新结构多出来")); }
+      rows.push([c, Object.keys(A).length, same]);
+    }
+    // 关键数字：同一套算法，分别用旧数据、新结构现算出来的数据算
+    const before = migNumbers(), keep = {}; for (const k of Object.values(MIG_V1)) { keep[k] = S[k]; S[k] = P[k]; }
+    let after; try { after = migNumbers(); } finally { for (const k of Object.values(MIG_V1)) S[k] = keep[k]; }
+    const numBad = Object.keys(before).filter((k) => Math.abs((before[k] || 0) - (after[k] || 0)) > 0.0001);
+    const nOld = rows.reduce((a, r) => a + r[1], 0), nNew = Object.keys(window.FBV2.COL).reduce((a, k) => a + (v2[k] || []).length, 0);
+    const ok = !bad.length && !numBad.length;
+    migPlan = ok ? v2 : null;
+    $("mig-out").innerHTML = '<p class="' + (ok ? "hint" : "err") + '">' + (ok ? "✅ 全部一致，可以迁移。" : "❌ 有不一致，先别迁移，把下面发给 Claude。") + "</p>" +
+      '<p class="hint">存储：旧结构 ' + nOld + " 条 → 新结构 " + nNew + " 条。逐条比对：" + rows.map((r) => ({ orders: "订单", movements: "流水", expenses: "支出", purchases: "订货", transfers: "往来", settlements: "结账" }[r[0]] + " " + r[2] + "/" + r[1])).join("，") + "</p>" +
+      '<table class="po-tbl"><tr><th>关键数字</th><th>旧结构</th><th>新结构</th></tr>' + Object.keys(before).map((k) => "<tr><td>" + esc(k) + "</td><td>" + before[k] + "</td><td>" + (numBad.includes(k) ? "<b>" + after[k] + "</b>" : after[k]) + "</td></tr>").join("") + "</table>" +
+      (bad.length ? '<p class="err">' + esc(bad.slice(0, 20).join("；")) + "</p>" : "");
+    $("mig-go").hidden = !ok;
+  }
+  async function migGo() {
+    if (!migPlan) return;
+    const btn = $("mig-go"); btn.disabled = true; btn.textContent = "迁移中…";
+    try {
+      const fsx = window.firebase.firestore(), COL = window.FBV2.COL, now = new Date().toISOString(), counts = {};
+      // 先清掉以前没做完的迁移留下的记录，再整份写入新结构（旧集合一条不动）
+      for (const [k, c] of Object.entries(COL)) {
+        const want = new Set((migPlan[k] || []).map((x) => x.id)), ops = [];
+        const ex = await fsx.collection(c).get().catch(() => ({ docs: [] }));
+        for (const d of ex.docs) if (!want.has(d.id)) ops.push((b) => b.delete(fsx.doc(c + "/" + d.id)));
+        for (const x of migPlan[k] || []) ops.push((b) => b.set(fsx.doc(c + "/" + x.id), migClean(x)));
+        for (let i = 0; i < ops.length; i += 400) { const b = fsx.batch(); ops.slice(i, i + 400).forEach((f) => f(b)); await b.commit(); }
+        counts[c] = want.size;
+      }
+      await rawDb.doc("meta/schema").set({ version: 2, migrated_at: now, by: meId, counts }); // 两台手机看到这个就自动刷新、换新结构
+      toast("迁移完成，正在切换…");
+    } catch (e) { btn.disabled = false; btn.textContent = "确认迁移"; toast("迁移失败：" + errText(e)); }
+  }
+  /* 迁移以后旧结构里又有改动（比如另一台手机当时还开着旧版）：提示，并可以用翻译层补进新结构 */
+  let migLate = [];
+  async function migLateCheck() {
+    if (!migSchema || !migSchema.migrated_at) return;
+    const fsx = window.firebase.firestore(), since = window.firebase.firestore.Timestamp.fromMillis(Date.parse(migSchema.migrated_at)); migLate = [];
+    for (const c of Object.keys(MIG_V1)) {
+      const s = await fsx.collection(c).where("_u", ">", since).get().catch(() => ({ docs: [] }));
+      for (const d of s.docs) migLate.push({ c, id: d.id, d: d.data() });
+    }
+    if (!migLate.length) return;
+    $("mig-status").textContent += " ⚠️ 迁移之后旧结构里又有 " + migLate.length + " 条改动（可能是另一台手机当时还开着旧版），点「补进新结构」。";
+    $("mig-late").hidden = false;
+    $("banner").textContent = "迁移之后旧结构里还有 " + migLate.length + " 条改动没进新结构，去「设置」点「补进新结构」。"; $("banner").hidden = false;
+  }
+  async function migLateApply() {
+    for (const x of migLate) { const d = migClean(x.d); delete d._u; if (d._deleted) { if (v2store.view()[MIG_V1[x.c]].some((y) => y.id === x.id)) await v2store.write(x.c, x.id, "delete"); } else await v2store.write(x.c, x.id, "set", d); }
+    const n = migLate.length; migLate = []; $("mig-late").hidden = true; $("banner").hidden = true;
+    await rawDb.doc("meta/schema").set(Object.assign({}, migSchema, { migrated_at: new Date().toISOString() }));
+    toast("已补进新结构：" + n + " 条。");
+  }
+  /* 退回旧结构：把新结构现算出来的旧样子写回旧集合（迁移后新记的账也写回去），再把版本改回 1 */
+  async function migBack() {
+    const btn = $("mig-back"); btn.disabled = true; btn.textContent = "退回中…";
+    try {
+      const fsx = window.firebase.firestore(), P = v2store.view();
+      for (const [c, k] of Object.entries(MIG_V1)) {
+        const want = {}; for (const x of P[k]) want[x.id] = migClean(x);
+        const ex = await fsx.collection(c).get(), have = {}, ops = [];
+        for (const d of ex.docs) { const x = d.data(); if (!x._deleted) { delete x._u; have[d.id] = x; } }
+        for (const id of Object.keys(have)) if (!want[id]) ops.push((b) => b.delete(fsx.doc(c + "/" + id)));
+        for (const [id, x] of Object.entries(want)) if (!have[id] || migKey(have[id]) !== migKey(x)) ops.push((b) => b.set(fsx.doc(c + "/" + id), x));
+        for (let i = 0; i < ops.length; i += 400) { const b = fsx.batch(); ops.slice(i, i + 400).forEach((f) => f(b)); await b.commit(); }
+      }
+      await rawDb.doc("meta/schema").set({ version: 1, rolled_back_at: new Date().toISOString(), by: meId });
+      toast("已退回旧结构，正在切换…");
+    } catch (e) { btn.disabled = false; btn.textContent = "退回旧结构"; toast("退回失败：" + errText(e)); }
+  }
+  $("mig-check").addEventListener("click", migCheck);
+  $("mig-go").addEventListener("click", (e) => arm(e.currentTarget, "确定迁移？", migGo));
+  $("mig-late").addEventListener("click", () => migLateApply().catch((e) => toast("补进失败：" + errText(e))));
+  $("mig-back").addEventListener("click", (e) => arm(e.currentTarget, "确定退回？", migBack));
+
   /* ---------- data ---------- */
   (async () => {
     rawDb = window.claude && window.claude.use ? await window.claude.use("db") : null;
@@ -4185,7 +4300,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
         S.orders = P.orders; S.moves = P.moves; S.expenses = P.expenses; S.purchases = P.purchases; S.settles = P.settles; S.transfers = P.transfers;
         if (ready) mark(2 | 4 | 8); render();
       });
+      window.__fbV2store = v2store; // 中转站（shim.js）用：上传现算的旧样子、写入 Claude 改动
     }
+    migInit();
     db.collection("items").limit(1000).onSnapshot((s) => { S.items = all(s).map((i) => Object.assign({ sku: i.id }, i)); mark(1); if (v2store) v2store.refresh(); render(); }, onErr);
     if (!v2store) db.collection("movements").limit(1000).onSnapshot((s) => { S.moves = all(s); mark(2); render(); }, onErr);
     if (!v2store) db.collection("orders").limit(1000).onSnapshot((s) => { S.orders = all(s); mark(4); render(); }, onErr);

@@ -26,8 +26,14 @@
   const col = (L, c) => L[c] || (L[c] = new Map());
   let ver = 0;
   const seedInto = (L, seed, ts) => { for (const [c, docs] of Object.entries(seed || {})) for (const [id, x] of Object.entries(docs)) { const d = copy(x); if (ts && !d._u) d._u = { __ts: ts }; col(L, c).set(id, { d, v: ++ver }); } };
-  seedInto(server, window.__SEED, null);
-  if (window.__CACHE_SEED) seedInto(cache, window.__CACHE_SEED, null); else seedInto(cache, window.__SEED, null);
+  // __MOCK_PERSIST：页面刷新后数据还在（存在 sessionStorage），用来测「迁移后自动刷新」
+  const saved = window.__MOCK_PERSIST ? (() => { try { return JSON.parse(sessionStorage.getItem("__mockfb") || "null"); } catch (_) { return null; } })() : null;
+  if (saved) { for (const [c, docs] of Object.entries(saved.server)) for (const [id, r] of Object.entries(docs)) col(server, c).set(id, r); for (const [c, docs] of Object.entries(saved.cache)) for (const [id, r] of Object.entries(docs)) col(cache, c).set(id, r); ver = saved.ver; }
+  else {
+    seedInto(server, window.__SEED, null);
+    if (window.__CACHE_SEED) seedInto(cache, window.__CACHE_SEED, null); else seedInto(cache, window.__SEED, null);
+  }
+  const persist = () => { if (!window.__MOCK_PERSIST) return; const dump = (L) => Object.fromEntries(Object.entries(L).map(([c, m]) => [c, Object.fromEntries(m)])); try { sessionStorage.setItem("__mockfb", JSON.stringify({ server: dump(server), cache: dump(cache), ver })); } catch (_) {} };
   window.__reads = 0; window.__writes = 0;
   window.__dump = (c) => { const o = {}; for (const [id, r] of col(cache, c)) o[id] = r.d; return o; };
   window.__server = (c) => { const o = {}; for (const [id, r] of col(server, c)) o[id] = r.d; return o; };
@@ -105,7 +111,7 @@
     l.cb({ docs, size: docs.length, empty: !docs.length, metadata: { hasPendingWrites: docs.some((d) => d.metadata.hasPendingWrites), fromCache: !online }, forEach: (f) => docs.forEach(f) });
   }
   let queued = false;
-  function notify() { if (queued) return; queued = true; setTimeout(() => { queued = false; listeners.filter((l) => !l.off && !l.cacheOnly).forEach(deliver); listeners.filter((l) => !l.off && l.cacheOnly).forEach(deliver); }, 0); }
+  function notify() { if (queued) return; queued = true; setTimeout(() => { queued = false; persist(); listeners.filter((l) => !l.off && !l.cacheOnly).forEach(deliver); listeners.filter((l) => !l.off && l.cacheOnly).forEach(deliver); }, 0); }
   const ack = (commit) => (OFFLINE ? new Promise(() => {}) : new Promise((r) => setTimeout(() => { commit(); notify(); r(); }, 40)));
   function subscribe(spec, a) {
     let opts = {}; if (a[0] && typeof a[0] === "object" && !a[0].next) opts = a.shift();

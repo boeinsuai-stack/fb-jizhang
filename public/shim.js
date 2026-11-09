@@ -357,6 +357,16 @@
   // 不是一条条攒改动，而是每次上传「当前全部数据」的完整拷贝，覆盖旧的那份；所以晚传、漏传都不会乱。
   const RELAY_FOLDER = "FB 记账中转站", RELAY_FILE = "最新数据.json";
   const COLLS = ["items", "movements", "orders", "expenses", "purchases", "settlements", "transfers", "customers", "followups", "log", "meta"];
+  /* v2（每件事只记一次）：订单/流水/支出/订货/往来/结账 在库里只存源头，旧样子由页面的翻译层（window.__fbV2store）现算。
+     中转站照旧收发旧样子：上传用现算结果，写入 Claude 改动、撤销都交给翻译层。 */
+  const V1COL = { orders: "orders", movements: "moves", expenses: "expenses", purchases: "purchases", transfers: "transfers", settlements: "settles" };
+  const v2s = () => window.__fbV2store || null;
+  const v2view = (col) => { const P = v2s().view(); return P[V1COL[col]] || []; };
+  const v2clean = (x) => { if (!x) return null; const o = JSON.parse(JSON.stringify(x)); delete o._v; delete o.id; return o; };
+  async function readV1(col, id) {
+    if (v2s() && V1COL[col]) return v2clean(v2view(col).find((x) => x.id === id));
+    try { return live(await fs.doc(col + "/" + id).get()); } catch (_) { return live(await fs.doc(col + "/" + id).get({ source: "cache" }).catch(() => null)); }
+  }
   let relayAt = null, relayState = "idle", relayTimer = null, relayBusy = false, relayAgain = false;
   try { relayAt = localStorage.getItem("fb-relay-at"); if (localStorage.getItem("fb-relay-stale")) relayState = "stale"; } catch (_) {}
   const relayOn = () => window.__fbOwner === true && !!CFG.googleClientId;
@@ -397,7 +407,9 @@
     relayBusy = true; relayState = "uploading"; paintBadge();
     try {
       const data = {};
+      if (v2s() && !v2s().ready()) { relayBusy = false; relayTimer = setTimeout(uploadRelay, 2000); return; } // 新结构还没读完，别传半份
       for (const c of COLLS) {
+        if (v2s() && V1COL[c]) { data[c] = {}; for (const x of v2view(c)) data[c][x.id] = v2clean(x); continue; }
         let snap;
         try { snap = await fs.collection(c).get({ source: "cache" }); } catch (_) { snap = await fs.collection(c).get(); } // 读手机缓存，不消耗 Firebase 读取额度
         data[c] = {}; snap.docs.forEach((d) => { const x = live(d); if (x) data[c][d.id] = x; });
@@ -515,8 +527,7 @@
       const kind = ch.op === "delete" ? "del" : ch.base ? "mod" : "add";
       const row = { i, ch, text, kind, state: "ok", note: "" };
       if (!INBOX_COLLS.includes(ch.col) || !ID_OK.test(String(ch.id || "")) || (ch.op !== "set" && ch.op !== "delete") || (ch.op === "set" && (!ch.data || typeof ch.data !== "object" || Array.isArray(ch.data)))) { row.state = "bad"; row.note = "格式不对，跳过"; rows.push(row); continue; }
-      let cur = null;
-      try { cur = live(await fs.doc(ch.col + "/" + ch.id).get()); } catch (_) { cur = live(await fs.doc(ch.col + "/" + ch.id).get({ source: "cache" }).catch(() => null)); }
+      const cur = await readV1(ch.col, ch.id);
       row.before = cur;
       const target = ch.op === "delete" ? null : ch.data;
       if (same(cur, target)) { row.state = "same"; row.note = "App 里已经是这样了，跳过"; }
@@ -564,15 +575,16 @@
       const undo = { at: now, file_id: inbox.fileId, file_name: inbox.fileName, change_id: file.id || null, by: me,
         items: todo.map((r) => ({ col: r.ch.col, id: r.ch.id, before: r.before == null ? null : r.before, after: r.ch.op === "delete" ? null : r.ch.data })) };
       if (JSON.stringify(undo).length > 900000) throw new Error("这份改动太大（超过 0.9MB），请让 Claude 分几次发");
-      const ops = [];
+      const ops = [], later = [];
       ops.push((b) => b.set(fs.doc("relay_undo/" + undoId), undo));
       for (const r of todo) {
         const ref = fs.doc(r.ch.col + "/" + r.ch.id);
-        ops.push(r.ch.op === "delete" ? (b) => b.delete(ref) : (b) => b.set(ref, r.ch.data));
+        if (v2s() && V1COL[r.ch.col]) later.push(r.ch); else ops.push(r.ch.op === "delete" ? (b) => b.delete(ref) : (b) => b.set(ref, r.ch.data));
         if (r.ch.col !== "movements") ops.push((b) => b.set(fs.collection("log").doc("l-c-" + undoId + "-" + r.i), { at: now, by: me, op: { add: "新增", mod: "修改", del: "删除" }[r.kind], col: r.ch.col, ref: r.ch.id, text: String(r.text).replace(/^[^：]*：/, "") + "（Claude 版同步）" }));
       }
       ops.push((b) => b.set(fs.doc("meta/relay_applied"), { last_file_id: inbox.fileId, last_change_id: file.id || null, last_created_at: file.created_at || now, applied_at: now, applied: todo.length, skipped: rows.length - todo.length, undo_id: undoId, by: me }));
       for (let i = 0; i < ops.length; i += 450) { const b = fs.batch(); ops.slice(i, i + 450).forEach((f) => f(b)); await b.commit(); }
+      for (const ch of later) await v2s().write(ch.col, ch.id, ch.op === "delete" ? "delete" : "set", ch.op === "delete" ? null : ch.data);
       inboxDone = { at: now, n: todo.length, undo: undoId };
       try { localStorage.setItem("fb-inbox-seen", inbox.fileId); } catch (_) {}
       try { localStorage.setItem("fb-inbox-done", JSON.stringify(inboxDone)); } catch (_) {}
@@ -594,13 +606,15 @@
     if (!s || !s.exists) { alert("找不到这次写入的备份，没法撤销。"); return; }
     const u = s.data(), items = u.items || [];
     let changedSince = 0;
-    for (const it of items) { const c = await fs.doc(it.col + "/" + it.id).get().catch(() => null); if (!same(live(c), it.after)) changedSince++; }
+    for (const it of items) { if (!same(await readV1(it.col, it.id), it.after)) changedSince++; }
     if (!confirm("撤销这次写入的 " + items.length + " 条改动，恢复成写入前的样子？" + (changedSince ? "\n\n注意：其中 " + changedSince + " 条在写入后又改过，撤销会把那些后来的改动也退回去。" : ""))) return;
-    const ops = items.map((it) => { const ref = fs.doc(it.col + "/" + it.id); return it.before == null ? (b) => b.delete(ref) : (b) => b.set(ref, it.before); });
+    const later = items.filter((it) => v2s() && V1COL[it.col]);
+    const ops = items.filter((it) => !later.includes(it)).map((it) => { const ref = fs.doc(it.col + "/" + it.id); return it.before == null ? (b) => b.delete(ref) : (b) => b.set(ref, it.before); });
     const now = new Date().toISOString();
     ops.push((b) => b.set(fs.collection("log").doc("l-c-undo-" + inboxDone.undo), { at: now, by: window.__fbMyId || null, op: "撤销", col: "", ref: inboxDone.undo, text: "撤销了 Claude 版同步的 " + items.length + " 条改动" }));
     ops.push((b) => b.set(fs.doc("relay_undo/" + inboxDone.undo), { undone_at: now }, { merge: true }));
     for (let i = 0; i < ops.length; i += 450) { const b = fs.batch(); ops.slice(i, i + 450).forEach((f) => f(b)); await b.commit(); }
+    for (const it of later) { const cur = await readV1(it.col, it.id); if (it.before == null) { if (cur) await v2s().write(it.col, it.id, "delete"); } else await v2s().write(it.col, it.id, "set", it.before); }
     inboxDone = null; try { localStorage.removeItem("fb-inbox-done"); } catch (_) {}
     paintInbox();
   }

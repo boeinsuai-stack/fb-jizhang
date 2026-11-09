@@ -316,7 +316,7 @@
       return flush();
     }
     function flush() { const all = ops.splice(0); kick(); return Promise.all(all).then(() => undefined); }
-    return { write, view: () => P || recompute(), refresh: kick, R, stop: () => unsubs.forEach((u) => u && u()) };
+    return { write, view: () => P || recompute(), refresh: kick, ready: () => got.size === Object.keys(COL).length, R, stop: () => unsubs.forEach((u) => u && u()) };
   }
 
   const api = { migrate, project, createStore, COL, V1, r2 };
