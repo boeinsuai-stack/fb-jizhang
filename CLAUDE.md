@@ -27,6 +27,18 @@
 - `public/sw.js`：安装时预存 App + vendor；页面网络优先、3 秒超时用缓存；vendor 缓存优先；字体先用缓存
 - 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一
 
+## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
+- `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
+- 源头：`v2_orders`（lines + picks[{sku,qty,cost,who?,key?,note?,date?,meta}]）、`v2_purchases`（lines + receipts[{id,date,lines{sku:qty},meta}]）、`v2_transfers`（in/out）、
+  `v2_batches`（早期整批进货的支出）、`v2_settlements`（只存正向列表）、`v2_movements` / `v2_expenses`（只剩独立的事：盘点、早期整批进货流水、手动支出、从订单上拿下来的货……）。items/customers/followups/log/meta 不变
+- 源头上的 `v2:{}` = 对齐老记录的补丁（备注原文、out/pick/pay 元数据、skip、no_out…），`"\u2205无"` 表示「旧记录没有这个字段」
+- 翻译层写入：业务代码照旧写旧样子 → 找源头（`_v` 或编号/字段规则）→ 在源头那一组上应用 → `migrate()` 重新生成源头 → 只写源头。本机刚写的先挂着（pend），写完再收到一次通知才放下
+- index.html：启动读 `meta/schema`，=2 才走 v2；版本变了自动刷新；`wrapDb` 把 orders/movements/expenses/purchases/transfers/settlements 交给 `v2ref`；`window.__fbV2store` 给 shim 中转站用
+- 设置页「数据结构升级」（店主）：检查迁移 → 确认迁移（写 v2_* + meta/schema=2，旧集合不动）→ 迁移后旧结构又有改动会提示「补进新结构」→ 退回旧结构（现算的旧样子写回旧集合 + 版本改回 1）
+- 测试（真实数据放仓库外，fixture 用 ArtifactData 或备份 json 生成）：`node tests/v2_roundtrip.js <fixture>`（往返逐字段）、`tests/golden.py` + `tests/golden_diff.py`（旧版计算结果当标准答案）、
+  `tests/test_v2_diff.py <fixture> <v2种子>`（界面上旧版/新版各做一遍逐条比）、`node tests/v2_fuzz.js <fixture> 2000 <种子>`（随机写入压力测试）、`tests/test_v2_migrate.py <fixture>`（迁移/补进/退回端到端）。种子：`node tests/v2_seed.js`
+- 中转站在 v2 下的端到端（Drive + 授权）**还没测**
+
 ## 中转站（App ↔ Claude 版 的同步，2026-11 起）
 - Claude 版不能直连 Firebase（artifact 网络被拦，已实测），所以用 Google Drive 当中转站
 - App → 中转站：只有 owner 的手机上传；每次云端确认保存后 4 秒，把所有集合（读手机缓存，不耗额度）打包成
