@@ -1055,8 +1055,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
     for (const l of ls) { const it = itemBy(l.sku), sr = seriesOf(it); if (!g[sr]) { g[sr] = []; ord.push(sr); } g[sr].push({ gen: isGeneric(it), t: nm(l.sku, l.name), q: l.qty, pk: short ? short[l.sku] || 0 : 0 }); }
     return ord.map((sr) => '<span class="ol-ser">' + esc(sr) + "</span>" + '<ul class="ol">' + g[sr].map((x) => "<li><span>" + esc(x.gen ? "口味" + (extra || "没记") : x.t) + (x.pk ? '<i class="ol-pick">找' + esc(short.__who || "合伙人") + "拿 " + x.pk + "</i>" : "") + "</span><b>×" + esc(x.q) + "</b></li>").join("") + "</ul>").join("");
   };
-  /* 分开找几个人拿的单：每一行后面一个小标签「找雷子拿」，手上的货在前，同一个人的排在一起（同一系列里）。
-     src = [{ label: "找杭子拿", cls: ""|"done", qty: {sku: 根数} }]；不加区头、不加色条 */
+  /* 分开找几个人拿的单：每一行后面一个小标签「找合伙人乙拿」，手上的货在前，同一个人的排在一起（同一系列里）。
+     src = [{ label: "找合伙人甲拿", cls: ""|"done", qty: {sku: 根数} }]；不加区头、不加色条 */
   const skuQty = (ms) => { const t = {}; for (const m of ms || []) t[m.sku] = (t[m.sku] || 0) + (Number(m.qty) || 0); return t; };
   function linesBySrc(o, src, extra) {
     const ls = o.lines || [];
