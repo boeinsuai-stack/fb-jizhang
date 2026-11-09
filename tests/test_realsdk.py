@@ -55,6 +55,23 @@ with sync_playwright() as p, tempfile.TemporaryDirectory() as prof:
     ctx, pg = launch()
     r = pg.evaluate(COUNT)
     check("关掉重开、没网：从手机本地数据库读回 1199 条", r["n"] == 1199, str(r["n"]))
+
+    # 读一条本地没有的记录（meta/schema 从没联网读过）：真 SDK 怎么表现 —— App 判断数据结构版本靠这个（test_v2_failsafe 的假 Firebase 照这个做）
+    g = pg.evaluate("""() => { const t = Date.now(); return firebase.firestore().doc("meta/schema").get().then((s) => ({ ok: true, exists: s.exists, ms: Date.now() - t }), (e) => ({ ok: false, code: e.code, ms: Date.now() - t })); }""")
+    check("真 SDK、没网：读本地没有的记录 → 报 unavailable（不是「不存在」）", not g["ok"] and g.get("code") == "unavailable", str(g))
+    sn = pg.evaluate("""() => new Promise((res) => { const un = firebase.firestore().doc("meta/schema").onSnapshot((s) => { un(); res({ exists: s.exists, fromCache: s.metadata.fromCache }); }, (e) => res({ err: e.code })); })""")
+    check("真 SDK、没网：监听本地没有的记录 → 「不存在」但标着 fromCache（App 不能当真）", sn == {"exists": False, "fromCache": True}, str(sn))
+    ctx.close()
+
+    # 这台手机记得「新结构」，没网打开：用新结构，不会一直刷新
+    ctx = p.chromium.launch_persistent_context(prof, executable_path=os.environ.get("CHROME", "/usr/bin/google-chrome"), args=["--no-sandbox"], service_workers="block", viewport={"width": 390, "height": 844})
+    ctx.add_init_script("localStorage.setItem('fb-last-user', JSON.stringify({ uid: 'u-test', email: '', displayName: '测试' })); localStorage.setItem('fb-schema', JSON.stringify({ version: 2 })); sessionStorage.setItem('loads', String(+(sessionStorage.getItem('loads') || 0) + 1));")
+    pg = ctx.pages[0] if ctx.pages else ctx.new_page()
+    pg.route("**/firebase-auth-compat.js", lambda r: r.fulfill(body=AUTH_STUB, content_type="text/javascript"))
+    pg.route("**/*", lambda r: r.abort() if "127.0.0.1" not in r.request.url else r.fallback())
+    pg.goto(URL); pg.wait_for_function("window.__fbFirstSync", timeout=15000); pg.wait_for_timeout(4000)
+    v = pg.evaluate("({ v2: !!window.__fbV2store, loads: +sessionStorage.getItem('loads') })")
+    check("真 SDK、没网、记得是新结构：用新结构，没有一直刷新", v["v2"] and v["loads"] == 1, str(v))
     ctx.close()
 
 print(f"\n{sum(results)}/{len(results)} 通过")

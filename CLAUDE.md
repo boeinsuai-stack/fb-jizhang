@@ -37,6 +37,9 @@
 - 设置页「数据结构升级」（店主）：检查迁移 → 确认迁移（写 v2_* + meta/schema=2，旧集合不动）→ 迁移后旧结构又有改动会提示「补进新结构」→ 退回旧结构（现算的旧样子写回旧集合 + 版本改回 1）
 - 测试（真实数据放仓库外，fixture 用 ArtifactData 或备份 json 生成）：`node tests/v2_roundtrip.js <fixture>`（往返逐字段）、`tests/golden.py` + `tests/golden_diff.py`（旧版计算结果当标准答案）、
   `tests/test_v2_diff.py <fixture> <v2种子>`（界面上旧版/新版各做一遍逐条比）、`node tests/v2_fuzz.js <fixture> 2000 <种子>`（随机写入压力测试）、`tests/test_v2_migrate.py <fixture>`（迁移/补进/退回端到端）。种子：`node tests/v2_seed.js`
+- **读不到 ≠ 没有**（2026-11-10）：数据结构版本 `readSchema()` 先问云端（没网时 SDK 用缓存），读不到用 localStorage `fb-schema`（这台手机上次看到的），都没有才当旧结构；
+  meta/schema 的监听收到「本地没有」（`!exists && fromCache`）不当真（不然没网时一直刷新）。确认迁移、迁移后查旧结构改动都用 `get({source:"server"})`，读不到就停/写明「还没能检查」，联网后自动再查。
+  测试 `tests/test_v2_failsafe.py`（编的小数据，GitHub 上也跑）；真 SDK 的对应行为在 test_realsdk.py 里实测过
 - 中转站 v2：`tests/test_v2_relay.py <fixture> <v2种子>`（Drive 用 page.route 内存模拟；预放没过期的 token）旧版/新版各走一遍 上传 → 写入 Claude 改动 → 撤销，8/8。注意 page.route 后注册的先生效；种子要有 meta/backfill.done
 
 ## 中转站（App ↔ Claude 版 的同步，2026-11 起）
@@ -64,7 +67,9 @@
 - 公开仓库：不要提交邮箱、人名、金额、客户数据、备份文件
 - 记账流程要快：快速下单在最上面，记一笔不能强制填客户信息
 - 定价策略不进 App
-- 改完先跑三套测试再推送（Playwright + /usr/bin/google-chrome）：`tests/test_offline_resv.py`、`tests/test_sync.py`、`tests/test_realsdk.py`；新功能把测试加进 tests/
+- 改完先跑测试再推送：`tests/run_all.sh [真实 fixture] [v2 种子]`（Playwright + /usr/bin/google-chrome，别的路径用环境变量 CHROME）；新功能把测试加进 tests/
+  - GitHub Actions `.github/workflows/test.yml`：推送到任何分支自动跑不需要真实数据的几套；推到 main 时 pages.yml 先跑测试，**不过就不发布**
+  - mockfb.js 没网时读本地没有的记录会报 unavailable、`source:"server"` 没网报错（照真 SDK，test_realsdk 实测）
   - tests/mockfb.js 分「云端 + 手机本地数据库」两层，按条计费（`__reads`），`__remoteWrite` 模拟另一台手机。照真 Firestore：本地马上更新，`__MOCK_OFFLINE` 时 set/update 的 promise 永远不完成。**不要改成立刻返回成功**，那样测不出离线问题
   - test_realsdk.py 用 public/vendor 里真的 Firestore SDK + Chrome 真 IndexedDB、断网跑（只把登录换成假的）
   - 测试数据里合伙人用「合伙人甲/乙」，不要用真名
@@ -75,4 +80,6 @@
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超
-- 一单的几条写入还不是一个 batch（中途关掉 App 理论上可能只存一半）；16 处 catch 吞掉错误；测试还没在推送时自动跑
+- 一单的几条写入还不是一个 batch（中途关掉 App 理论上可能只存一半）—— v2 下一单只写一条源头，基本解决
+- （已查，2026-11-10）约 60 处 catch：大部分是记住界面设置（localStorage）、删照片、复制文字的退路，吞掉没事；
+  会让账出错的 5 处已改（数据结构版本 ×2、确认迁移、迁移后旧结构改动、中转站「写入过没有」）。写入失败本来就由 shim 的红字计数兜底

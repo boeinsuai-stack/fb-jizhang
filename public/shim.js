@@ -506,7 +506,7 @@
       if (!f) { inbox = null; paintInbox(); return; }
       let seenId = null; try { seenId = localStorage.getItem("fb-inbox-seen"); } catch (_) {}
       if (seenId === f.id) { inbox = null; paintInbox(); return; } // 这份已经处理过，不用再查
-      const applied = await fs.doc("meta/relay_applied").get().catch(() => null);
+      const applied = await fs.doc("meta/relay_applied").get(); // 读不到就先不提示（以前当成「没写入过」，会把写过的清单再提示一遍）
       const last = applied && applied.exists ? applied.data() : {};
       if (inbox && inbox.pending && inbox.fileId === f.id) { paintInbox(); return; } // 已经提示着这份
       if (last.last_file_id === f.id) { try { localStorage.setItem("fb-inbox-seen", f.id); } catch (_) {} inbox = null; paintInbox(); return; }

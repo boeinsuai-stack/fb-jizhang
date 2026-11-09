@@ -88,14 +88,14 @@
     if (q.lim) rows = rows.slice(0, q.lim);
     return rows;
   }
-  function docSnap(id, r, c) {
+  function docSnap(id, r, c, fromCache) {
     const data = (o) => { if (!r) return undefined; const x = copy(r.d); for (const k of Object.keys(x)) { if (isTs(x[k])) x[k] = new Timestamp(x[k].__ts); else if (isPend(x[k])) x[k] = o && o.serverTimestamps === "estimate" ? Timestamp.now() : null; } return x; };
-    return { id, exists: !!r, ref: new DocumentReference(c + "/" + id), metadata: { hasPendingWrites: !!(r && r.pend), fromCache: false }, data, get: (f) => { const x = data(); return x ? x[f] : undefined; } };
+    return { id, exists: !!r, ref: new DocumentReference(c + "/" + id), metadata: { hasPendingWrites: !!(r && r.pend), fromCache: !!fromCache }, data, get: (f) => { const x = data(); return x ? x[f] : undefined; } };
   }
   const listeners = [];
   function deliver(l) {
     const online = !OFFLINE && !l.cacheOnly;
-    if (l.doc) { const [c, id] = l.doc.split("/"); const r = col(online ? server : cache, c).get(id); l.cb(docSnap(id, r, c)); return; }
+    if (l.doc) { const [c, id] = l.doc.split("/"); const r = col(online ? server : cache, c).get(id); l.cb(docSnap(id, r, c, !online)); return; }
     let rows;
     if (online) {
       rows = run(server, l.q);
@@ -126,7 +126,14 @@
     set(d, opt) { const commit = write(this.path, "set", d, opt); notify(); return ack(commit); }
     update(d, ...rest) { if (typeof d === "string") { const o = {}; o[d] = rest[0]; for (let i = 1; i + 1 < rest.length; i += 2) o[rest[i]] = rest[i + 1]; d = o; } const commit = write(this.path, "update", d); notify(); return ack(commit); }
     delete() { const commit = write(this.path, "delete"); notify(); return ack(commit); }
-    get(o) { const [c, id] = this.path.split("/"); const useCache = OFFLINE || (o && o.source === "cache"); const r = col(useCache ? cache : server, c).get(id); if (!useCache && r) window.__reads++; return Promise.resolve(docSnap(id, r, c)); }
+    // 照真 SDK：没网时读不在本地的记录 → 报 unavailable；指定 source:"server" 没网也报错；source:"cache" 本地没有也报错
+    get(o) {
+      const [c, id] = this.path.split("/"), src = o && o.source;
+      if (OFFLINE && src === "server") return Promise.reject(Object.assign(new Error("Failed to get document because the client is offline."), { code: "unavailable" }));
+      const useCache = OFFLINE || src === "cache"; const r = col(useCache ? cache : server, c).get(id);
+      if (useCache && !r) return Promise.reject(Object.assign(new Error(src === "cache" ? "Failed to get document from cache." : "Failed to get document because the client is offline."), { code: "unavailable" }));
+      if (!useCache && r) window.__reads++; return Promise.resolve(docSnap(id, r, c, useCache));
+    }
     onSnapshot(...a) { return subscribe({ doc: this.path }, a); }
   }
   class WriteBatch {
@@ -142,7 +149,8 @@
       orderBy: (f, dir) => query(c, Object.assign({}, q, { order: [f, dir || "asc"] })),
       where: (f, op, v) => query(c, Object.assign({}, q, { where: q.where.concat([[f, op, v]]) })),
       onSnapshot: (...a) => subscribe({ q: Object.assign({ c }, q) }, a),
-      get: (o) => { const useCache = OFFLINE || (o && o.source === "cache"); const rows = run(useCache ? cache : server, Object.assign({ c }, q)); if (!useCache) window.__reads += rows.length; const docs = rows.map(([id, r]) => docSnap(id, r, c)); return Promise.resolve({ docs, size: docs.length, empty: !docs.length, metadata: { fromCache: useCache } }); },
+      get: (o) => { if (OFFLINE && o && o.source === "server") return Promise.reject(Object.assign(new Error("Failed to get documents because the client is offline."), { code: "unavailable" }));
+        const useCache = OFFLINE || (o && o.source === "cache"); const rows = run(useCache ? cache : server, Object.assign({ c }, q)); if (!useCache) window.__reads += rows.length; const docs = rows.map(([id, r]) => docSnap(id, r, c)); return Promise.resolve({ docs, size: docs.length, empty: !docs.length, metadata: { fromCache: useCache } }); },
       doc: (id) => new DocumentReference(c + "/" + (id || "auto" + Math.random().toString(36).slice(2))),
     };
   }
