@@ -17,6 +17,9 @@
   const pickMeta = (x) => { const o = {}; for (const k of META) if (x && x[k] != null) o[k] = x[k]; return o; };
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const isPickId = (id) => /-pick-/.test(id);
+  // 补丁里「这个字段旧记录没有」用 NONE 表示（undefined 存不进数据库）
+  const NONE = "\u2205无";
+  const ov = (target, patch) => { for (const [k, v] of Object.entries(patch || {})) { if (v === NONE) delete target[k]; else target[k] = v; } return target; };
 
   // ---------- 现算：v2 → App 原来的样子 ----------
   function project(v2) {
@@ -35,8 +38,8 @@
         const skip = V.no_out || [];
         for (const sku of order) {
           if (skip.includes(sku)) continue;
-          const ov = (V.out || {})[sku] || {};
-          moves.push(Object.assign({ id: o0.id + "-" + sku, type: "out", sku, name: nameOf(sku, per[sku].name), qty: per[sku].qty, date: o0.date, order_id: o0.id }, pickMeta(o0), ov, { _v: "order:" + o0.id }));
+          const o = (V.out || {})[sku] || {};
+          moves.push(Object.assign(ov(Object.assign({ id: o0.id + "-" + sku, type: "out", sku, name: nameOf(sku, per[sku].name), qty: per[sku].qty, date: o0.date, order_id: o0.id }, pickMeta(o0)), o), { _v: "order:" + o0.id }));
         }
       }
       const P = o0.picks || [];
@@ -45,12 +48,12 @@
         for (const p of P) {
           const m = { id: bid + "-" + p.sku + (p.key || ""), type: "in", sku: p.sku, name: nameOf(p.sku, p.name), qty: p.qty, cost: p.cost, date: p.date || o0.date, order_id: o0.id, batch_id: bid, expense_id: bid + "-cost", note: p.note || "按单向合伙人拿货" };
           if (p.who != null) m.partner = p.who;
-          moves.push(Object.assign(m, pickMeta(o0), p.meta || {}, { _v: "order:" + o0.id }));
+          moves.push(Object.assign(ov(Object.assign(m, pickMeta(o0)), p.meta), { _v: "order:" + o0.id }));
         }
         if (!V.no_pick_expense) {
           const x = { id: bid + "-cost", category: "进货成本", amount: r2(P.reduce((a, p) => a + (Number(p.cost) || 0), 0)), date: o0.date, batch_id: bid,
             note: V.pick_note != null ? V.pick_note : "按单拿货 " + P.map((p) => nm(p.sku, p.name) + " ×" + p.qty).join("、") };
-          expenses.push(Object.assign(x, pickMeta(o0), V.pick_meta || {}, { _v: "order:" + o0.id }));
+          expenses.push(Object.assign(ov(Object.assign(x, pickMeta(o0)), V.pick_meta), { _v: "order:" + o0.id }));
         }
       }
       return o;
@@ -62,11 +65,11 @@
       for (const r of p0.receipts || []) for (const [sku, qty] of Object.entries(r.lines || {})) {
         const l = (p0.lines || []).find((x) => x.sku === sku) || {};
         const mv = { id: p0.id + "-" + r.id + "-" + sku, type: "in", sku, name: nameOf(sku, l.name), qty, cost: r2(qty * (Number(l.unit_cost) || 0)), date: r.date, po_id: p0.id, po_line: sku, receipt_id: r.id, note: "订货到货" };
-        moves.push(Object.assign(mv, pickMeta(r), (r.meta || {})[sku] || {}, { _v: "purchase:" + p0.id }));
+        moves.push(Object.assign(ov(Object.assign(mv, pickMeta(r)), (r.meta || {})[sku]), { _v: "purchase:" + p0.id }));
       }
       if (!V.no_pay_expense) {
         const x = { id: p0.id + "-pay", category: "进货成本", amount: r2(p0.total), date: V.pay_date || p0.date, po_id: p0.id, note: V.pay_note != null ? V.pay_note : "订货 " + (p0.lines || []).map((l) => nameOf(l.sku, l.name) + " ×" + l.qty).join("、") };
-        expenses.push(Object.assign(x, pickMeta(p0), V.pay_meta || {}, { _v: "purchase:" + p0.id }));
+        expenses.push(Object.assign(ov(Object.assign(x, pickMeta(p0)), V.pay_meta), { _v: "purchase:" + p0.id }));
       }
       return p;
     });
@@ -75,11 +78,11 @@
       const t = clone(t0); delete t.v2;
       const V = t0.v2 || {};
       for (const side of ["in", "out"]) for (const l of t0[side] || []) {
-        const ov = (V.moves || {})[side + ":" + l.sku] || {};
+        const o = (V.moves || {})[side + ":" + l.sku] || {};
         const mv = side === "in"
           ? { id: t0.id + "-in-" + l.sku, type: "in", sku: l.sku, name: nameOf(l.sku, l.name), qty: l.qty, cost: r2(l.qty * (Number(l.unit) || 0)), date: t0.date, transfer_id: t0.id, note: "合伙人往来：" + t0.partner + " 给的" }
           : { id: t0.id + "-out-" + l.sku, type: "adjust", sku: l.sku, name: nameOf(l.sku, l.name), qty: -l.qty, date: t0.date, transfer_id: t0.id, note: "合伙人往来：给 " + t0.partner };
-        const m = Object.assign(mv, pickMeta(t0), ov, { _v: "transfer:" + t0.id });
+        const m = Object.assign(ov(Object.assign(mv, pickMeta(t0)), o), { _v: "transfer:" + t0.id });
         for (const k of Object.keys(m)) if (m[k] === undefined) delete m[k];
         moves.push(m);
       }
@@ -91,7 +94,7 @@
     // 早期整批进货：支出 = 这批流水的成本合计
     for (const b of v2.batches || []) {
       const ms = moves.filter((m) => m.batch_id === b.id);
-      expenses.push(Object.assign({ id: b.id + "-cost", category: "进货成本", amount: r2(ms.reduce((a, m) => a + (Number(m.cost) || 0), 0)), date: b.date, batch_id: b.id, note: b.note }, b.meta || {}, { _v: "batch:" + b.id }));
+      expenses.push(Object.assign(ov({ id: b.id + "-cost", category: "进货成本", amount: r2(ms.reduce((a, m) => a + (Number(m.cost) || 0), 0)), date: b.date, batch_id: b.id, note: b.note }, b.meta), { _v: "batch:" + b.id }));
     }
     // 结账 → 单据上的反向指针
     const settles = (v2.settlements || []).map(clone);
@@ -104,6 +107,10 @@
       for (const tid of s.transfer_ids || []) if (tBy[tid]) tBy[tid].partner_settlement_id = s.id;
       for (const pid of s.po_ids || []) if (pBy[pid]) pBy[pid].settlement_id = s.id;
     }
+    // 源头标了「这几条旧数据里没有」的（比如撤销往来时先删了流水、往来单还在），不算出来
+    const skip = new Set();
+    for (const z of (v2.orders || []).concat(v2.purchases || [], v2.transfers || [])) for (const id of (z.v2 && z.v2.skip) || []) skip.add(id);
+    if (skip.size) { for (const a of [moves, expenses]) for (let i = a.length - 1; i >= 0; i--) if (a[i]._v && skip.has(a[i].id)) a.splice(i, 1); }
     // 跟 Firebase 一样按编号排序（App 有些列表靠这个顺序）
     const byId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
     for (const a of [orders, purchases, transfers, moves, expenses, settles]) a.sort(byId);
@@ -133,7 +140,8 @@
       }
       if (picks.length) n.picks = picks.map((p) => { for (const k of Object.keys(p)) if (p[k] === undefined) delete p[k]; return p; });
       for (const m of M) if (m.order_id === o.id && m.type === "out" && m.id === o.id + "-" + m.sku) used.add(m.id);
-      const px = E.find((x) => x.id === o.id + "-pick-cost"); if (px) usedE.add(px.id);
+      // 拿货支出归订单管，前提是订单上有拿货；没有拿货了（货留作库存），这笔支出就是独立的
+      const px = E.find((x) => x.id === o.id + "-pick-cost"); if (px && picks.length) usedE.add(px.id);
       return n;
     });
     const purchases = L("purchases").map((p) => {
@@ -163,7 +171,7 @@
     const oldM = {}, oldE = {}; for (const m of M) oldM[m.id] = m; for (const x of E) oldE[x.id] = x;
     const newM = {}, newE = {}; for (const m of P.moves) newM[m.id] = m; for (const x of P.expenses) newE[x.id] = x;
     const src = (v) => { const [k, id] = v.split(/:(.*)/); return (k === "order" ? orders : k === "purchase" ? purchases : k === "transfer" ? transfers : []).find((z) => z.id === id); };
-    const diffs = (a, b) => { const d = {}; for (const k of new Set(Object.keys(a).concat(Object.keys(b)))) { if (k === "_v" || k === "id" || k === "by_at") continue; if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) d[k] = a[k] === undefined ? undefined : a[k]; } return d; };
+    const diffs = (a, b) => { const d = {}; for (const k of new Set(Object.keys(a).concat(Object.keys(b)))) { if (k === "_v" || k === "id" || k === "by_at") continue; if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) d[k] = a[k] === undefined ? NONE : a[k]; } return d; };
     for (const id of Object.keys(newM)) {
       const nm = newM[id], om = oldM[id]; if (!om) continue;
       const d = diffs(om, nm); if (!Object.keys(d).length) continue;
@@ -187,6 +195,14 @@
       const miss = want.filter((sku) => !oldM[o.id + "-" + sku]); if (miss.length) o.v2.no_out = miss;
       if (o.status === "reserved" && M.some((m) => m.order_id === o.id && m.type === "out")) o.v2.out_reserved = true;
       if (o.picks && !oldE[o.id + "-pick-cost"]) o.v2.no_pick_expense = true;
+    }
+    {
+      const P2 = project(v2);
+      for (const z of orders.concat(purchases, transfers)) {
+        const tag = (orders.includes(z) ? "order:" : purchases.includes(z) ? "purchase:" : "transfer:") + z.id;
+        const extra = P2.moves.filter((m) => m._v === tag && !oldM[m.id]).map((m) => m.id).concat(P2.expenses.filter((x) => x._v === tag && !oldE[x.id]).map((x) => x.id));
+        if (extra.length) z.v2.skip = extra;
+      }
     }
     for (const z of orders.concat(purchases, transfers)) if (!Object.keys(z.v2).length) delete z.v2;
     return v2;
@@ -291,6 +307,7 @@
         // 这一组里没被源头收回的 = 独立的流水/支出
         const idsM = new Set(Object.keys(old.movements).concat(Object.values(cur.movements).filter(mine).map((m) => m.id)));
         const idsE = new Set(Object.keys(old.expenses).concat(Object.values(cur.expenses).filter(mine).map((x) => x.id)));
+        if (oA !== own) { if (c === "movements") idsM.delete(id); if (c === "expenses") idsE.delete(id); } // 刚写的这条已经归别处（或独立）了，这一组不管它
         const freeM = {}, freeE = {}; for (const m of v.movements) freeM[m.id] = m; for (const x of v.expenses) freeE[x.id] = x;
         for (const mid of idsM) put("movements", mid, freeM[mid] ? clean(freeM[mid]) : null);
         for (const xid of idsE) put("expenses", xid, freeE[xid] ? clean(freeE[xid]) : null);
