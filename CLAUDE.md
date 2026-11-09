@@ -11,7 +11,16 @@
   - 同步状态小圆点：包住 DocumentReference.set/update/delete 和 WriteBatch.commit，用 waitForPendingWrites 判断已保存
   - **没网也能记账（2026-11-08）**：Firestore 写入的 promise 要等云端确认，没网时永远不完成 → 包装后改成「写进本地缓存就完成」
     （读一次 cache 排在写入后面当标记 + 等一拍让 onSnapshot 跑完）。云端拒收另外计数，右上角红字显示。不要去掉这层
-  - 登录：1.5 秒内 Firebase 还没确认登录，就用 localStorage `fb-last-user`（上次登录的人）先打开；确认后换人则刷新
+  - 登录：1.5 秒内 Firebase 还没确认登录，就用 localStorage `fb-last-user`（上次登录的人）先打开；确认后换人则刷新；确认是退出状态则取消
+  - **增量同步（feat12，2026-11-09，替代 limit(1000)）**：业务代码拿到的 db 是 shim 的 `dbApi`，不是原始 Firestore
+    - 账本集合 SYNCED（items movements orders expenses purchases settlements transfers customers followups log）：
+      页面用 `onSnapshot({source:"cache"})` 读手机本地数据库的**全部**记录（不计费）；业务代码写的 `limit(1000)` 被忽略，`orderBy().limit(n)`（操作记录 200 条）照旧
+    - 另开云端监听 `where("_u", ">", 上次看到的最大 _u − 10 分钟)` 把别的手机的改动拉进本地；进度存 localStorage `fb-sync:<uid>:<集合>`
+    - 每台手机每 24 小时（或本地是空的时候）整份读一次云端 = 对账
+    - 写入：DocumentReference / WriteBatch 的 set/update 自动加 `_u: serverTimestamp()`；**delete 改成写 `{_deleted:true,_u}` 标记**（软删除），页面过滤掉
+    - 中转站上传、核对 Claude 版改动、撤销都用 `live()`：已删除 = 不存在，去掉 `_u`。Claude 版看到的数据格式不变
+    - 本地数据库不可用（隐私模式）时退回直接订阅云端（不限条数）
+    - settings 里 `cacheSizeBytes: CACHE_SIZE_UNLIMITED`，不让 SDK 清掉本地旧记录
 - `public/firebase-config.js`：Firebase 配置 + APP_CONFIG（只放指纹，不放邮箱）
 - `public/vendor/`：Firebase compat SDK 10.12.2（app/auth/firestore）和 xlsx 0.18.5，从 npm 包复制（去掉 sourceMappingURL）。
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
@@ -43,8 +52,9 @@
 - 公开仓库：不要提交邮箱、人名、金额、客户数据、备份文件
 - 记账流程要快：快速下单在最上面，记一笔不能强制填客户信息
 - 定价策略不进 App
-- 改完先跑 `python3 tests/test_offline_resv.py`（Playwright + /usr/bin/google-chrome + tests/mockfb.js，手机尺寸）再推送；新功能把测试加进 tests/
-  - tests/mockfb.js 照真 Firestore 离线时的样子：本地马上更新，`__MOCK_OFFLINE` 时 set/update 的 promise 永远不完成。**不要改成立刻返回成功**，那样测不出离线问题
+- 改完先跑三套测试再推送（Playwright + /usr/bin/google-chrome）：`tests/test_offline_resv.py`、`tests/test_sync.py`、`tests/test_realsdk.py`；新功能把测试加进 tests/
+  - tests/mockfb.js 分「云端 + 手机本地数据库」两层，按条计费（`__reads`），`__remoteWrite` 模拟另一台手机。照真 Firestore：本地马上更新，`__MOCK_OFFLINE` 时 set/update 的 promise 永远不完成。**不要改成立刻返回成功**，那样测不出离线问题
+  - test_realsdk.py 用 public/vendor 里真的 Firestore SDK + Chrome 真 IndexedDB、断网跑（只把登录换成假的）
   - 测试数据里合伙人用「合伙人甲/乙」，不要用真名
 
 ## 编辑预定（feat11，2026-11-09）
@@ -52,4 +62,5 @@
 - 已卖出的单仍走 orderEditForm（数量锁住）
 
 ## 已知问题
-- 每个集合 `limit(1000)` 且没有 orderBy：Firestore 按文档 ID 排序取前 1000 条，ID 里带日期 → 超过之后**丢的是最新的记录**，没有提示。库存流水预计 2027-01 底超限，12 月前要改（按月结账 / 只读最近 N 个月 + 期初结余）
+- （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超
+- 一单的几条写入还不是一个 batch（中途关掉 App 理论上可能只存一半）；16 处 catch 吞掉错误；测试还没在推送时自动跑

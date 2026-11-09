@@ -6,9 +6,11 @@
   const auth = firebase.auth();
   const fs = firebase.firestore();
   // 和 Claude 数据库一致：值为 undefined 的字段直接忽略，而不是报错
-  fs.settings({ ignoreUndefinedProperties: true, merge: true });
-  // 离线可用：没网时照常记账，联网后自动同步
-  fs.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+  // cacheSizeBytes 无上限：手机里的本地数据库不自动清旧记录（App 现在从本地数据库读全部记录，见下面「增量同步」）
+  fs.settings({ ignoreUndefinedProperties: true, merge: true, cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED });
+  // 离线可用：没网时照常记账，联网后自动同步。persistOK = 本地数据库能不能用（隐私模式等情况下不能用）
+  let persistOK = null;
+  const persistReady = fs.enablePersistence({ synchronizeTabs: true }).then(() => { persistOK = true; }, (e) => { persistOK = false; console.warn("本地数据库不可用，改为每次从云端整份读取", e); });
 
   /* ---------- 登录界面 ---------- */
   let resolveUser;
@@ -48,7 +50,7 @@
   let started = null, lastU = null;
   const startWith = (u) => { if (started) return; started = u; resolveUser(u); };
   try { lastU = JSON.parse(localStorage.getItem("fb-last-user") || "null"); } catch (_) {}
-  if (lastU && lastU.uid) setTimeout(() => startWith(lastU), 1500);
+  const fastStart = lastU && lastU.uid ? setTimeout(() => startWith(lastU), 1500) : null;
   auth.onAuthStateChanged((u) => {
     if (u) {
       try { localStorage.setItem("fb-last-user", JSON.stringify({ uid: u.uid, email: u.email || "", displayName: u.displayName || "" })); } catch (_) {}
@@ -56,6 +58,7 @@
       if (started && started.uid !== u.uid) { location.reload(); return; }
       startWith(u);
     } else {
+      clearTimeout(fastStart); // 已经退出登录：不要再用上次的人启动
       try { localStorage.removeItem("fb-last-user"); } catch (_) {}
       if (document.body) showLogin(); else document.addEventListener("DOMContentLoaded", () => showLogin());
     }
@@ -179,10 +182,99 @@
     p.catch((e) => { if (!settled) return; failed++; failMsg = (e && (e.code || e.message)) || String(e); paintBadge(); console.error("云端没收下这笔", e); });
     return Promise.race([p, localDone()]).finally(() => { settled = true; });
   }
+  /* ---------- 增量同步：写入这一半 ----------
+     账本里的记录（SYNCED）每次写入都自动带上 _u = 云端收到的时间。另一台手机只需要问云端
+     「_u 比我上次看到的晚的有哪些」，不用每次把全部记录重读一遍（重读按条数收费，记录越多越贵）。
+     删除不真删，而是留一个 { _deleted: true } 标记：这样删除也有 _u，另一台手机能同步到。App 里看不到这些标记。 */
+  const SYNCED = new Set(["items", "movements", "orders", "expenses", "purchases", "settlements", "transfers", "customers", "followups", "log"]);
+  const FV = firebase.firestore.FieldValue;
+  const synced = (ref) => !!ref && !!ref.parent && !ref.parent.parent && SYNCED.has(ref.parent.id);
+  const tomb = () => ({ _deleted: true, _u: FV.serverTimestamp() });
+  const stampSet = (ref, d, opt) => (!synced(ref) || !d || typeof d !== "object" ? d : Object.assign({}, d, { _u: FV.serverTimestamp() }, opt && opt.merge ? { _deleted: FV.delete() } : {}));
+  const stampUpd = (ref, a) => (!synced(ref) ? a : a.length && a[0] && typeof a[0] === "object" && !(a[0] instanceof firebase.firestore.FieldPath) ? [Object.assign({}, a[0], { _u: FV.serverTimestamp() })].concat(a.slice(1)) : a.concat(["_u", FV.serverTimestamp()]));
   const DR = firebase.firestore.DocumentReference.prototype;
-  for (const m of ["set", "update", "delete"]) { const orig = DR[m]; DR[m] = function (...a) { return local(trackWrite(orig.apply(this, a))); }; }
+  const dSet = DR.set, dUpd = DR.update, dDel = DR.delete;
+  DR.set = function (d, opt) { return local(trackWrite(dSet.call(this, stampSet(this, d, opt), opt))); };
+  DR.update = function (...a) { return local(trackWrite(dUpd.apply(this, stampUpd(this, a)))); };
+  DR.delete = function () { return local(trackWrite(synced(this) ? dSet.call(this, tomb()) : dDel.call(this))); };
   const WB = firebase.firestore.WriteBatch.prototype, origCommit = WB.commit;
+  const bSet = WB.set, bUpd = WB.update, bDel = WB.delete;
+  WB.set = function (ref, d, opt) { return bSet.call(this, ref, stampSet(ref, d, opt), opt); };
+  WB.update = function (ref, ...a) { return bUpd.call(this, ref, ...stampUpd(ref, a)); };
+  WB.delete = function (ref) { return synced(ref) ? bSet.call(this, ref, tomb()) : bDel.call(this, ref); };
   WB.commit = function (...a) { return local(trackWrite(origCommit.apply(this, a))); };
+  // 读一条记录：已删除标记 = 不存在；去掉内部字段 _u
+  const live = (s) => { if (!s || !s.exists) return null; const x = s.data(); if (!x || x._deleted) return null; delete x._u; return x; };
+
+  /* ---------- 增量同步：读取这一半 ----------
+     以前：每类记录 limit(1000) 直接从云端订阅。超过 1000 条后按编号丢记录（t- 开头的合伙人往来先丢），
+     而且每次打开 App（离开超过 30 分钟）都把全部记录重新计费读一遍。
+     现在：页面从手机里的本地数据库读全部记录（不收费、没网也能读）；另开一个只问「新改动」的云端监听，
+     把别的手机的改动拉进本地数据库。每台手机每天整份对一次账（补漏、清理旧版本真删的记录）。 */
+  const MARGIN = 10 * 60e3, DAY = 24 * 3600e3;
+  let syncUid = "";
+  const pulled = {};
+  const maxU = (s) => s.docs.reduce((m, d) => { if (d.metadata.hasPendingWrites) return m; const u = d.get("_u"); return u && u.toMillis ? Math.max(m, u.toMillis()) : m; }, 0);
+  function pull(c) {
+    if (pulled[c]) return; pulled[c] = 1;
+    const key = "fb-sync:" + syncUid + ":" + c;
+    let st = {}; try { st = JSON.parse(localStorage.getItem(key) || "{}") || {}; } catch (_) {}
+    const save = (o) => { Object.assign(st, o); try { localStorage.setItem(key, JSON.stringify(st)); } catch (_) {} };
+    const delta = () => {
+      const since = firebase.firestore.Timestamp.fromMillis(Math.max(0, (st.since || 0) - MARGIN));
+      fs.collection(c).where("_u", ">", since).onSnapshot({ includeMetadataChanges: true }, (s) => {
+        if (s.metadata.fromCache) return;
+        const m = maxU(s); if (m > (st.since || 0)) save({ since: m });
+      }, (e) => console.warn("增量同步出错：" + c, e));
+    };
+    const full = () => {
+      const t0 = Date.now();
+      const un = fs.collection(c).onSnapshot({ includeMetadataChanges: true }, (s) => {
+        if (s.metadata.fromCache) return; // 等云端的完整结果
+        un();
+        save({ since: Math.max(maxU(s), st.since || 0) || t0 - 3600e3, full: Date.now(), n: s.size });
+        delta();
+      }, (e) => { console.warn("整份对账出错：" + c, e); if (st.since) delta(); });
+    };
+    fs.collection(c).get({ source: "cache" }).then((s) => s.size, () => 0).then((have) => {
+      // 本地数据库是空的（新手机、清过数据）或者一天没对账了：先整份读一次
+      if (!st.since || !have || Date.now() - (st.full || 0) > DAY) full(); else delta();
+    });
+  }
+  // 给页面的快照：去掉已删除的、去掉 _u；有 lim 时只给前 lim 条（操作记录只显示最新 200 条）
+  function view(s, lim) {
+    let docs = s.docs.filter((d) => !d.get("_deleted")).map((d) => ({ id: d.id, ref: d.ref, exists: true, metadata: d.metadata, get: (f) => d.get(f), data: () => { const x = d.data({ serverTimestamps: "estimate" }); delete x._u; return x; } }));
+    if (lim) docs = docs.slice(0, lim);
+    return { docs, size: docs.length, empty: !docs.length, metadata: s.metadata, forEach: (f) => docs.forEach(f) };
+  }
+  function listen(c, order, lim, next, err) {
+    let un = null, stop = false;
+    persistReady.then(() => {
+      if (stop) return;
+      let q = fs.collection(c); if (order) q = q.orderBy(order[0], order[1]);
+      if (persistOK === false) { if (lim) q = q.limit(lim * 2); un = q.onSnapshot((s) => next(view(s, lim)), err); return; } // 没有本地数据库：直接读云端（不再限 1000 条）
+      un = q.onSnapshot({ source: "cache" }, (s) => next(view(s, lim)), err);
+      pull(c);
+    });
+    return () => { stop = true; if (un) un(); };
+  }
+  function syncedQuery(c, order, lim) {
+    return {
+      limit: (n) => syncedQuery(c, order, order ? n : null), // 没排序的 limit(1000) 不再生效：全部记录都要
+      orderBy: (f, d) => syncedQuery(c, [f, d || "asc"], lim),
+      onSnapshot: (...a) => { const fns = a.filter((x) => typeof x === "function"); return listen(c, order, lim, fns[0], fns[1]); },
+    };
+  }
+  // 交给业务代码的数据库：账本集合走增量同步，其他（meta 等）照旧
+  const dbApi = {
+    collection: (c) => {
+      const raw = fs.collection(c);
+      if (!SYNCED.has(c)) return raw;
+      return Object.assign(syncedQuery(c, null, null), { doc: (id) => raw.doc(id), id: c });
+    },
+    doc: (p) => fs.doc(p),
+    batch: () => fs.batch(),
+  };
   window.addEventListener("online", paintBadge);
   window.addEventListener("offline", paintBadge);
 
@@ -307,7 +399,7 @@
       for (const c of COLLS) {
         let snap;
         try { snap = await fs.collection(c).get({ source: "cache" }); } catch (_) { snap = await fs.collection(c).get(); } // 读手机缓存，不消耗 Firebase 读取额度
-        data[c] = {}; snap.docs.forEach((d) => { data[c][d.id] = d.data(); });
+        data[c] = {}; snap.docs.forEach((d) => { const x = live(d); if (x) data[c][d.id] = x; });
       }
       const counts = {}; for (const c of COLLS) counts[c] = Object.keys(data[c]).length;
       const body = JSON.stringify({ format: "fb-jizhang-relay/1", uploaded_at: new Date().toISOString(), saved_at: lastSaved, uploaded_by: "Bowen 的手机", counts, last_record: lastRecord(data), data });
@@ -423,7 +515,7 @@
       const row = { i, ch, text, kind, state: "ok", note: "" };
       if (!INBOX_COLLS.includes(ch.col) || !ID_OK.test(String(ch.id || "")) || (ch.op !== "set" && ch.op !== "delete") || (ch.op === "set" && (!ch.data || typeof ch.data !== "object" || Array.isArray(ch.data)))) { row.state = "bad"; row.note = "格式不对，跳过"; rows.push(row); continue; }
       let cur = null;
-      try { const s = await fs.doc(ch.col + "/" + ch.id).get(); cur = s.exists ? s.data() : null; } catch (_) { const s = await fs.doc(ch.col + "/" + ch.id).get({ source: "cache" }).catch(() => null); cur = s && s.exists ? s.data() : null; }
+      try { cur = live(await fs.doc(ch.col + "/" + ch.id).get()); } catch (_) { cur = live(await fs.doc(ch.col + "/" + ch.id).get({ source: "cache" }).catch(() => null)); }
       row.before = cur;
       const target = ch.op === "delete" ? null : ch.data;
       if (same(cur, target)) { row.state = "same"; row.note = "App 里已经是这样了，跳过"; }
@@ -501,7 +593,7 @@
     if (!s || !s.exists) { alert("找不到这次写入的备份，没法撤销。"); return; }
     const u = s.data(), items = u.items || [];
     let changedSince = 0;
-    for (const it of items) { const c = await fs.doc(it.col + "/" + it.id).get().catch(() => null); if (!same(c && c.exists ? c.data() : null, it.after)) changedSince++; }
+    for (const it of items) { const c = await fs.doc(it.col + "/" + it.id).get().catch(() => null); if (!same(live(c), it.after)) changedSince++; }
     if (!confirm("撤销这次写入的 " + items.length + " 条改动，恢复成写入前的样子？" + (changedSince ? "\n\n注意：其中 " + changedSince + " 条在写入后又改过，撤销会把那些后来的改动也退回去。" : ""))) return;
     const ops = items.map((it) => { const ref = fs.doc(it.col + "/" + it.id); return it.before == null ? (b) => b.delete(ref) : (b) => b.set(ref, it.before); });
     const now = new Date().toISOString();
@@ -535,7 +627,7 @@
   window.claude = {
     use: async (name) => {
       const u = await userReady;
-      if (name === "db") { if (!window.__fbFirstSync) { window.__fbFirstSync = 1; trackWrite(Promise.resolve()); } return fs; }
+      if (name === "db") { if (!window.__fbFirstSync) { window.__fbFirstSync = 1; trackWrite(Promise.resolve()); } syncUid = u.uid || ""; return dbApi; }
       if (name === "user") return await userNs(u);
       if (name === "downloads") return downloads;
       if (name === "mcp") return CFG.googleClientId ? mcp : null;
