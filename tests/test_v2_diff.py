@@ -83,8 +83,7 @@ def stock_sku(pg, want_zero):
 def save(pg):
     # 时钟固定住了，提示条不会自己消失；提示条可能压在保存按钮上 → 测试里先去掉
     pg.evaluate("() => document.querySelectorAll('.toast').forEach((t) => t.remove())")
-    # 老客人：输入框失去焦点时 App 会带出客人资料、表单变高，这一下点击会落空（App 原有的小毛病）→ 先失焦
-    pg.evaluate("() => document.activeElement && document.activeElement.blur()"); pg.wait_for_timeout(300)
+    pg.wait_for_timeout(300)  # 「回头客」提示打字时就出来（feat：不再等失焦，第一下保存不会点空）
     pg.click("#sheet-save")
     try:
         try: pg.wait_for_selector("#sheet", state="hidden", timeout=1500)

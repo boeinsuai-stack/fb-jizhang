@@ -1332,6 +1332,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
       if (sub && !$("f-sub").value.trim()) $("f-sub").value = sub;
       if ($("f-src") && !$("f-src").value.trim()) $("f-src").value = "回头客";
     };
+    /* 打字时就显示「回头客」那行：以前要等输入框失焦（也就是点「保存」那一下）才冒出来，表单变高、按钮下移，第一下保存会点空 */
+    $("f-cust").addEventListener("input", () => upd(false));
     $("f-cust").addEventListener("change", () => upd(true)); upd(false);
   }
   function readCust(o) {

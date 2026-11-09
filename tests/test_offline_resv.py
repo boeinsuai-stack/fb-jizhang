@@ -143,6 +143,26 @@ with sync_playwright() as p:
     pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(300)
     pg.click("#fin-sale"); pick(pg, 0, "Grape"); pg.select_option("#f-pay", "现金")
     check("有网时照常保存", save(pg))
+
+    # 7. 回头客：打完名字直接点「保存」（不先点别处）
+    #   以前「回头客：之前买过…」那行要等输入框失焦才冒出来 —— 按下保存的那一刻表单变高、按钮往下挪，
+    #   提示长（买过多次）时松手已经不在按钮上，第一下点空。判断标准：失焦前后保存按钮不动
+    pg.set_viewport_size({"width": 390, "height": 560})  # 小屏手机：表单超过一屏，按钮跟着内容往下挪（真实数据在大屏上也会）
+    pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(300)
+    before = set(pg.evaluate("Object.keys(__server('orders'))"))
+    pg.click("#fin-sale"); pick(pg, 0, "Apple"); pg.select_option("#f-pay", "现金")
+    pg.click("#f-cust"); pg.keyboard.type("Cat", delay=30)
+    box = lambda: pg.evaluate("() => { const r = document.querySelector('#sheet-save').getBoundingClientRect(); return [Math.round(r.top), Math.round(r.left)]; }")
+    y0 = box(); hint = pg.is_visible("#f-cust-hint")
+    pg.evaluate("() => document.activeElement.blur()"); pg.wait_for_timeout(100); y1 = box()
+    check("回头客：打字时就提示", hint)
+    check("回头客：输入框失焦时保存按钮不挪位置", y0 == y1, f"{y0} → {y1}")
+    pg.click("#f-cust"); pg.keyboard.press("End")  # 回到输入框，直接点保存
+    check("回头客：直接点保存，第一下就存上", save(pg, 1500))
+    pg.wait_for_timeout(500)
+    new = [k for k in pg.evaluate("Object.keys(__server('orders'))") if k not in before]
+    o = pg.evaluate(f"__server('orders')[{json.dumps(new[0])}]") if new else None
+    check("回头客：照旧自动填上来源「回头客」", bool(o) and o.get("customer") == "Cat" and o.get("source") == "回头客", str(o and o.get("source")))
     ctx.close()
     browser.close()
 
