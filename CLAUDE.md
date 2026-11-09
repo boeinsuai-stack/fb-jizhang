@@ -37,7 +37,7 @@
 - 设置页「数据结构升级」（店主）：检查迁移 → 确认迁移（写 v2_* + meta/schema=2，旧集合不动）→ 迁移后旧结构又有改动会提示「补进新结构」→ 退回旧结构（现算的旧样子写回旧集合 + 版本改回 1）
 - 测试（真实数据放仓库外，fixture 用 ArtifactData 或备份 json 生成）：`node tests/v2_roundtrip.js <fixture>`（往返逐字段）、`tests/golden.py` + `tests/golden_diff.py`（旧版计算结果当标准答案）、
   `tests/test_v2_diff.py <fixture> <v2种子>`（界面上旧版/新版各做一遍逐条比）、`node tests/v2_fuzz.js <fixture> 2000 <种子>`（随机写入压力测试）、`tests/test_v2_migrate.py <fixture>`（迁移/补进/退回端到端）。种子：`node tests/v2_seed.js`
-- 中转站在 v2 下的端到端（Drive + 授权）**还没测**
+- 中转站 v2：`tests/test_v2_relay.py <fixture> <v2种子>`（Drive 用 page.route 内存模拟；预放没过期的 token）旧版/新版各走一遍 上传 → 写入 Claude 改动 → 撤销，8/8。注意 page.route 后注册的先生效；种子要有 meta/backfill.done
 
 ## 中转站（App ↔ Claude 版 的同步，2026-11 起）
 - Claude 版不能直连 Firebase（artifact 网络被拦，已实测），所以用 Google Drive 当中转站
