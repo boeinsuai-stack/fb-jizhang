@@ -1,7 +1,7 @@
 """同步测试：去掉 1000 条上限后的增量同步（tests/mockfb.js 模拟「云端 + 手机本地数据库」两层，并按条计费）。
 运行：python3 tests/test_sync.py [public 目录]
 可选：python3 tests/test_sync.py <旧版 public 目录> --old   只跑场景 1，看旧版丢不丢记录。"""
-import functools, http.server, json, sys, threading, pathlib, time
+import os, functools, http.server, json, sys, threading, pathlib, time
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -66,7 +66,7 @@ def open_app(ctx, port, server, cache=None, offline=False, extra=""):
 
 with sync_playwright() as p:
     port = serve()
-    browser = p.chromium.launch(executable_path="/usr/bin/google-chrome", args=["--no-sandbox"])
+    browser = p.chromium.launch(executable_path=os.environ.get("CHROME", "/usr/bin/google-chrome"), args=["--no-sandbox"])
     ctx = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="block", locale="zh-CN", timezone_id="Australia/Perth")
 
     # 场景 1：新手机（本地数据库是空的），云端有 1101 条流水

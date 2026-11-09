@@ -2,7 +2,7 @@
 → 在新结构下记一笔卖出 → 另一台手机（还开着旧版）往旧结构写一笔 → 「补进新结构」→ 「退回旧结构」→ 自动刷新回旧结构，
 迁移后记的账都在、数字跟退回前一样。
 用法：python3 tests/test_v2_migrate.py <旧 fixture.json>（真实数据放仓库外面）"""
-import datetime, functools, hashlib, http.server, json, sys, threading, pathlib
+import os, datetime, functools, hashlib, http.server, json, sys, threading, pathlib
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -43,7 +43,7 @@ def ready(pg):
 
 
 with sync_playwright() as p:
-    br = p.chromium.launch(executable_path="/usr/bin/google-chrome", args=["--no-sandbox"])
+    br = p.chromium.launch(executable_path=os.environ.get("CHROME", "/usr/bin/google-chrome"), args=["--no-sandbox"])
     ctx = br.new_context(viewport={"width": 390, "height": 844}, service_workers="block", timezone_id="Australia/Perth", locale="zh-CN")
     pg = ctx.new_page()
     pg.on("pageerror", lambda e: print("   页面报错：", e))

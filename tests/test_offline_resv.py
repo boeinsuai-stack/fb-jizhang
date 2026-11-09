@@ -1,6 +1,6 @@
 """页面测试：没网时记账 + 编辑预定改口味。用假 Firebase（tests/mockfb.js），手机尺寸。
 运行：python3 tests/test_offline_resv.py [public 目录]   需要 playwright 和 Chrome。"""
-import functools, http.server, json, sys, threading, datetime, pathlib
+import os, functools, http.server, json, sys, threading, datetime, pathlib
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -82,7 +82,7 @@ def save(pg, timeout=3000):
 
 with sync_playwright() as p:
     port = serve()
-    browser = p.chromium.launch(executable_path="/usr/bin/google-chrome", args=["--no-sandbox"])
+    browser = p.chromium.launch(executable_path=os.environ.get("CHROME", "/usr/bin/google-chrome"), args=["--no-sandbox"])
 
     # 1. 没网：记一笔卖出
     ctx, pg = open_app(browser, port, offline=True)

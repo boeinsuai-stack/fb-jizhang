@@ -4,7 +4,7 @@
   ③ 撤销 → 两边都回到原样
 Google Drive 用 page.route 在内存里模拟；授权：预先放一个没过期的 token（不用登录弹窗）。
 用法：python3 tests/test_v2_relay.py <旧 fixture.json> <v2 种子.json>（真实数据放仓库外面）"""
-import datetime, functools, hashlib, http.server, json, re, sys, threading, pathlib, urllib.parse
+import os, datetime, functools, hashlib, http.server, json, re, sys, threading, pathlib, urllib.parse
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -88,7 +88,7 @@ def run(seed, label):
     D.add("Claude改动-20261110-0300.json", fold, content=json.dumps({"format": "fb-jizhang-changes/1", "id": "c-test-1", "created_at": "2026-11-10T03:00:00Z", "based_on": None, "supersedes": None,
           "count": len(ch), "summary": ["测试"], "changes": ch, "log": []}, ensure_ascii=False))
     with sync_playwright() as p:
-        br = p.chromium.launch(executable_path="/usr/bin/google-chrome", args=["--no-sandbox"])
+        br = p.chromium.launch(executable_path=os.environ.get("CHROME", "/usr/bin/google-chrome"), args=["--no-sandbox"])
         ctx = br.new_context(viewport={"width": 390, "height": 844}, service_workers="block", timezone_id="Australia/Perth", locale="zh-CN")
         pg = ctx.new_page(); pg.clock.set_fixed_time(datetime.datetime(2026, 11, 10, 11, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=8))))
         pg.on("pageerror", lambda e: print("   页面报错：", e)); pg.on("dialog", lambda d: d.accept())

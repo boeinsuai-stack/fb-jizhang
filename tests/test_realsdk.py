@@ -1,7 +1,7 @@
 """真 Firebase SDK 测试：用 App 自带的 Firestore SDK（public/vendor）+ Chrome 真的本地数据库（IndexedDB），断网运行。
 只把登录换成假的（登录要联网）。验证：超过 1000 条全部显示、删除留标记且看不到、关掉重开从本地数据库读回来。
 运行：python3 tests/test_realsdk.py [public 目录]"""
-import functools, http.server, sys, threading, pathlib, tempfile
+import os, functools, http.server, sys, threading, pathlib, tempfile
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -25,7 +25,7 @@ COUNT = """async () => { const db = await window.claude.use("db");
 
 with sync_playwright() as p, tempfile.TemporaryDirectory() as prof:
     def launch():
-        ctx = p.chromium.launch_persistent_context(prof, executable_path="/usr/bin/google-chrome", args=["--no-sandbox"], service_workers="block", viewport={"width": 390, "height": 844})
+        ctx = p.chromium.launch_persistent_context(prof, executable_path=os.environ.get("CHROME", "/usr/bin/google-chrome"), args=["--no-sandbox"], service_workers="block", viewport={"width": 390, "height": 844})
         ctx.add_init_script("localStorage.setItem('fb-last-user', JSON.stringify({ uid: 'u-test', email: '', displayName: '测试' }));")
         pg = ctx.pages[0] if ctx.pages else ctx.new_page()
         pg.on("pageerror", lambda e: print("   页面报错：", e))

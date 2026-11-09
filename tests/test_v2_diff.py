@@ -3,7 +3,7 @@
 并检查 v2 存下来的只有源头（没有出库/拿货/往来流水、没有进货成本支出这些复制品）。
 用法：python3 tests/test_v2_diff.py <旧 fixture.json> <v2 种子.json>（真实数据放仓库外面；v2 种子用 tests/v2_seed.js 生成）
 时间固定、随机数固定，所以两边生成的编号一样。合伙人名字从数据里读，不写进代码。"""
-import datetime, functools, http.server, json, re, sys, threading, pathlib
+import os, datetime, functools, http.server, json, re, sys, threading, pathlib
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -101,7 +101,7 @@ def new_ids(before, pg, k="orders"):
 
 T0 = datetime.datetime(2026, 11, 10, 10, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=8)))
 with sync_playwright() as p:
-    br = p.chromium.launch(executable_path="/usr/bin/google-chrome", args=["--no-sandbox"])
+    br = p.chromium.launch(executable_path=os.environ.get("CHROME", "/usr/bin/google-chrome"), args=["--no-sandbox"])
     A, B = open_page(br, FIX1, T0), open_page(br, FIX2, T0)
     compare("打开（迁移后）", A, B)
     partner = A.evaluate("window.__GM.partnerNames()[0]")

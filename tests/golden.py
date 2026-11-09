@@ -3,7 +3,7 @@ v2 验收 = 旧版在真实数据上算出的数字，v2 在迁移后的数据�
 用法：python3 tests/golden.py <public 目录> <数据 fixture.json> <输出.json>
 注意：真实数据和输出里有客户名、金额，**不要放进仓库**（公开仓库），放在仓库外面。
 做法：测试服务器把 index.html 末尾临时加一行，把计算函数借出来（window.__GM），业务逻辑一个字不改。"""
-import functools, http.server, json, sys, threading, pathlib
+import os, functools, http.server, json, sys, threading, pathlib
 from playwright.sync_api import sync_playwright
 
 PUB = pathlib.Path(sys.argv[1]).resolve()
@@ -57,7 +57,7 @@ COLLECT = r"""() => {
 s = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(H, directory=str(PUB)))
 threading.Thread(target=s.serve_forever, daemon=True).start()
 with sync_playwright() as p:
-    b = p.chromium.launch(executable_path="/usr/bin/google-chrome", args=["--no-sandbox"])
+    b = p.chromium.launch(executable_path=os.environ.get("CHROME", "/usr/bin/google-chrome"), args=["--no-sandbox"])
     ctx = b.new_context(service_workers="block", timezone_id="Australia/Perth", locale="zh-CN")
     pg = ctx.new_page()
     errs = []

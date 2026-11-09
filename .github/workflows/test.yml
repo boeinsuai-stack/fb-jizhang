@@ -1,0 +1,32 @@
+# 自动跑测试：推送到任何分支都跑；推送到 main 时由「发布网站」先调用这里，测试不过就不发布
+# 只跑不需要真实数据的三套（真实数据在仓库外面，全套在本地用 tests/run_all.sh）
+name: 测试
+on:
+  push:
+    branches-ignore: [main]
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # 用 runner 自带的 Chrome（/usr/bin/google-chrome），不用下载 Playwright 的浏览器
+      - run: pip install playwright==1.63.0 && google-chrome --version
+      - name: 没网记账 + 编辑预定 + 回头客
+        run: python tests/test_offline_resv.py
+      - name: 增量同步 / 两台手机
+        run: python tests/test_sync.py
+      - name: 真 Firestore SDK 断网
+        run: python tests/test_realsdk.py
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 测试截图
+          path: tests/shots/
