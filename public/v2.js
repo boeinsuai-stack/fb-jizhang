@@ -4,7 +4,7 @@
      App 的计算和页面代码照旧读这些，所以报表跟以前一样；存储里每件事只有一个家。
    v2 里谁是源头：
    - 订单 orders：lines（卖了什么）+ picks（这单找合伙人拿的货：sku、qty、cost、who、at…）。出库流水、拿货流水、拿货支出都从它算。
-   - 订货 purchases：lines + receipts（每次到货：id、date、at、lines{sku: qty}）。到货流水、付款支出从它算。
+   - 订货 purchases：lines + receipts（每次到货：id、date、at、lines{sku: qty}，按系列订的行到货分口味记在 series{系列: {sku: qty}}）。到货流水、付款支出从它算。
    - 往来 transfers：in / out（qty、unit）。调入调出流水从它算。
    - 流水 movements：只剩独立发生的事（盘点调整、早期整批进货、算不出来的老记录）。
    - 支出 expenses：只剩真正的开销（不是进货成本的）。早期整批进货的支出从它的流水算。
@@ -62,10 +62,18 @@
     const purchases = (v2.purchases || []).map((p0) => {
       const p = clone(p0); delete p.receipts; delete p.v2;
       const V = p0.v2 || {};
-      for (const r of p0.receipts || []) for (const [sku, qty] of Object.entries(r.lines || {})) {
-        const l = (p0.lines || []).find((x) => x.sku === sku) || {};
-        const mv = { id: p0.id + "-" + r.id + "-" + sku, type: "in", sku, name: nameOf(sku, l.name), qty, cost: r2(qty * (Number(l.unit_cost) || 0)), date: r.date, po_id: p0.id, po_line: sku, receipt_id: r.id, note: "订货到货" };
-        moves.push(Object.assign(ov(Object.assign(mv, pickMeta(r)), (r.meta || {})[sku]), { _v: "purchase:" + p0.id }));
+      for (const r of p0.receipts || []) {
+        for (const [sku, qty] of Object.entries(r.lines || {})) {
+          const l = (p0.lines || []).find((x) => x.sku === sku) || {};
+          const mv = { id: p0.id + "-" + r.id + "-" + sku, type: "in", sku, name: nameOf(sku, l.name), qty, cost: r2(qty * (Number(l.unit_cost) || 0)), date: r.date, po_id: p0.id, po_line: sku, receipt_id: r.id, note: "订货到货" };
+          moves.push(Object.assign(ov(Object.assign(mv, pickMeta(r)), (r.meta || {})[sku]), { _v: "purchase:" + p0.id }));
+        }
+        // 按系列订、到货时才分口味的行：编号多一个 -s-，po_line = "series:系列"，成本按系列那一行的单根成本
+        for (const [ser, al] of Object.entries(r.series || {})) for (const [sku, qty] of Object.entries(al)) {
+          const l = (p0.lines || []).find((x) => !x.sku && x.series === ser) || {};
+          const mv = { id: p0.id + "-" + r.id + "-s-" + sku, type: "in", sku, name: nameOf(sku), qty, cost: r2(qty * (Number(l.unit_cost) || 0)), date: r.date, po_id: p0.id, po_line: "series:" + ser, receipt_id: r.id, note: "订货到货" };
+          moves.push(Object.assign(ov(Object.assign(mv, pickMeta(r)), (r.meta || {})["s-" + sku]), { _v: "purchase:" + p0.id }));
+        }
       }
       if (!V.no_pay_expense) {
         const x = { id: p0.id + "-pay", category: "进货成本", amount: r2(p0.total), date: V.pay_date || p0.date, po_id: p0.id, note: V.pay_note != null ? V.pay_note : "订货 " + (p0.lines || []).map((l) => nameOf(l.sku, l.name) + " ×" + l.qty).join("、") };
@@ -107,6 +115,11 @@
       for (const tid of s.transfer_ids || []) if (tBy[tid]) tBy[tid].partner_settlement_id = s.id;
       for (const pid of s.po_ids || []) if (pBy[pid]) pBy[pid].settlement_id = s.id;
     }
+    // 撤销结账留下的空指针（null、空的 {}）：旧数据里有这个字段，照原样算出来
+    for (const [src, by] of [[v2.orders, oBy], [v2.transfers, tBy], [v2.purchases, pBy]]) for (const z of src || []) {
+      const e = z.v2 && z.v2.empty, x = by[z.id]; if (!e || !x) continue;
+      for (const [f, v] of Object.entries(e)) if (x[f] === undefined) x[f] = clone(v);
+    }
     // 源头标了「这几条旧数据里没有」的（比如撤销往来时先删了流水、往来单还在），不算出来
     const skip = new Set();
     for (const z of (v2.orders || []).concat(v2.purchases || [], v2.transfers || [])) for (const id of (z.v2 && z.v2.skip) || []) skip.add(id);
@@ -147,7 +160,15 @@
     const purchases = L("purchases").map((p) => {
       const n = clone(p); delete n.settlement_id; n.v2 = {};
       const rs = {};
-      for (const m of M) if (m.po_id === p.id && m.receipt_id) { const r = rs[m.receipt_id] || (rs[m.receipt_id] = { id: m.receipt_id, date: m.date, lines: {}, meta: {} }); r.lines[m.sku] = m.qty; r.meta[m.sku] = pickMeta(m); used.add(m.id); }
+      for (const m of M) if (m.po_id === p.id && m.receipt_id) {
+        const tail = m.id.slice((p.id + "-" + m.receipt_id + "-").length), ser = String(m.po_line || "").startsWith("series:") ? m.po_line.slice(7) : null;
+        const fixed = m.id.startsWith(p.id + "-" + m.receipt_id + "-") && tail === m.sku && !ser;
+        const alloc = m.id.startsWith(p.id + "-" + m.receipt_id + "-") && tail === "s-" + m.sku && ser != null;
+        if (!fixed && !alloc) continue; // 认不出的写法：留在流水里当独立的事（不丢）
+        const r = rs[m.receipt_id] || (rs[m.receipt_id] = { id: m.receipt_id, date: m.date, lines: {}, meta: {} });
+        if (fixed) r.lines[m.sku] = m.qty; else ((r.series = r.series || {})[ser] = r.series[ser] || {})[m.sku] = m.qty;
+        r.meta[tail] = pickMeta(m); used.add(m.id);
+      }
       n.receipts = Object.values(rs);
       const x = E.find((e) => e.po_id === p.id); if (x) usedE.add(x.id); else n.v2.no_pay_expense = true;
       return n;
@@ -161,6 +182,10 @@
       }
       return n;
     });
+    // 撤销结账以后单据上留下的空指针（App 写的是 null，分开拿的单剩下空的 {}）：记成补丁，算出来才跟旧数据一模一样
+    const isEmptyPtr = (v) => v === null || (v && typeof v === "object" && !Array.isArray(v) && !Object.keys(v).length);
+    for (const [list, src, fs] of [[orders, "orders", ["partner_settlement_id", "partner_settlements"]], [transfers, "transfers", ["partner_settlement_id"]], [purchases, "purchases", ["settlement_id"]]])
+      for (const n of list) { const o = (old[src] || {})[n.id] || {}; for (const f of fs) if (f in o && isEmptyPtr(o[f])) { (n.v2.empty = n.v2.empty || {})[f] = o[f]; delete n[f]; } }
     const batches = [];
     for (const x of E) if ((x.batch_id || "").startsWith("b-") && x.id === x.batch_id + "-cost") { batches.push({ id: x.batch_id, date: x.date, note: x.note, meta: pickMeta(x) }); usedE.add(x.id); }
     const settlements = L("settlements");
@@ -179,7 +204,7 @@
       if (k === "order" && nm.type === "out") (s.v2.out = s.v2.out || {})[nm.sku] = d;
       else if (k === "order") { const p = s.picks.find((p) => id === s.id + "-pick-" + p.sku + (p.key || "")); p.meta = Object.assign(p.meta || {}, d); }
       else if (k === "transfer") (s.v2.moves = s.v2.moves || {})[(nm.type === "in" ? "in:" : "out:") + nm.sku] = d;
-      else if (k === "purchase") { const r = s.receipts.find((r) => r.id === nm.receipt_id); r.meta[nm.sku] = Object.assign(r.meta[nm.sku] || {}, d); }
+      else if (k === "purchase") { const r = s.receipts.find((r) => r.id === nm.receipt_id), t = id.slice((s.id + "-" + r.id + "-").length); r.meta[t] = Object.assign(r.meta[t] || {}, d); }
     }
     for (const id of Object.keys(newE)) {
       const nx = newE[id], ox = oldE[id]; if (!ox || !nx._v) continue;
@@ -195,6 +220,12 @@
       const miss = want.filter((sku) => !oldM[o.id + "-" + sku]); if (miss.length) o.v2.no_out = miss;
       if (o.status === "reserved" && M.some((m) => m.order_id === o.id && m.type === "out")) o.v2.out_reserved = true;
       if (o.picks && !oldE[o.id + "-pick-cost"]) o.v2.no_pick_expense = true;
+    }
+    // 保险：收回到源头、但重新算不出来的旧记录，一律原样留在流水/支出里当独立的事（宁可多存一条，也不能丢）
+    {
+      const P1 = project(v2), has = new Set(P1.moves.map((m) => m.id)), hasE = new Set(P1.expenses.map((x) => x.id));
+      for (const m of M) if (used.has(m.id) && !has.has(m.id)) { used.delete(m.id); v2.movements.push(m); }
+      for (const x of E) if (usedE.has(x.id) && !hasE.has(x.id)) { usedE.delete(x.id); v2.expenses.push(x); }
     }
     {
       const P2 = project(v2);

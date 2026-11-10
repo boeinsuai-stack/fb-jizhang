@@ -31,7 +31,7 @@ function compare() {
     const A = V1[c], B = Object.fromEntries(P[k].map((x) => [x.id, x]));
     for (const id of new Set(Object.keys(A).concat(Object.keys(B)))) {
       const a = A[id] ? strip(Object.assign({ id }, A[id])) : null, b = B[id] ? strip(B[id]) : null;
-      if (JSON.stringify(sortKeys(a)) !== JSON.stringify(sortKeys(b))) bad.push(c + "/" + id + "  旧:" + JSON.stringify(a).slice(0, 160) + "  新:" + JSON.stringify(b).slice(0, 160));
+      if (JSON.stringify(sortKeys(a)) !== JSON.stringify(sortKeys(b))) bad.push(c + "/" + id + "  不一样的字段：" + (a && b ? [...new Set(Object.keys(a).concat(Object.keys(b)))].filter((f) => JSON.stringify(a[f]) !== JSON.stringify(b[f])).map((f) => f + " 旧=" + JSON.stringify(a[f]) + " 新=" + JSON.stringify(b[f])).join("；") : a ? "新结构里没有" : "新结构多出来"));
     }
   }
   return bad;
@@ -98,12 +98,19 @@ const ACTIONS = {
   // 订货：订货单 → 付款支出；到货：到货流水；撤销到货
   async po() {
     const pid = nid("p"), date = day(), ls = [{ sku: pick(skus), qty: 5, unit_cost: 20, series: "One" }];
+    // 一半的订货单再加一行「只订系列、到货时才分口味」（sku 为 null）；2026-11-07 真实数据里第一次出现，之前没测到
+    if (rnd() < 0.5) ls.push({ series: pick(["One", "Bar"]), sku: null, name: "系列（口味到货再分）", qty: 10, unit_cost: 55 });
     await w("purchases", pid, "set", { date, supplier: pick(partners), lines: ls, total: 100, paid: rnd() < 0.5, paid_date: date, payment: "现金", note: "" });
     await w("expenses", pid + "-pay", "set", { date, amount: 100, category: "进货成本", note: "订货 x", po_id: pid });
   },
   async receive() {
     const ps = ids("purchases"); if (!ps.length) return; const pid = pick(ps), p = V1.purchases[pid], rc = "r" + (k++).toString(36);
     for (const l of p.lines || []) if (l.sku) await w("movements", pid + "-" + rc + "-" + l.sku, "set", { type: "in", sku: l.sku, qty: 2, cost: 2 * (l.unit_cost || 0), date: day(), po_id: pid, po_line: l.sku, receipt_id: rc, note: "订货到货" });
+    // 系列行：到货时分到 1–2 个口味，编号多一个 -s-；有时故意跟指定口味的行撞同一个口味
+    for (const l of p.lines || []) if (!l.sku && l.series) {
+      const fixed = (p.lines.find((x) => x.sku) || {}).sku, ss = [rnd() < 0.3 && fixed ? fixed : pick(skus), pick(skus)].filter((x, i, a) => a.indexOf(x) === i).slice(0, 1 + Math.floor(rnd() * 2));
+      for (const sku of ss) { const it = items.find((i) => i.sku === sku); await w("movements", pid + "-" + rc + "-s-" + sku, "set", { type: "in", sku, name: (it && it.name) || sku, qty: 3, date: day(), po_id: pid, po_line: "series:" + l.series, receipt_id: rc, cost: 3 * l.unit_cost, note: "订货到货" }); }
+    }
   },
   async voidReceipt() { const ms = ids("movements").filter((m) => V1.movements[m].receipt_id); if (!ms.length) return; const r = V1.movements[pick(ms)]; for (const m of ids("movements")) if (V1.movements[m] && V1.movements[m].receipt_id === r.receipt_id && V1.movements[m].po_id === r.po_id) await w("movements", m, "delete"); },
   async poPay() { const ps = ids("purchases"); if (ps.length) await w("purchases", pick(ps), "update", { paid: true, paid_date: day(), payment: "PayID" }); },
@@ -119,9 +126,11 @@ const ACTIONS = {
   },
   async unsettle() {
     const ss = ids("settlements"); if (!ss.length) return; const sid = pick(ss), s = V1.settlements[sid];
-    for (const o of s.order_ids || []) if (V1.orders[o] && V1.orders[o].partner_settlement_id === sid) { const x = clone(V1.orders[o]); delete x.partner_settlement_id; await w("orders", o, "set", x); }
-    for (const t of s.transfer_ids || []) if (V1.transfers[t] && V1.transfers[t].partner_settlement_id === sid) { const x = clone(V1.transfers[t]); delete x.partner_settlement_id; await w("transfers", t, "set", x); }
-    for (const p of s.po_ids || []) if (V1.purchases[p] && V1.purchases[p].settlement_id === sid) { const x = clone(V1.purchases[p]); delete x.settlement_id; await w("purchases", p, "set", x); }
+    // 跟 App 的 unsettle() 一样的写法：改成 null、分开拿的单从 partner_settlements 里删掉这次结账（可能剩下空的 {}）、订货改回未付
+    for (const o of ids("orders")) if (V1.orders[o].partner_settlement_id === sid) await w("orders", o, "update", { partner_settlement_id: null });
+    for (const o of ids("orders")) if (Object.values(V1.orders[o].partner_settlements || {}).includes(sid)) { const mp = Object.assign({}, V1.orders[o].partner_settlements); for (const k of Object.keys(mp)) if (mp[k] === sid) delete mp[k]; await w("orders", o, "update", { partner_settlements: mp }); }
+    for (const t of ids("transfers")) if (V1.transfers[t].partner_settlement_id === sid) await w("transfers", t, "update", { partner_settlement_id: null });
+    for (const p of ids("purchases")) if (V1.purchases[p].settlement_id === sid) await w("purchases", p, "update", { paid: false, paid_date: null, settlement_id: null });
     await w("settlements", sid, "delete");
   },
   // 独立的：盘点调整、手动支出、早期整批进货改成本
