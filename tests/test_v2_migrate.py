@@ -77,11 +77,13 @@ with sync_playwright() as p:
 
     # 新结构下记一笔卖出（有货的口味）
     have = pg.evaluate("""() => { const st = window.__GM.derive().st; const i = window.__GM.S.items.find((i) => i.status === "在售" && i.variant && st[i.sku] >= 2); return i && i.variant; }""")
+    before_ids = pg.evaluate("window.__GM.S.orders.map((o) => o.id)")
     pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(300); pg.click("#fin-sale")
     pg.fill("#f-skuq-0", have); pg.press("#f-skuq-0", "Enter"); pg.select_option("#f-pay", "现金")
     pg.evaluate("() => document.activeElement && document.activeElement.blur()"); pg.click("#sheet-save"); pg.wait_for_selector("#sheet", state="hidden", timeout=5000)
     pg.wait_for_timeout(500)
-    new_oid = pg.evaluate("window.__GM.S.orders.map((o) => o.id).sort().pop()")
+    # 记账前后对比找新单（不能取编号最大的：真实数据里当天已有的单，随机编号可能排在新单后面）
+    new_oid = pg.evaluate("(b) => window.__GM.S.orders.map((o) => o.id).find((id) => !b.includes(id))", before_ids)
     check("新结构下记账：订单只存一条源头，出库是现算的", pg.evaluate(f"!!__server('v2_orders')['{new_oid}'] && !__server('v2_movements')['{new_oid}-' + window.__GM.S.orders.find(o => o.id === '{new_oid}').lines[0].sku] && window.__GM.S.moves.some(m => m.order_id === '{new_oid}')"))
 
     # 另一台手机还开着旧版：往旧结构写了一笔支出 → 刷新后提示，「补进新结构」
