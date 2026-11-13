@@ -2907,7 +2907,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="lg-tot">' + (x.tin ? "<span>调入</span><b>+" + money(x.tin) + "</b>" : "") + (x.tpo ? "<span>订货</span><b>+" + money(x.tpo) + "</b>" : "") + (x.tout ? "<span>调出</span><b>−" + money(x.tout) + "</b>" : "") +
         '<span class="g">' + esc(owedTxt(w, x.net)) + '</span><b class="g">' + money(Math.abs(x.net)) + "</b></div>" +
       (x.unk ? '<p class="hint">＋ 有的货拿货价还没填，金额可能偏少。</p>' : "") +
-      '<div class="actions"><button class="btn small" type="button" data-lg="copy">复制发给' + W + '</button><button class="btn small ghost" type="button" data-lg="xfer">记往来</button></div>';
+      '<div class="actions"><button class="btn small" type="button" data-lg="copy">复制发给' + W + '</button><button class="btn small ghost" type="button" data-lg="xfer">记往来</button>' +
+      (openXfers(w).length ? '<button class="btn small ghost" type="button" data-lg="xprice">改单价</button>' : "") + "</div>";
     openSheet(w + " · 对账单", html, async () => { setTimeout(() => partnerSettleForm(w), 0); return ""; }, () => {
       $("sheet-save").textContent = "结账";
       sheetOn("click", (e) => { const b = e.target.closest("[data-lg]"); if (!b) return; const a = b.dataset.lg;
@@ -2915,7 +2916,55 @@ details.restock > summary::-webkit-details-marker { display: none; }
         else if (a === "picked") { const g = pendingPicks(w).find((z) => z.oid === b.dataset.id); if (!g) return;
           arm(b, "确认已拿到？", async () => { try { needDb(); await recordPrePick(g, today()); toast("已记成调入，算进应付 " + w + "。"); closeSheet(); setTimeout(() => ledgerSheet(w), 300); } catch (e2) { toast(e2.userMsg || errText(e2)); } }); }
         else if (a === "xfer") { closeSheet(); xferForm(w); }
+        else if (a === "xprice") { closeSheet(); xferPriceForm(w); }
         else if (a === "po-pay") { closeSheet(); poPayForm(b.dataset.id); } });
+    });
+  }
+  /* 改往来单价（只改还没结账的）：调出 = 他拿走的，只影响谁欠谁；调入 = 他给我的，那几根的进价跟着改（库存成本、利润按新价算）。
+     随客户订单拿的货不在这里改（库存页「系列价格」） */
+  function xferPriceForm(w) {
+    const byT = (a, b) => (a.date || "").localeCompare(b.date || "") || (a.at || "").localeCompare(b.at || "");
+    const xs = openXfers(w).slice().sort(byT);
+    if (!xs.length) { toast("跟" + w + "没有没结的往来。"); return; }
+    const rows = [];
+    for (const side of ["out", "in"]) for (const t of xs) (t[side] || []).forEach((l, i) => rows.push({ t, side, i, l, sr: seriesOf(itemBy(l.sku)), q: Number(l.qty) || 0 }));
+    const val = (k) => numOrNull($("f-xu-" + k).value);
+    const block = (side, label) => {
+      const rs = rows.filter((r) => r.side === side); if (!rs.length) return "";
+      return '<p class="xs-h">' + label + '</p><div class="serp" data-side="' + side + '">' + serpHtml([...new Set(rs.map((r) => r.sr))], {}) + '</div><div class="pt-lines">' +
+        rs.map((r) => { const k = rows.indexOf(r); return '<div class="pt-line"><span class="pt-name"><small style="white-space:nowrap">' + esc(fmtD(r.t.date)) + "</small> " + esc(r.sr + " " + nm(r.l.sku, r.l.name)) + '</span><span class="pt-q">×' + r.q + '</span><label class="pt-u"><span>$</span><input id="f-xu-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(r.l.unit != null ? r2(Number(r.l.unit)) : "") + '" aria-label="' + esc(nm(r.l.sku, r.l.name)) + ' 每根多少钱"></label></div>'; }).join("") + "</div>";
+    };
+    const html = block("out", "调出 · " + esc(w) + "拿走的货") + block("in", "调入 · " + esc(w) + "给我的货（往来）") + '<p class="callout xsum" id="f-xsum">–</p>';
+    const x0 = ledgerOf(w) || { net: 0 };
+    const tot = (side, now) => r2(rows.filter((r) => r.side === side).reduce((a, r) => a + r.q * ((now ? val(rows.indexOf(r)) : numOrNull(r.l.unit)) || 0), 0));
+    function recalc() {
+      const o0 = tot("out", false), o1 = tot("out", true), i0 = tot("in", false), i1 = tot("in", true), n1 = r2(x0.net + (i1 - i0) - (o1 - o0));
+      const ch = (a, b) => money(a) + (a !== b ? " → <b>" + money(b) + "</b>" : "");
+      $("f-xsum").innerHTML = (rows.some((r) => r.side === "out") ? "调出 " + ch(o0, o1) + "<br>" : "") + (rows.some((r) => r.side === "in") ? "调入（往来） " + ch(i0, i1) + "<br>" : "") +
+        esc(owedTxt(w, x0.net)) + " " + money(Math.abs(x0.net)) + (n1 !== x0.net ? " → <b>" + esc(owedTxt(w, n1)) + " " + money(Math.abs(n1)) + "</b>" : "");
+    }
+    openSheet(w + " · 改往来单价", html, async () => {
+      needDb();
+      const byId = new Map();
+      rows.forEach((r, k) => { const u = val(k); if (u == null || u < 0) throw userError("填一下 " + fmtD(r.t.date) + " " + nm(r.l.sku, r.l.name) + " 每根多少钱。");
+        if (numOrNull(r.l.unit) === u) return; const c = byId.get(r.t.id) || { t: r.t, out: (r.t.out || []).map((l) => ({ ...l })), in: (r.t.in || []).map((l) => ({ ...l })), skus: [] };
+        c[r.side][r.i].unit = u; if (r.side === "in") c.skus.push(r.l.sku); byId.set(r.t.id, c); });
+      if (!byId.size) return "单价没有改动。";
+      let n = 0;
+      for (const c of byId.values()) {
+        await db.doc("transfers/" + c.t.id).update({ out: c.out, in: c.in });
+        for (const sku of c.skus) { const l = c.in.find((z) => z.sku === sku), m = S.moves.find((z) => z.transfer_id === c.t.id && z.type === "in" && z.sku === sku);
+          if (m) await db.doc("movements/" + m.id).update({ cost: r2((Number(l.qty) || 0) * l.unit) }); }
+        n++;
+      }
+      setTimeout(() => ledgerSheet(w), 300);
+      return "已改 " + n + " 笔往来的单价，" + owedTxt(w, ledgerNet(w)) + " " + money(Math.abs(ledgerNet(w))) + "。";
+    }, () => {
+      $("sheet-save").textContent = "保存单价";
+      sheetOn("input", (e) => { const sr = e.target.dataset && e.target.dataset.sr, box = e.target.closest(".serp");
+        if (sr && box) rows.forEach((r, k) => { if (r.side === box.dataset.side && r.sr === sr) $("f-xu-" + k).value = e.target.value; });
+        recalc(); });
+      recalc();
     });
   }
   function xferText(t) {
