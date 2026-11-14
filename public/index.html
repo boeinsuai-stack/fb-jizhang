@@ -194,7 +194,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .sheet { position: fixed; inset: 0; background: var(--scrim); display: flex; align-items: flex-end; justify-content: center; z-index: 20;
   padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
 @media (min-width: 640px) { .sheet { align-items: center; } }
-.sheet-card { background: var(--surface); color: var(--fg); border-radius: 14px; width: 100%; max-width: 540px; max-height: 100%; overflow: auto; padding: 18px; box-shadow: 0 12px 40px rgba(0, 0, 0, .25); }
+.sheet-card { background: var(--surface); color: var(--fg); border-radius: 14px; width: 100%; max-width: 540px; max-height: 100%; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 18px; box-shadow: 0 12px 40px rgba(0, 0, 0, .25); }
+.sheet { overscroll-behavior: contain; }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
 .sheet-head h3 { margin: 0; font-family: var(--font-display); font-size: 1.6rem; font-weight: 600; }
 #sheet-form { display: grid; gap: 12px; }
@@ -277,6 +278,7 @@ label.chip input { width: auto; margin: 0; accent-color: var(--accent); }
 .pl-f { display: grid; gap: 2px; min-width: 0; } .pl-f small { font-size: .7rem; color: var(--muted); }
 #f-lines .line { align-items: end; } #f-lines .line > .btn { margin-bottom: 2px; }
 .po-flav .lines-head { display: none; }
+.po-date { margin: -6px 0 0; text-align: right; font-size: .8rem; color: var(--muted); } .po-date input { margin-left: 6px; }
 .po-all { display: flex; align-items: center; gap: 6px; font-size: .86rem; } .po-all input { width: 72px; }
 .pser { border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px 12px; margin: 0; display: grid; gap: 10px; min-width: 0; }
 .pser legend { padding: 0 6px; font-weight: 600; font-size: .9rem; }
@@ -1127,15 +1129,20 @@ details.restock > summary::-webkit-details-marker { display: none; }
 
   /* ---------- sheet (form overlay) ---------- */
   let sheetSubmit = null;
-  function openSheet(title, html, onSubmit, onMount) {
+  /* 弹出页开着时锁住后面的页面：iPhone 上滑到弹出页底再滑，后面的一级页面不会跟着动；关掉后回到原来的位置 */
+  let sheetLockY = null;
+  function lockPage() { if (sheetLockY != null) return; sheetLockY = window.scrollY; const b = document.body.style; b.position = "fixed"; b.top = -sheetLockY + "px"; b.left = "0"; b.right = "0"; b.width = "100%"; }
+  function unlockPage() { if (sheetLockY == null) return; const y = sheetLockY, b = document.body.style; sheetLockY = null; b.position = b.top = b.left = b.right = b.width = ""; window.scrollTo(0, y); }
+  function openSheet(title, html, onSubmit, onMount, opts) {
     $("sheet-title").textContent = title;
     $("sheet-form").innerHTML = html + '<p class="err" id="sheet-err" hidden></p><div class="sheet-actions"><button type="button" class="btn ghost" data-close="1">取消</button><button type="submit" class="btn primary" id="sheet-save">保存</button></div>';
     enhancePartnerInputs();
     sheetCleanup.forEach((u) => u()); sheetCleanup = [];
     sheetSubmit = onSubmit;
-    $("sheet").hidden = false;
+    lockPage(); $("sheet").hidden = false; $("sheet").querySelector(".sheet-card").scrollTop = 0;
     if (onMount) onMount();
-    const first = $("sheet-form").querySelector("input, select, textarea");
+    // 不自动聚焦日期框、下拉框（iPhone 上一聚焦就弹出滚轮）；opts.focus === false 整页都不聚焦（免得一打开就弹键盘）
+    const first = opts && opts.focus === false ? null : $("sheet-form").querySelector('input:not([type="date"]):not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), textarea');
     if (first) first.focus();
   }
   /* 合伙人输入框：下面放常用合伙人按钮，点一下就填上（iPhone 浏览器不太显示下拉候选，还会把它当成「姓名」去填你自己的名字） */
@@ -1157,7 +1164,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   /* form-level listeners belong to one sheet; drop them when it closes so they don't fire on the next form */
   let sheetCleanup = [];
   function sheetOn(type, fn) { const f = $("sheet-form"); f.addEventListener(type, fn); sheetCleanup.push(() => f.removeEventListener(type, fn)); }
-  function closeSheet() { $("sheet").hidden = true; $("sheet-form").innerHTML = ""; sheetSubmit = null; sheetCleanup.forEach((u) => u()); sheetCleanup = []; }
+  function closeSheet() { $("sheet").hidden = true; unlockPage(); $("sheet-form").innerHTML = ""; sheetSubmit = null; sheetCleanup.forEach((u) => u()); sheetCleanup = []; }
   $("sheet-close").addEventListener("click", closeSheet);
   $("sheet").addEventListener("click", (e) => { if (e.target === $("sheet") || (e.target.dataset && e.target.dataset.close)) closeSheet(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("sheet").hidden) closeSheet(); });
@@ -2512,7 +2519,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     let n = 0;
     const fld = (id, label, inner) => '<div class="field"><label for="' + id + '">' + label + "</label>" + inner + "</div>";
     const html =
-      fld("f-date", "订货日期", '<input id="f-date" type="date" value="' + esc(po ? po.date : today()) + '">') +
+
       fld("f-supplier", "找谁订的（供货人）", '<input id="f-supplier" list="f-pnames" autocomplete="off" placeholder="可以不填" value="' + esc(po ? po.supplier || "" : "") + '"><datalist id="f-pnames">' + partnerNames().map((x) => '<option value="' + esc(x) + '">').join("") + "</datalist>") +
       (po && po.settlement_id ? '<p class="hint">这张订货单已经在跟' + esc(poWho(po)) + "的结账里付清了。</p>" :
         '<div class="field"><span class="flabel">付款</span><div class="chips" id="f-paidseg"><button type="button" class="chip" data-paid="0">还没付（记在欠款里）</button><button type="button" class="chip" data-paid="1">已经付了</button></div><input type="hidden" id="f-paid" value="' + (po ? (po.paid === false ? "0" : "1") : "0") + '"></div>') +
@@ -2538,7 +2545,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
           (l && recv[lineKey(l)] ? '<p class="hint">已经到货 ' + recv[lineKey(l)] + " 根，订货数不能比这个少。</p>" : "") +
           "</fieldset>"; }).join("") +
       "</details>" +
-      '<p class="total">共 <b id="f-units">0</b> 根 · 付款 <b id="f-total">–</b></p>';
+      '<p class="total">共 <b id="f-units">0</b> 根 · 付款 <b id="f-total">–</b></p>' +
+      '<p class="po-date">订货日期：<span id="f-date-txt"></span> <button type="button" class="linkbtn" id="f-date-edit">改</button><input id="f-date" type="date" value="' + esc(po ? po.date : today()) + '" hidden aria-label="订货日期"></p>';
     const serVal = {};
     /* 选好的口味按系列分组：每组一个框，框头 = 系列小标签 + 这组几根 + 整系列每根成本 */
     function grpOf(sr) {
@@ -2676,13 +2684,16 @@ details.restock > summary::-webkit-details-marker { display: none; }
       $("f-pastebtn").addEventListener("click", () => { const box = $("f-pastebox"); box.hidden = !box.hidden; $("f-pastebtn").setAttribute("aria-expanded", String(!box.hidden)); if (!box.hidden) $("f-paste").focus(); });
       $("f-parse").addEventListener("click", parsePaste);
       $("f-allq").addEventListener("input", () => { const q = Number($("f-allq").value); if (!Number.isInteger(q) || q < 1) return; $("f-lines").querySelectorAll(".line").forEach((r) => { $("f-qty-" + r.dataset.line).value = q; }); flavSync(); });
+      const dTxt = () => { const v = $("f-date").value || today(); $("f-date-txt").textContent = v === today() ? "今天" : fmtD(v); };
+      $("f-date-edit").addEventListener("click", () => { $("f-date").hidden = false; $("f-date-edit").hidden = true; $("f-date").focus(); });
+      $("f-date").addEventListener("change", dTxt); dTxt();
       flavSync();
       sheetOn("click", (e) => { const b = e.target.closest("[data-step]"); if (!b) return; const i = $(b.dataset.for); i.value = Math.max(0, (Number(i.value) || 0) + Number(b.dataset.step)); recalc(); });
       sheetOn("input", recalc); sheetOn("change", recalc); recalc();
       const seg = $("f-paidseg");
       if (seg) { const paint = () => seg.querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.paid === $("f-paid").value)));
         seg.addEventListener("click", (e) => { const c = e.target.closest("[data-paid]"); if (!c) return; $("f-paid").value = c.dataset.paid; paint(); }); paint(); }
-    });
+    }, { focus: false });
   }
 
   function receiveForm(pid) {

@@ -35,6 +35,8 @@ jobs:
         run: python tests/test_offset.py
       - name: 订货单点口味 + 粘贴清单识别
         run: node tests/orderparse_test.js && python tests/test_po_quick.py
+      - name: 弹出页锁住后面的页面、不自动弹日期；订货日期默认今天
+        run: python tests/test_sheet.py
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
