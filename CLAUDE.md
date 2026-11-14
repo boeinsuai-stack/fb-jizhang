@@ -90,6 +90,17 @@
 - 当场换货：`xferEff(t)`（一笔往来自己算互抵）= 0 就自动关单（以前要两边钱一样）；往来列表/记录里一笔的金额也用 xferEff
 - 纯计算，不改数据，新旧结构一样。测试 `tests/test_offset.py` 33/33（编的数据，GitHub 上也跑）
 
+## 镜像（Claude 里看 App 界面，2026-11-15，替代 Claude 版）
+- artifact「FB 记账镜像」https://claude.ai/artifact/5adhRecZNQHzxdv8zs8gP3（slug 2516b6e0-e04e-4ea9-afc7-e4415ffde092；能力 db + user + mcp Google Drive search_files/download_file_content）
+- **自动生成，不是第二份代码**：`python3 tools/build_mirror.py <out.html> [--preview "说明"]` = public/index.html 原样 + v2.js + `tools/mirror_shell.js`；
+  只做机械替换（window.claude.use → __M.use；#settings → #shezhi，claude.ai 保留了 settings）。用 claude-artifacts 的 publish_files 发布到上面的 slug
+- 外壳：店主打开就从中转站 `最新数据.json` 同步（开着时每 30 秒、切回页面时再查，文件没变不下载），只写变了的记录（指纹 meta/fp_<集合>，含 log）；
+  **不抄 meta**（文件里 meta/schema=2，抄了会去读 v2_*），镜像里 App 走旧样子；写 meta/backfill done 免得补操作记录
+- 业务代码拿到的 db 只读：写入一律 reject（code read_only），顶上提示「镜像只读」；备份、数据结构升级隐藏
+- **每次「同步到 App」后重新生成并发布镜像**（不带 --preview）。**预览新功能**：在功能分支上 `--preview "这次改了什么"` 生成、发布到镜像，
+  顶上黄条写明「还没同步到 App」；Bowen 看完说「同步到 App」→ 上线 main → 再发布一次不带预览的
+- 测试 `tests/test_mirror.py [fixture]`：同一份数据，镜像里 App 代码算出的所有数字 == 手机 App（golden.py）算的；只读；增量同步只写变了的；GitHub 上用编的数据跑
+
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超
 - 一单的几条写入还不是一个 batch（中途关掉 App 理论上可能只存一半）—— v2 下一单只写一条源头，基本解决
