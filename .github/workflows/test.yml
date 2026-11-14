@@ -29,12 +29,18 @@ jobs:
         run: python tests/test_v2_failsafe.py
       - name: v2 边角情况（系列订货到货分口味、认不出的记录不丢、撤销结账的空指针）+ 随机写入压力测试
         run: node tests/v2_cases.js
+      - name: 镜像页（Claude 里看 App 界面）：数字跟手机 App 一样、只读、增量同步
+        run: python tests/test_mirror.py
       - name: 对账单改往来单价（旧结构 / 新结构）
         run: python tests/test_xfer_price.py
       - name: 合伙人对账同系列互抵（旧结构 / 新结构）
         run: python tests/test_offset.py
       - name: 备份 → 弄坏 → 从备份恢复 → 账一模一样（旧结构 / 新结构）
         run: python tests/test_restore.py
+      - name: 订货单点口味 + 粘贴清单识别
+        run: node tests/orderparse_test.js && python tests/test_po_quick.py
+      - name: 弹出页锁住后面的页面、不自动弹日期；订货日期默认今天
+        run: python tests/test_sheet.py
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
