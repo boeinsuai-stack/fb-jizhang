@@ -25,7 +25,7 @@
 - `public/vendor/`：Firebase compat SDK 10.12.2（app/auth/firestore）和 xlsx 0.18.5，从 npm 包复制（去掉 sourceMappingURL）。
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；页面网络优先、3 秒超时用缓存；vendor 缓存优先；字体先用缓存
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一（2026-11-15 线上 fb-app-v19）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一（2026-11-15 线上 fb-app-v20）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -96,6 +96,29 @@
 - 对账单（Bowen 说「互抵」一栏看不清抵完还剩什么 → 改版）：钱都在「按系列算」：每个系列一行「调入 3 · 调出 2 · 抵 2」+「调入/调出 还要结 N 根 ±$」（xOffset 的 rows，serIO/serRest）→ 订货 → 合计 → 「明细 · 按日期（只记货）」不写钱 → 预定。复制给合伙人的文字同样结构；结账弹窗逐行写「抵完还要结」。结账记的 amount 是互抵后的
 - 当场换货：`xferEff(t)`（一笔往来自己算互抵）= 0 就自动关单（以前要两边钱一样）；往来列表/记录里一笔的金额也用 xferEff
 - 纯计算，不改数据，新旧结构一样。测试 `tests/test_offset.py` 33/33（编的数据，GitHub 上也跑）
+
+## 订货单「点口味 + 粘贴清单」（feat15，2026-11-15）
+- 新建/编辑订货（2026-11-15 去掉了「供货人 / 备注」框和底部长说明，以前的 note 保存时照旧保留）：先「指定口味」：按系列的口味格子（跟快速下单一样，点一下 +1、「−」减一、格子上显示已选根数和现在库存，可搜中英文）→ 下面每行「根数 / 单根成本 $」→「选中的每种都订 N 根」→「整系列每根」成本。「只知道系列，口味到货再分」收进折叠（有系列行时展开）
+- 「粘贴清单」：`public/orderparse.js`（`FBParse.parseOrder(text, items, {series})`，浏览器 + node 都能用，sw.js SHELL 里有）。认出来的按清单根数加进来（已选的改成清单的数），系列是猜的、没写根数、没认出的分别列出来
+  - 规则：一行只写系列 = 下面几行的系列，只在这个系列里找（对不上宁可认不出）；英文逐词比（拼错一处/两个字母打反算对）、中文名包含或差一个字；长名字优先；有词对不上又有更长的名字包含其余词 → 不猜；同名口味跨系列 → 上文系列 > 这段文字多数口味的系列 > 界面当前系列，标「猜的」
+  - 测试 `node tests/orderparse_test.js [真实 fixture]`（写法逐条 + 300 份随机订单盲测，认错必须 0）；`tests/test_po_quick.py` 26/26（旧/新结构）。真实口味表盲测 5×500 份 100%；加重噪声（错两处、漏一个词、夹废话）认对 93%、认错 0.3–0.4%（都是漏词后正好变成另一个真口味）
+
+## 弹出页（2026-11-15）
+- `openSheet` 打开时 `lockPage()`（body position:fixed + top=-scrollY），`closeSheet` 时 `unlockPage()` 回到原位；`.sheet-card`/`.sheet` 加 `overscroll-behavior: contain`。以前弹出页滑到底会带着一级页面一起滑
+- 自动聚焦跳过日期框/下拉框/勾选框（iPhone 上一聚焦就弹滚轮）；`openSheet(..., { focus: false })` 整页不聚焦（订货单用）
+- 订货单日期默认今天，不显示框：底下「订货日期：今天 · 改」。测试 `tests/test_sheet.py` 10/10（旧代码 5 项不过：后面页面 600 → 3025）
+- Bowen 说弹出页「质感」以后再优化，先落实功能
+
+## 镜像（Claude 里看 App 界面，2026-11-15，替代 Claude 版）
+- artifact「FB 记账镜像」https://claude.ai/artifact/5adhRecZNQHzxdv8zs8gP3（slug 2516b6e0-e04e-4ea9-afc7-e4415ffde092；能力 db + user + mcp Google Drive search_files/download_file_content）
+- **自动生成，不是第二份代码**：`python3 tools/build_mirror.py <out.html> [--preview "说明"]` = public/index.html 原样 + v2.js + `tools/mirror_shell.js`；
+  只做机械替换（window.claude.use → __M.use；#settings → #shezhi，claude.ai 保留了 settings）。用 claude-artifacts 的 publish_files 发布到上面的 slug
+- 外壳：店主打开就从中转站 `最新数据.json` 同步（开着时每 30 秒、切回页面时再查，文件没变不下载），只写变了的记录（指纹 meta/fp_<集合>，含 log）；
+  **不抄 meta**（文件里 meta/schema=2，抄了会去读 v2_*），镜像里 App 走旧样子；写 meta/backfill done 免得补操作记录
+- 业务代码拿到的 db 只读：写入一律 reject（code read_only），顶上提示「镜像只读」；备份、数据结构升级隐藏
+- **每次「同步到 App」后重新生成并发布镜像**（不带 --preview）。**预览新功能**：在功能分支上 `--preview "这次改了什么"` 生成、发布到镜像，
+  顶上黄条写明「还没同步到 App」；Bowen 看完说「同步到 App」→ 上线 main → 再发布一次不带预览的
+- 测试 `tests/test_mirror.py [fixture]`：同一份数据，镜像里 App 代码算出的所有数字 == 手机 App（golden.py）算的；只读；增量同步只写变了的；GitHub 上用编的数据跑
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超
