@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """从 App 的真代码生成「镜像」页（发布成 Claude artifact，给 Bowen 在 Claude 里看、给 Claude 读数据、预览新功能）。
 
-镜像 = public/index.html 的业务代码原样 + public/v2.js + 一小段镜像外壳：
+镜像 = public/index.html 的业务代码原样 + 页头里 App 自己的脚本（v2.js 等）+ 一小段镜像外壳：
   - 外壳打开就从 Google Drive「FB 记账中转站/最新数据.json」读 App 最新上传的数据，只把变了的记录写进镜像的数据库；
     开着时每 30 秒、切回来时再查一次
   - App 业务代码拿到的数据库是只读的：保存/删除会提示「镜像只读」，不会改到任何数据
@@ -22,7 +22,6 @@ preview = args[args.index("--preview") + 1] if "--preview" in args else ""
 hook = "--hook" in args
 
 html = (ROOT / "public/index.html").read_text(encoding="utf8")
-v2js = (ROOT / "public/v2.js").read_text(encoding="utf8")
 shell = (ROOT / "tools/mirror_shell.js").read_text(encoding="utf8")
 
 head_end = html.index("</head><body>")
@@ -30,6 +29,12 @@ head, body = html[:head_end], html[head_end + len("</head><body>"):]
 # 页头只留 App 自己的样式（重置样式由外壳给），去掉 Firebase / 登录 / PWA 那些
 styles = "".join(re.findall(r"<style>.*?</style>", head, flags=re.S)[1:])  # 第一个是重置样式，外壳自己带
 assert "<script" not in styles
+# 页头的脚本：App 自己的（v2.js、orderparse.js…）原样内嵌；Firebase、Google 登录、firebase-config、shim 不要
+SKIP = ("vendor/firebasejs/", "accounts.google.com", "firebase-config.js", "shim.js")
+srcs = re.findall(r'<script src="([^"]+)"', head)
+own = [x for x in srcs if not any(k in x for k in SKIP)]
+assert "v2.js" in own and not any(x.startswith("http") for x in own), srcs
+own_js = "".join("<script>\n" + (ROOT / "public" / x).read_text(encoding="utf8") + "\n</script>" for x in own)
 
 def sub1(s, a, b, count=None):
     n = s.count(a)
@@ -83,7 +88,7 @@ page = (
     "<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}"
     "body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>"
     + styles + mirror_css
-    + "<script>\n" + v2js + "\n</script>"
+    + own_js
     + "<script>\n" + shell + "\n</script>"
     + "</head><body>" + banner + body
 )
