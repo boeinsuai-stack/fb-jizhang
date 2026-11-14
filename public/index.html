@@ -443,6 +443,16 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 .lg-tot .g { border-top: 1px solid var(--fg); padding-top: 6px; font-weight: 700; font-size: 1rem; }
 .k-in { background: var(--warn-soft); color: var(--warn); }
 .lg-pend { border-style: dashed; background: var(--bg); }
+.lg-sr { display: grid; gap: 4px; padding: 9px 12px; }
+.lg-sr + .lg-sr { border-top: 1px solid var(--line); }
+.lg-sr-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.lg-sr-h small { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.lg-sr-r { display: flex; align-items: center; gap: 8px; font-size: .88rem; }
+.lg-sr-r > span:nth-child(2) { flex: 1; }
+.lg-sr-r b { font-variant-numeric: tabular-nums; }
+.lg-sr-r b.neg { color: var(--warn); } .lg-sr-r b.pos { color: var(--accent); }
+.lg-sr-r .muted { color: var(--muted); }
+.lg-mx { margin: 6px 0 -2px; font-size: .8rem; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
 .lg-pend .lg-l { color: var(--muted); }
 .pend-n { color: var(--muted); font-size: .8rem; }
 .k-out { background: var(--accent-soft); color: var(--accent); }
@@ -2872,7 +2882,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   const lnArr = (ls, tag) => (ls || []).map((l) => { const it = itemBy(l.sku); return { k: seriesOf(it) + (isGeneric(it) ? "（口味没记）" : " " + nm(l.sku, l.name)) + (tag || ""), q: Number(l.qty) || 0 }; });
   /* 互抵（Bowen 2026-11-14）：同一个合伙人、同一个系列，调入（随单拿的 + 往来他给我的）和调出（他拿走的）一根抵一根，不管单价。
      抵掉的根数 = 两边小的那个；抵掉的钱按那一边的平均单价算，从调入、调出各减掉，剩下的照原价。订货不参加。
-     gs = 随单拿货组（moves 带 cost），ts = 往来单。返回 { inV, outV, list:[{sr,q}] } */
+     gs = 随单拿货组（moves 带 cost），ts = 往来单。返回 { inV, outV, list:[{sr,q}]（抵掉的）, rows:[{sr,iq,oq,m,side,rq,rv}]（每个系列：进/出/抵/抵完还要结） } */
   function xOffset(gs, ts) {
     const by = {}, A = (sr) => by[sr] || (by[sr] = { iq: 0, iv: 0, oq: 0, ov: 0 });
     for (const g of gs || []) for (const m of g.moves || []) { const a = A(seriesOf(itemBy(m.sku))); a.iq += Number(m.qty) || 0; a.iv += Number(m.cost) || 0; }
@@ -2880,12 +2890,19 @@ details.restock > summary::-webkit-details-marker { display: none; }
       for (const l of t.in || []) { const a = A(seriesOf(itemBy(l.sku))), q = Number(l.qty) || 0; a.iq += q; a.iv += q * (Number(l.unit) || 0); }
       for (const l of t.out || []) { const a = A(seriesOf(itemBy(l.sku))), q = Number(l.qty) || 0; a.oq += q; a.ov += q * (Number(l.unit) || 0); }
     }
-    let inV = 0, outV = 0; const list = [];
-    for (const [sr, a] of Object.entries(by)) { const q = Math.min(a.iq, a.oq); if (q <= 0) continue; inV += a.iv * q / a.iq; outV += a.ov * q / a.oq; list.push({ sr, q }); }
-    list.sort((a, b) => serRank(a.sr) - serRank(b.sr) || a.sr.localeCompare(b.sr));
-    return { inV: r2(inV), outV: r2(outV), list };
+    let inV = 0, outV = 0; const list = [], rows = [];
+    for (const [sr, a] of Object.entries(by)) {
+      const q = Math.min(a.iq, a.oq), side = a.iq > a.oq ? "in" : a.oq > a.iq ? "out" : "";
+      if (q > 0) { inV += a.iv * q / a.iq; outV += a.ov * q / a.oq; list.push({ sr, q }); }
+      rows.push({ sr, iq: a.iq, oq: a.oq, m: q, side, rq: Math.abs(a.iq - a.oq), rv: r2(side === "in" ? a.iv * (a.iq - q) / a.iq : side === "out" ? a.ov * (a.oq - q) / a.oq : 0) });
+    }
+    const bySr = (a, b) => serRank(a.sr) - serRank(b.sr) || a.sr.localeCompare(b.sr);
+    list.sort(bySr); rows.sort(bySr);
+    return { inV: r2(inV), outV: r2(outV), list, rows };
   }
   const offTxt = (list) => list.map((o) => o.sr + " " + o.q + " 根").join("、");
+  const serIO = (r) => [r.iq ? "调入 " + r.iq : "", r.oq ? "调出 " + r.oq : "", r.m ? "抵 " + r.m : ""].filter(Boolean).join(" · ");
+  const serRest = (r) => (r.side === "in" ? "调入 " + r.rq + " 根 " + money(r.rv) : r.side === "out" ? "调出 " + r.rq + " 根 " + money(r.rv) : "抵完两清");
   function ledgerFrom(gs, xs, ps, pend) {
     const by = {};
     const W = (w) => by[w] || (by[w] = { inn: [], out: [], po: [], pend: [], tin: 0, tout: 0, tpo: 0, tpend: 0, unk: false, gs: [], ts: [] });
@@ -2897,7 +2914,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     for (const q of ps || []) { const x = W(poWho(q)); x.po.push({ date: q.date, at: q.at || "", id: q.id, amt: poOweAmt(q), lines: (q.lines || []).map((l) => ({ k: isSerLine(l) ? l.series + "（口味到货再分）" : seriesOf(itemBy(l.sku)) + " " + nm(l.sku, l.name), q: Number(l.qty) || 0 })) }); x.tpo += poOweAmt(q); }
     const byT = (a, b) => (a.date || "").localeCompare(b.date || "") || (a.at || "").localeCompare(b.at || "");
     for (const x of Object.values(by)) { x.inn.sort(byT); x.out.sort(byT); x.po.sort(byT); x.pend.sort(byT); x.tpend = r2(x.tpend);
-      const off = xOffset(x.gs, x.ts); x.off = off.list; x.tin = r2(x.tin - off.inV); x.tout = r2(x.tout - off.outV); delete x.gs; delete x.ts; x.tpo = r2(x.tpo); x.net = r2(x.tin + x.tpo - x.tout); }
+      const off = xOffset(x.gs, x.ts); x.off = off.list; x.ser = off.rows; x.tin = r2(x.tin - off.inV); x.tout = r2(x.tout - off.outV); delete x.gs; delete x.ts; x.tpo = r2(x.tpo); x.net = r2(x.tin + x.tpo - x.tout); }
     return by;
   }
   /* 同一天同一个口味合并成一行 */
@@ -2916,16 +2933,19 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const W = esc(w);
     const days = (list) => '<ul class="lg">' + byDay(list).map((d) => '<li class="lg-d">' + esc(fmtD(d.date)) + "</li>" + d.lines.map((l) => '<li class="lg-l"><span>' + esc(l.k) + "</span><b>×" + l.q + "</b></li>").join("")).join("") + "</ul>";
     const sec = (cls, label, sub, amt, inner) => '<section class="lg-sec"><div class="lg-sh"><span class="lg-k ' + cls + '">' + label + "</span><small>" + sub + "</small><b>" + amt + "</b></div>" + inner + "</section>";
+    const serRow = (r) => '<li class="lg-sr"><div class="lg-sr-h"><b>' + esc(r.sr) + "</b><small>" + esc(serIO(r)) + "</small></div>" +
+      '<div class="lg-sr-r">' + (r.side ? '<span class="lg-k ' + (r.side === "in" ? "k-in" : "k-out") + '">' + (r.side === "in" ? "调入" : "调出") + "</span><span>还要结 " + r.rq + ' 根</span><b class="' + (r.side === "in" ? "neg" : "pos") + '">' + (r.side === "in" ? "+" : "−") + money(r.rv) + "</b>" : '<span class="muted">抵完两清</span>') + "</div></li>";
     const html = '<p class="lg-sum">' + esc(owedTxt(w, x.net)) + " <b>" + money(Math.abs(x.net)) + "</b></p>" +
-      (x.inn.length ? sec("k-in", "调入", "从" + W + "拿的货", money(x.tin) + (x.unk ? "＋" : ""), days(x.inn)) : "") +
-      (x.out.length ? sec("k-out", "调出", W + "拿走的货", money(x.tout), days(x.out)) : "") +
-      (x.off.length ? sec("k-swap", "互抵", "同系列一根抵一根，不算钱", "", '<ul class="lg">' + x.off.map((o) => '<li class="lg-l"><span>' + esc(o.sr) + "</span><b>×" + o.q + "</b></li>").join("") + "</ul>") : "") +
+      (x.ser.length ? sec("k-swap", "按系列算", "同系列一根抵一根，抵完剩下的照价算", "", '<ul class="lg lg-ser">' + x.ser.map(serRow).join("") + "</ul>") : "") +
       (x.po.length ? sec("k-po", "订货", "还没付", money(x.tpo), '<ul class="lg">' + x.po.map((q) => '<li class="lg-d"><span>' + esc(fmtD(q.date)) + '</span><span><b>' + money(q.amt) + '</b> <button class="linkbtn" type="button" data-lg="po-pay" data-id="' + esc(q.id) + '">结款</button></span></li>' +
         q.lines.map((l) => '<li class="lg-l"><span>' + esc(l.k) + "</span><b>×" + l.q + "</b></li>").join("")).join("") + "</ul>") : "") +
+      '<div class="lg-tot">' + (x.tin ? "<span>调入</span><b>+" + money(x.tin) + "</b>" : "") + (x.tpo ? "<span>订货</span><b>+" + money(x.tpo) + "</b>" : "") + (x.tout ? "<span>调出</span><b>−" + money(x.tout) + "</b>" : "") +
+        '<span class="g">' + esc(owedTxt(w, x.net)) + '</span><b class="g">' + money(Math.abs(x.net)) + "</b></div>" +
+      (x.inn.length || x.out.length ? '<p class="lg-mx">明细 · 按日期（只记货）</p>' : "") +
+      (x.inn.length ? sec("k-in", "调入", "从" + W + "拿的货", "", days(x.inn)) : "") +
+      (x.out.length ? sec("k-out", "调出", W + "拿走的货", "", days(x.out)) : "") +
       (x.pend.length ? sec("k-resv", "预定", "还没拿 · 不算进应付", "", '<ul class="lg lg-pend">' + x.pend.map((q) => '<li class="lg-d"><span>' + esc(fmtD(q.date)) + '</span><button class="linkbtn" type="button" data-lg="picked" data-id="' + esc(q.oid) + '">已拿到</button></li>' +
         q.lines.map((l) => '<li class="lg-l"><span>' + esc(l.k) + "</span><b>×" + l.q + "</b></li>").join("")).join("") + "</ul>") : "") +
-      '<div class="lg-tot">' + (x.off.length ? "<span>互抵 " + esc(offTxt(x.off)) + "</span><b>$0</b>" : "") + (x.tin ? "<span>调入</span><b>+" + money(x.tin) + "</b>" : "") + (x.tpo ? "<span>订货</span><b>+" + money(x.tpo) + "</b>" : "") + (x.tout ? "<span>调出</span><b>−" + money(x.tout) + "</b>" : "") +
-        '<span class="g">' + esc(owedTxt(w, x.net)) + '</span><b class="g">' + money(Math.abs(x.net)) + "</b></div>" +
       (x.unk ? '<p class="hint">＋ 有的货拿货价还没填，金额可能偏少。</p>' : "") +
       '<div class="actions"><button class="btn small" type="button" data-lg="copy">复制发给' + W + '</button><button class="btn small ghost" type="button" data-lg="xfer">记往来</button>' +
       (openXfers(w).length ? '<button class="btn small ghost" type="button" data-lg="xprice">改单价</button>' : "") + "</div>";
@@ -3334,7 +3354,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const upd = () => { const { gs, ts, ps, pick, poSum, off, net } = netOf(), w = whoTxt();
         const tk = r2(ts.reduce((a, t) => a + xLineVal(t.out), 0) - off.outV), gv = r2(ts.reduce((a, t) => a + xLineVal(t.in), 0) + pick - off.inV);
         const parts = [gv ? "调入 " + money(gv) : "", poSum ? "订货 " + money(poSum) : ""].filter(Boolean).join(" + ");
-        $("f-net").innerHTML = !gs.length && !ts.length && !ps.length ? "没选" : (off.list.length ? "互抵 " + esc(offTxt(off.list)) + "（不算钱）<br>" : "") + (parts || "$0") + (tk ? " − 调出 " + money(tk) : "") + "<br><b>= " + esc(owedTxt(w, net)) + " " + money(Math.abs(net)) + "</b>";
+        $("f-net").innerHTML = !gs.length && !ts.length && !ps.length ? "没选" : (off.list.length ? "<small>同系列一根抵一根，抵完还要结：</small><br>" + (off.rows.filter((r) => r.side).map((r) => esc(r.sr + " " + serRest(r))).join("<br>") || "无") + "<br>" : "") + (parts || "$0") + (tk ? " − 调出 " + money(tk) : "") + "<br><b>= " + esc(owedTxt(w, net)) + " " + money(Math.abs(net)) + "</b>";
         $("f-paid-l").textContent = net < 0 ? "实际收到 $" : "实际付款 $"; };
       $("f-all").addEventListener("click", () => { open.forEach((g, k) => { $("f-g-" + k).checked = true; }); xs.forEach((t, k) => { $("f-x-" + k).checked = true; }); pos.forEach((x, k) => { $("f-po-" + k).checked = true; }); upd(); });
       $("f-none").addEventListener("click", () => { open.forEach((g, k) => { $("f-g-" + k).checked = false; }); xs.forEach((t, k) => { $("f-x-" + k).checked = false; }); pos.forEach((x, k) => { $("f-po-" + k).checked = false; }); upd(); });
@@ -3359,12 +3379,12 @@ details.restock > summary::-webkit-details-marker { display: none; }
     let net = 0;
     for (const [w, x] of Object.entries(by)) {
       out.push("");
-      if (x.inn.length) out.push("【调入 · 从" + w + "拿的货】", ...days(x.inn), "调入合计 " + money(x.tin) + (x.unk ? "（有拿货价没填）" : ""), "");
-      if (x.out.length) out.push("【调出 · " + w + "拿走的货】", ...days(x.out), "调出合计 " + money(x.tout), "");
+      if (x.ser.length) out.push("【按系列算 · 同系列一根抵一根】", ...x.ser.map((r) => r.sr + "：" + serIO(r) + " → " + (r.side ? "还要结 " : "") + serRest(r)), ...(x.unk ? ["（有拿货价没填，金额可能偏少）"] : []), "");
       if (x.po.length) { out.push("【订货 · 还没付】"); for (const q of x.po) { out.push(fmtD(q.date) + "  " + money(q.amt)); for (const l of q.lines) out.push("  " + l.k + " ×" + l.q); } out.push("订货合计 " + money(x.tpo), ""); }
-      if (x.off.length) out.push("【互抵 · 同系列一根抵一根，不算钱】", ...x.off.map((o) => "  " + o.sr + " ×" + o.q), "调入、调出合计已经扣掉这几根", "");
-      if (x.pend.length) out.push("【预定 · 还没拿，不算进合计】", ...days(x.pend), "");
       out.push([x.tin ? "调入 " + money(x.tin) : "", x.tpo ? "+ 订货 " + money(x.tpo) : "", x.tout ? "− 调出 " + money(x.tout) : ""].filter(Boolean).join(" ").replace(/^\+ /, "") + " = " + owedTxt(w, x.net) + " " + money(Math.abs(x.net)));
+      if (x.inn.length) out.push("", "【明细 · 调入（从" + w + "拿的货）】", ...days(x.inn));
+      if (x.out.length) out.push("", "【明细 · 调出（" + w + "拿走的货）】", ...days(x.out));
+      if (x.pend.length) out.push("", "【预定 · 还没拿，不算进合计】", ...days(x.pend));
       net += x.net;
     }
     net = r2(net);
