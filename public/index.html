@@ -2538,9 +2538,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
           (l && recv[lineKey(l)] ? '<p class="hint">已经到货 ' + recv[lineKey(l)] + " 根，订货数不能比这个少。</p>" : "") +
           "</fieldset>"; }).join("") +
       "</details>" +
-      fld("f-note", "供货人 / 备注", '<input id="f-note" value="' + esc(po ? po.note || "" : "") + '" placeholder="例如 小王、预计周五到">') +
-      '<p class="total">共 <b id="f-units">0</b> 根 · 付款 <b id="f-total">–</b></p>' +
-      '<p class="hint">订货金额会记进「进货成本」：它先变成库存，卖出时才算进利润里的成本。还没付的会出现在财务「你欠 …」里，付了点「结款」。货还没到，库存先不变；到货时在订货单上点「登记到货」。</p>';
+      '<p class="total">共 <b id="f-units">0</b> 根 · 付款 <b id="f-total">–</b></p>';
     const serVal = {};
     /* 选好的口味按系列分组：每组一个框，框头 = 系列小标签 + 这组几根 + 整系列每根成本 */
     function grpOf(sr) {
@@ -2645,7 +2643,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
         if (!l) throw userError(label + " 已经到货 " + got + " 根，不能从订货单里删掉。");
         if (l.qty < got) throw userError(label + " 已经到货 " + got + " 根，订货数不能比这个少。");
       }
-      const date = $("f-date").value || today(), note = $("f-note").value.trim();
+      const date = $("f-date").value || today(), note = po ? po.note || "" : ""; // 备注框去掉了（Bowen 嫌多余），以前写过的照旧保留
       const total = r2(lines.reduce((a, l) => a + (l.unit_cost == null ? 0 : l.unit_cost * l.qty), 0));
       const id = po ? po.id : rid("p"), at = po ? po.at : new Date().toISOString();
       const supplier = $("f-supplier").value.trim();
