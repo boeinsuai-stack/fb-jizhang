@@ -9,7 +9,7 @@
 | `public/index.html` | 原 App，业务代码一行没改；只改了 5 句提示文字（原来写「请在 claude.ai 打开」），加了 PWA 标签 |
 | `public/shim.js` | 转接层：用 Firebase 提供原来 Claude 的 `db / user / downloads` 接口，并负责登录界面、离线缓存 |
 | `public/firebase-config.js` | ⚠️ 待填 Firebase 项目配置 |
-| `public/import.html` | 一次性导入旧数据，并逐字段核对 |
+| `public/import.html` | 从备份恢复：选整份数据 JSON，先核对、再恢复 |
 | `public/sw.js`、`manifest.webmanifest`、`icons/` | 让它能装到主屏幕、离线打开 |
 | `firestore.rules` | 只允许名单里的邮箱读写数据 |
 | `data-backup/backup-2026-11-03.json` | 2026-11-03 从 Claude 导出的全部数据（含客户信息，**不要上传到 GitHub**，已在 .gitignore 里） |
@@ -26,7 +26,7 @@
 - 每次推送到 `main`，GitHub Actions 自动把 `public/` 发布到 GitHub Pages（见 `.github/workflows/pages.yml`）
 - 数据库：Firebase 项目 `fb-jizhang`，Firestore 在悉尼（australia-southeast1）；只开放邮箱/密码登录，已关闭自助注册
 - 安全规则在 Firebase 控制台里维护（本地副本 `firestore.rules` 含邮箱，不进仓库）
-- 迁移：打开 `import.html` → 登录 → 选备份 JSON → 导入并核对，必须显示「✓ 全部记录逐字段一致」
+- 从备份恢复：打开 `import.html` → 登录 → 选整份数据 JSON（设置页备份存的「FB记账 整份数据 ….json」或中转站「最新数据.json」）→ 只核对 / 恢复，必须显示「✓ 恢复好了」；恢复后在设置页重新「数据结构升级」
 
 ## 和旧版的差别
 

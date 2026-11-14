@@ -1,76 +1,125 @@
 <!doctype html>
 <html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>导入备份</title>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js"></script><script src="shim.js"></script>
+<title>从备份恢复</title>
+<script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script><script src="shim.js"></script><script src="v2.js"></script>
 <style>
 body{margin:0;font-family:"Noto Sans SC",system-ui,sans-serif;background:#f5f6f3;color:#1d2430}
 main{max-width:640px;margin:0 auto;padding:24px 16px;display:grid;gap:14px}
+h1{margin:0;font-size:1.4rem}p{margin:0;line-height:1.6}
 button{font:inherit;padding:10px 14px;border:0;border-radius:8px;background:#2f6b5a;color:#fff;font-weight:600}
-button:disabled{opacity:.5}
-pre{white-space:pre-wrap;background:#fff;border:1px solid #dde1dc;border-radius:8px;padding:12px;font-size:.85rem;min-height:4em}
-.ok{color:#2f6b5a;font-weight:700}.bad{color:#b23b3b;font-weight:700}
+button.danger{background:#b23b3b}button:disabled{opacity:.5}
+input[type=file]{font:inherit}
+pre{white-space:pre-wrap;background:#fff;border:1px solid #dde1dc;border-radius:8px;padding:12px;font-size:.85rem;min-height:4em;margin:0}
+.row{display:flex;gap:10px;flex-wrap:wrap}
 </style></head>
 <body><main>
-<h1>导入旧数据并核对</h1>
-<p>选择备份文件 备份 JSON 文件。导入后会把云端每一条记录读回来，和备份文件逐字段比对。</p>
-<input type="file" id="f" accept="application/json">
-<button id="go" disabled>导入并核对</button>
-<button id="check" disabled>只核对（不写入）</button>
+<h1>从备份恢复</h1>
+<p>选一份整份数据的 JSON：设置页「备份到 Google Drive」存的「FB记账 整份数据 ….json」，或中转站的「最新数据.json」。Excel 不行。</p>
+<p>先点「只核对」看备份和云端差在哪。「恢复」会把云端的账整份换成备份里的样子（备份里没有的记录会删掉），然后回到旧结构：恢复完打开 App → 设置 → 数据结构升级 → 检查迁移 → 确认迁移。</p>
+<input type="file" id="f" accept="application/json,.json">
+<div class="row"><button id="check" disabled>只核对（不写入）</button><button id="go" class="danger" disabled>恢复成这份备份</button></div>
 <pre id="out"></pre>
 </main>
 <script>
+/* 恢复的是「旧样子」的 9 类账本记录；meta（数据结构版本、备份记录、中转站记录）和操作记录不动，只把数据结构版本改回 1。
+   读写都直接用 Firestore（shim 给页面的那个 db 只能订阅，不能 get；批量写入会自动带上同步用的 _u，删除留标记，另一台手机能同步到）。 */
+const LEDGER = ["items", "movements", "orders", "expenses", "purchases", "settlements", "transfers", "customers", "followups"];
+const V1COL = { orders: "orders", movements: "moves", expenses: "expenses", purchases: "purchases", transfers: "transfers", settlements: "settles" };
 const out = document.getElementById("out");
 const log = (s) => { out.textContent += s + "\n"; };
 let bundle = null, fs = null;
-// 与键顺序无关的深比较
+// 与键顺序无关的深比较；null 和没有这个字段算一样
 function same(a, b) {
   if (a === b) return true;
+  if (a == null && b == null) return true;
   if (typeof a !== typeof b || a === null || b === null || typeof a !== "object") return false;
   if (Array.isArray(a) !== Array.isArray(b)) return false;
   if (Array.isArray(a)) return a.length === b.length && a.every((x, i) => same(x, b[i]));
-  const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
-  return same(ka, kb) && ka.every((k) => same(a[k], b[k]));
+  const ks = [...new Set(Object.keys(a).concat(Object.keys(b)))];
+  return ks.every((k) => same(a[k], b[k]));
+}
+const clean = (x) => { const o = JSON.parse(JSON.stringify(x)); delete o._u; delete o._deleted; delete o._v; delete o.id; return o; };
+function readBundle(j) {
+  const d = j && typeof j === "object" && j.data && typeof j.data === "object" && /^fb-jizhang-(relay|backup)\//.test(j.format || "") ? j.data : j;
+  if (!d || typeof d !== "object" || !LEDGER.some((c) => d[c] && typeof d[c] === "object")) throw new Error("不认识");
+  const b = {};
+  for (const c of LEDGER) { b[c] = {}; for (const [id, x] of Object.entries(d[c] || {})) if (x && typeof x === "object" && !x._deleted && !id.startsWith(".")) b[c][id] = clean(x); }
+  return { b, when: (j && (j.saved_at || j.uploaded_at)) || "" };
 }
 document.getElementById("f").addEventListener("change", async (e) => {
-  out.textContent = "";
-  try { bundle = JSON.parse(await e.target.files[0].text()); }
-  catch (_) { log("文件读不了，确认选的是备份 JSON。"); return; }
-  for (const [c, docs] of Object.entries(bundle)) log(c + "：" + Object.keys(docs).length + " 条");
-  fs = await window.claude.use("db");
+  out.textContent = ""; bundle = null;
+  document.getElementById("go").disabled = document.getElementById("check").disabled = true;
+  let r;
+  try { r = readBundle(JSON.parse(await e.target.files[0].text())); }
+  catch (_) { log("这个文件用不了：要选整份数据的 JSON（「FB记账 整份数据 ….json」或中转站的「最新数据.json」）。"); return; }
+  bundle = r.b;
+  if (r.when) log("备份时间：" + new Date(r.when).toLocaleString("zh-CN"));
+  for (const c of LEDGER) log(c + "：" + Object.keys(bundle[c]).length + " 条");
+  if (!Object.keys(bundle.items).length || !Object.keys(bundle.movements).length) { log("\n这份备份里没有口味或流水，不像一份完整的备份，不能用来恢复。"); bundle = null; return; }
+  try { await window.claude.use("db"); fs = firebase.firestore(); } catch (x) { log("\n没登录上：" + ((x && x.message) || x)); return; }
   document.getElementById("go").disabled = document.getElementById("check").disabled = false;
 });
-async function verify() {
-  let bad = 0, total = 0;
-  for (const [c, docs] of Object.entries(bundle)) {
-    const snap = await fs.collection(c).get({ source: "server" });
-    const cloud = {}; snap.docs.forEach((d) => { cloud[d.id] = d.data(); });
-    const ids = Object.keys(docs);
-    const missing = ids.filter((id) => !(id in cloud));
-    const diff = ids.filter((id) => id in cloud && !same(docs[id], cloud[id]));
-    const extra = Object.keys(cloud).filter((id) => !(id in docs));
-    total += ids.length; bad += missing.length + diff.length;
-    log(`${c}：备份 ${ids.length}，云端 ${snap.size}` + (missing.length ? `，缺 ${missing.length}` : "") + (diff.length ? `，不一致 ${diff.length}（${diff.slice(0, 3).join("、")}…）` : "") + (extra.length ? `，云端多出 ${extra.length}（迁移后新记的，正常）` : ""));
+// 云端现在的账（旧样子）：新结构下由 v2 的源头现算
+async function cloudNow() {
+  const get = async (c) => { const s = await fs.collection(c).get({ source: "server" }); const m = {}; s.docs.forEach((d) => { const x = d.data(); if (!x._deleted) m[d.id] = clean(x); }); return m; };
+  const sch = await fs.doc("meta/schema").get({ source: "server" });
+  const v2 = sch.exists && sch.data().version === 2;
+  const cur = {};
+  for (const c of LEDGER) if (!(v2 && V1COL[c])) cur[c] = await get(c);
+  if (v2) {
+    const src = {}; for (const [k, c] of Object.entries(window.FBV2.COL)) src[k] = Object.entries(await get(c)).map(([id, x]) => Object.assign({ id }, x));
+    const P = window.FBV2.project(Object.assign({ items: Object.entries(cur.items).map(([id, x]) => Object.assign({ id }, x)) }, src));
+    for (const [c, k] of Object.entries(V1COL)) { cur[c] = {}; for (const x of P[k]) cur[c][x.id] = clean(x); }
   }
-  log(bad ? `\n✗ 有 ${bad} 条对不上，先别停用旧版。` : `\n✓ 全部 ${total} 条记录逐字段一致。`);
+  return { cur, v2 };
 }
-document.getElementById("check").addEventListener("click", async () => { out.textContent = ""; await verify(); });
-document.getElementById("go").addEventListener("click", async () => {
-  out.textContent = "";
-  const first = await fs.collection("orders").limit(1).get({ source: "server" });
-  if (!first.empty && !confirm("云端已经有数据。继续导入会用备份覆盖同 ID 的记录，确定吗？")) return;
-  const writes = [];
-  for (const [c, docs] of Object.entries(bundle)) for (const [id, data] of Object.entries(docs)) writes.push([c, id, data]);
-  for (let i = 0; i < writes.length; i += 400) {
-    const b = fs.batch();
-    for (const [c, id, data] of writes.slice(i, i + 400)) b.set(fs.collection(c).doc(id), data);
-    await b.commit();
-    log(`已写入 ${Math.min(i + 400, writes.length)} / ${writes.length}`);
+function report(cur) {
+  let bad = 0, total = 0;
+  for (const c of LEDGER) {
+    const want = bundle[c], have = cur[c] || {}, ids = Object.keys(want);
+    const missing = ids.filter((id) => !(id in have)), diff = ids.filter((id) => id in have && !same(want[id], have[id])), extra = Object.keys(have).filter((id) => !(id in want));
+    total += ids.length; bad += missing.length + diff.length + extra.length;
+    log(`${c}：备份 ${ids.length}，云端 ${Object.keys(have).length}` + (missing.length ? `，云端缺 ${missing.length}` : "") + (diff.length ? `，不一样 ${diff.length}（${diff.slice(0, 3).join("、")}${diff.length > 3 ? "…" : ""}）` : "") + (extra.length ? `，云端多出 ${extra.length}（${extra.slice(0, 3).join("、")}${extra.length > 3 ? "…" : ""}）` : ""));
   }
-  log("\n开始核对…");
-  await verify();
+  return { bad, total };
+}
+const busy = (b) => { document.getElementById("go").disabled = document.getElementById("check").disabled = b; };
+document.getElementById("check").addEventListener("click", async () => {
+  out.textContent = ""; busy(true);
+  try {
+    const { cur, v2 } = await cloudNow();
+    log("云端现在是" + (v2 ? "新结构（v2）" : "旧结构") + "。\n");
+    const r = report(cur);
+    log(r.bad ? `\n✗ 有 ${r.bad} 条跟备份不一样（备份之后新记的也算在里面）。` : `\n✓ 全部 ${r.total} 条记录跟备份逐字段一样。`);
+  } catch (x) { log("\n读不到云端（要联网）：" + ((x && (x.code || x.message)) || x)); }
+  busy(false);
+});
+document.getElementById("go").addEventListener("click", async () => {
+  if (!confirm("把云端的账整份换成这份备份？备份之后记的东西会没有。")) return;
+  out.textContent = ""; busy(true);
+  try {
+    if (navigator.onLine === false) throw new Error("要联网");
+    for (const c of LEDGER) {
+      const s = await fs.collection(c).get({ source: "server" }), have = {}, ops = [];
+      s.docs.forEach((d) => { const x = d.data(); if (!x._deleted) have[d.id] = clean(x); });
+      for (const id of Object.keys(have)) if (!(id in bundle[c])) ops.push((b) => b.delete(fs.doc(c + "/" + id)));
+      for (const [id, x] of Object.entries(bundle[c])) if (!(id in have) || !same(have[id], x)) ops.push((b) => b.set(fs.doc(c + "/" + id), x));
+      for (let i = 0; i < ops.length; i += 400) { const b = fs.batch(); ops.slice(i, i + 400).forEach((f) => f(b)); await b.commit(); }
+      log(`${c}：写了 ${ops.length} 条`);
+    }
+    // 回到旧结构（两台手机看到会自动刷新）；新结构的记录留着，重新「确认迁移」时会整份换掉
+    await fs.doc("meta/schema").set({ version: 1, restored_at: new Date().toISOString(), by: window.__fbMyId || null });
+    log("\n等云端收下…");
+    await fs.waitForPendingWrites(); // 写入是「写进手机就算完成」，核对要等云端真的收下
+    log("开始核对…");
+    const { cur } = await cloudNow();
+    const r = report(cur);
+    log(r.bad ? `\n✗ 有 ${r.bad} 条对不上，把这页的字发给 Claude 看。` : `\n✓ 恢复好了：全部 ${r.total} 条记录跟备份逐字段一样。\n现在打开 App → 设置 → 数据结构升级 → 检查迁移 → 确认迁移。`);
+  } catch (x) { log("\n没做完：" + ((x && (x.code || x.message)) || x) + "。可以再点一次「恢复」，重复做没关系。"); }
+  busy(false);
 });
 </script>
 </body></html>

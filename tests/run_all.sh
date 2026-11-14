@@ -12,6 +12,7 @@ run python3 tests/test_realsdk.py
 run python3 tests/test_v2_failsafe.py
 run python3 tests/test_xfer_price.py
 run python3 tests/test_offset.py
+run python3 tests/test_restore.py
 run node tests/v2_cases.js
 if [ -n "$F" ]; then
   [ -n "$S" ] || { S=$(mktemp --suffix=.json); node tests/v2_seed.js "$F" "$S" > /dev/null; }
@@ -19,6 +20,7 @@ if [ -n "$F" ]; then
   run python3 tests/test_v2_diff.py "$F" "$S"
   run python3 tests/test_v2_migrate.py "$F"
   run python3 tests/test_v2_relay.py "$F" "$S"
+  run python3 tests/test_restore.py "$F"
   for sd in 1 2 3; do run node tests/v2_fuzz.js "$F" 2000 $sd; done
 fi
 [ $fail = 0 ] && echo "全部通过" || { echo "有没通过的"; exit 1; }

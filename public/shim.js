@@ -345,7 +345,7 @@
       const parent = await folderId(); // 放进本应用自己建的文件夹，而不是旧的 Claude 备份文件夹
       const bin = Uint8Array.from(atob(input.base64Content), (c) => c.charCodeAt(0));
       const form = new FormData();
-      form.append("metadata", new Blob([JSON.stringify({ name: input.title + ".xlsx", parents: [parent] })], { type: "application/json" }));
+      form.append("metadata", new Blob([JSON.stringify({ name: input.title + (input.ext || ".xlsx"), parents: [parent] })], { type: "application/json" }));
       form.append("file", new Blob([bin], { type: input.contentMimeType }));
       const f = await gfetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", { method: "POST", body: form });
       return { payload: { id: f.id, viewUrl: f.webViewLink } };
@@ -400,20 +400,26 @@
     const what = c === "orders" ? (d.customer ? d.customer + " " : "") + (d.lines || []).map((l) => (l.name || l.sku) + "×" + l.qty).join("、") : d.note || d.name || "";
     return { at, collection: c, id, text: what.slice(0, 80) };
   }
+  // 当前全部数据（旧样子：新结构下订单/流水等是现算出来的），中转站和「备份」里那份能恢复的 JSON 都用它
+  async function snapshotAll() {
+    const data = {};
+    for (const c of COLLS) {
+      if (v2s() && V1COL[c]) { data[c] = {}; for (const x of v2view(c)) data[c][x.id] = v2clean(x); continue; }
+      let snap;
+      try { snap = await fs.collection(c).get({ source: "cache" }); } catch (_) { snap = await fs.collection(c).get(); } // 读手机缓存，不消耗 Firebase 读取额度
+      data[c] = {}; snap.docs.forEach((d) => { const x = live(d); if (x) data[c][d.id] = x; });
+    }
+    return data;
+  }
+  window.__fbSnapshot = async () => { if (v2s() && !v2s().ready()) throw new Error("数据还没读完，等几秒再试"); return snapshotAll(); };
   async function uploadRelay() {
     if (!relayOn() || !tokenOk()) { if (relayOn()) markStale(); return; }
     if (relayBusy) { relayAgain = true; return; }
     if (pending > 0) { relayTimer = setTimeout(uploadRelay, 2000); return; } // 等云端确认保存后再拷贝
     relayBusy = true; relayState = "uploading"; paintBadge();
     try {
-      const data = {};
       if (v2s() && !v2s().ready()) { relayBusy = false; relayTimer = setTimeout(uploadRelay, 2000); return; } // 新结构还没读完，别传半份
-      for (const c of COLLS) {
-        if (v2s() && V1COL[c]) { data[c] = {}; for (const x of v2view(c)) data[c][x.id] = v2clean(x); continue; }
-        let snap;
-        try { snap = await fs.collection(c).get({ source: "cache" }); } catch (_) { snap = await fs.collection(c).get(); } // 读手机缓存，不消耗 Firebase 读取额度
-        data[c] = {}; snap.docs.forEach((d) => { const x = live(d); if (x) data[c][d.id] = x; });
-      }
+      const data = await snapshotAll();
       const counts = {}; for (const c of COLLS) counts[c] = Object.keys(data[c]).length;
       const body = JSON.stringify({ format: "fb-jizhang-relay/1", uploaded_at: new Date().toISOString(), saved_at: lastSaved, uploaded_by: "Bowen 的手机", counts, last_record: lastRecord(data), data });
       let ids = await relayIds();

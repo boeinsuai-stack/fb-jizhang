@@ -3953,9 +3953,21 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const pl = (r && r.payload) || {};
       if (!pl.id) throw { code: "tool_error", message: "没有拿到新文件的编号" };
       const entry = { id: pl.id, url: pl.viewUrl || ("https://docs.google.com/spreadsheets/d/" + pl.id + "/edit"), title, at: new Date().toISOString() };
+      /* Excel 是给人看的报表，导不回去。同时存一份整份数据（JSON）：出事时用 import.html 恢复 */
+      let dataFile = null, dataErr = "";
+      try {
+        if (!window.__fbSnapshot) throw new Error("这个版本不能存整份数据");
+        const data = await window.__fbSnapshot(), counts = {}; for (const c of Object.keys(data)) counts[c] = Object.keys(data[c]).length;
+        const json = JSON.stringify({ format: "fb-jizhang-backup/1", saved_at: entry.at, by: who || null, counts, data });
+        const bytes = new TextEncoder().encode(json); let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+        const r2f = await mcp.callTool("Google Drive", "create_file", { title: "FB记账 整份数据 " + stamp() + (who ? " · " + who : ""), ext: ".json", contentMimeType: "application/json", parentId: prev.drive_folder_id || FOLDER_ID, base64Content: btoa(bin) });
+        const p2 = (r2f && r2f.payload) || {}; if (!p2.id) throw new Error("没有拿到新文件的编号");
+        dataFile = { id: p2.id, url: p2.viewUrl || ("https://drive.google.com/file/d/" + p2.id + "/view"), at: entry.at, counts };
+      } catch (e2) { dataErr = (e2 && (e2.userMsg || e2.message)) || "未知错误"; }
       const older = Array.isArray(prev.history) ? prev.history : prev.files && prev.files.workbook ? [Object.assign({ title: "更早的备份", at: prev.synced_at }, prev.files.workbook)] : [];
-      await db.doc("meta/sync").set({ synced_at: entry.at, drive_folder_id: prev.drive_folder_id || FOLDER_ID, files: { workbook: { id: entry.id, url: entry.url } }, history: [entry].concat(older).slice(0, 60) });
-      toast("已备份到 Google Drive：新建了一份，以前的备份都还在。");
+      await db.doc("meta/sync").set({ synced_at: entry.at, drive_folder_id: prev.drive_folder_id || FOLDER_ID, files: Object.assign({ workbook: { id: entry.id, url: entry.url } }, dataFile ? { data: dataFile } : prev.files && prev.files.data ? { data: prev.files.data } : {}), history: [entry].concat(older).slice(0, 60) });
+      if (dataFile) toast("已备份到 Google Drive：Excel + 整份数据（恢复用），以前的备份都还在。");
+      else showBk("Excel 已备份；整份数据（恢复用的那份）没存上：" + dataErr + "。再点一次试试。");
     } catch (e) {
       const msg = e && e.userMsg ? e.userMsg : e && e.code ? mcpErrText(e) : errText(e);
       showBk(msg + (e && e.code === "tool_error" ? " 如果你不是 Bowen：请让 Bowen 把 Google Drive 里的备份文件夹共享给你的 Google 账号（编辑权限）。" : ""));

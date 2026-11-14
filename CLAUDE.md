@@ -78,6 +78,17 @@
 - 预定的「编辑」= saleForm(null, true, null, null, 订单)：口味/数量/行都能改。已从合伙人拿到、但口味换掉或数量减少的流水：order_id 清空、备注「预定改了，拿到的货留作库存」，拿货支出不动
 - 已卖出的单仍走 orderEditForm（数量锁住）
 
+## 备份和恢复（fix-backup-restore，2026-11-15）
+- 设置页「备份到 Google Drive」现在存两份：Excel（给人看的报表，**导不回去**）+ `FB记账 整份数据 <时间>.json`（格式 fb-jizhang-backup/1，`{format, saved_at, counts, data}`，data = 旧样子的全部集合，跟中转站 `最新数据.json` 的 data 一样）
+  - 数据来自 shim 的 `snapshotAll()`（中转站上传也用它），页面用 `window.__fbSnapshot()`；`mcp.callTool` 的 create_file 多了 `ext`（默认 .xlsx）
+  - JSON 没存上不影响 Excel，设置页会写明；`meta/sync.files.data` 记最近一份
+- `public/import.html` = 恢复页（以前自 feat12 起一按就报错：shim 给页面的 db 只能订阅、没有 get）：
+  - 认上面那份 JSON 和中转站的 `最新数据.json`；直接用 `firebase.firestore()` 读写（批量写会自动带 `_u`、删除留标记，另一台手机能同步到）
+  - 「只核对」：云端现在的账（新结构下用 `FBV2.project` 现算）跟备份逐字段比
+  - 「恢复」：9 类账本记录整份换成备份的样子（备份里没有的删掉），`meta/schema.version` 改回 1 → App 回到旧结构 → 设置页「数据结构升级」再迁移一次（`migGo` 会把 v2_* 整份换掉）
+  - 空的或不认识的文件不让恢复；写完要 `waitForPendingWrites()` 再核对（shim 的写入是「写进手机就算完成」）
+- 测试 `tests/test_restore.py [真实 fixture]` 31/31：备份 → 把云端弄坏 → 恢复 → 数字一样 → 升级回新结构还一样（旧结构/新结构各开始一遍；GitHub 上跑编的数据）
+
 ## 对账单改往来单价（feat13，2026-11-14）
 - 对账单（ledgerSheet）有没结账的往来时多一个「改单价」→ `xferPriceForm(w)`：列出没结账的往来每一行（调出、调入分开），每个系列一个「整系列每根」框，边改边显示改完后的应付/应收
 - 保存：`transfers/<id>.update({out, in})`；调入那几根同时改流水 `cost`（= 进价，库存成本/利润跟着变）。已结账的往来不出现。随客户订单拿的货不在这里改（库存页「系列价格」）
