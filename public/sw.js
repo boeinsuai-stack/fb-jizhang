@@ -4,7 +4,7 @@
    - vendor/ 里的文件带版本号、不会变：直接用手机里存的
    - 字体：有就存，没网时用存过的（拿不到就用系统字体，不影响使用）
    数据由 Firestore 离线缓存负责：没网时照常记账，联网后自动上传 */
-const CACHE = "fb-app-v18";
+const CACHE = "fb-app-v19";
 const SHELL = ["./", "index.html", "v2.js", "shim.js", "firebase-config.js", "manifest.webmanifest", "icons/icon-192.png", "icons/apple-touch-icon.png",
   "vendor/firebasejs/10.12.2/firebase-app-compat.js", "vendor/firebasejs/10.12.2/firebase-auth-compat.js", "vendor/firebasejs/10.12.2/firebase-firestore-compat.js",
   "vendor/xlsx/0.18.5/xlsx.full.min.js"];
