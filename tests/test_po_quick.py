@@ -80,8 +80,11 @@ with sync_playwright() as p:
         check("粘贴识别：Grape Ice 5、蓝莓冰 → Blueberry Ice 4、Pink Lemon 改成 6", q("XF-02") == 5 and q("XF-03") == 4 and q("XF-04") == 6 and q("XF-01") == 2, msg)
         check("没认出的只有「随便写的东西」（「4 根」的根不会被当成一种口味）", "没认出" in msg and msg.split("没认出")[1].count("／") == 0 and "随便写的东西" in msg, msg)
         check("识别完收起粘贴框", pg.evaluate("document.getElementById('f-pastebox').hidden"))
+        check("识别结果只写口味名，不带系列前缀", "Bar Pro Grape" not in msg and "Ali Pink" not in msg, msg)
         if SHOT and mode == "新结构": pg.screenshot(path=SHOT + "-粘贴识别.png", full_page=False)
-        pg.fill('#f-serp input[data-sr="Bar Pro"]', "32")
+        grp = pg.evaluate("[...document.querySelectorAll('#f-lines .po-grp')].map((g) => [g.dataset.sr, g.querySelector('.po-gn').textContent, [...g.querySelectorAll('.pl-name b')].map((b) => b.textContent)])")
+        check("按系列分框：Bar Pro 框 11 根、Ali 框 6 根，行里只写口味名", grp == [["Bar Pro", "11 根", ["Banana Buzz", "Grape Ice", "Blueberry Ice"]], ["Ali", "6 根", ["Pink Lemon"]]], str(grp))
+        pg.fill('#f-lines input[data-sr="Bar Pro"]', "32")
         tot = pg.inner_text("#f-units")
         check("共 17 根", tot == "17", tot)
         if SHOT and mode == "新结构":

@@ -267,6 +267,13 @@ label.chip input { width: auto; margin: 0; accent-color: var(--accent); }
 .po-parsed { font-size: .86rem; line-height: 1.5; } .po-parsed .warn { color: var(--warn); font-weight: 600; }
 .po-tiles .t-main { min-height: 70px; }
 .pl-name { display: grid; gap: 1px; } .pl-name b { font-size: .88rem; font-weight: 600; overflow-wrap: anywhere; } .pl-name small { font-size: .74rem; color: var(--muted); }
+.po-grp { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px 4px; display: grid; gap: 6px; }
+.po-grp + .po-grp { margin-top: 8px; }
+.po-gh { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.k-ser { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.po-gn { color: var(--muted); font-size: .78rem; flex: 1; }
+.po-gc { display: flex; align-items: center; gap: 4px; font-size: .74rem; color: var(--muted); } .po-gc input { width: 78px; padding: 4px 8px; font-size: .86rem; }
+.po-grows .line:last-child { border-bottom: 0; }
 .pl-f { display: grid; gap: 2px; min-width: 0; } .pl-f small { font-size: .7rem; color: var(--muted); }
 #f-lines .line { align-items: end; } #f-lines .line > .btn { margin-bottom: 2px; }
 .po-flav .lines-head { display: none; }
@@ -2519,7 +2526,6 @@ details.restock > summary::-webkit-details-marker { display: none; }
         '<div class="lines-head"><span>香型</span><span>订多少根</span><span>单根成本 $</span><span></span></div>' +
         '<div id="f-lines"></div>' +
         '<label class="po-all" id="f-allbox" hidden>选中的每种都订 <input id="f-allq" type="number" min="1" step="1" inputmode="numeric" aria-label="每种都订多少根"> 根</label>' +
-        '<div class="serp" id="f-serp" hidden></div>' +
       "</div>" +
       '<details class="fold"' + (SERS.some((sr) => serLine(sr)) ? " open" : "") + '><summary>只知道系列，口味到货再分</summary>' +
       SERS.map((sr, k) => { const l = serLine(sr), unit = l ? l.unit_cost : defaultPickCost(sr);
@@ -2535,20 +2541,30 @@ details.restock > summary::-webkit-details-marker { display: none; }
       fld("f-note", "供货人 / 备注", '<input id="f-note" value="' + esc(po ? po.note || "" : "") + '" placeholder="例如 小王、预计周五到">') +
       '<p class="total">共 <b id="f-units">0</b> 根 · 付款 <b id="f-total">–</b></p>' +
       '<p class="hint">订货金额会记进「进货成本」：它先变成库存，卖出时才算进利润里的成本。还没付的会出现在财务「你欠 …」里，付了点「结款」。货还没到，库存先不变；到货时在订货单上点「登记到货」。</p>';
+    const serVal = {};
+    /* 选好的口味按系列分组：每组一个框，框头 = 系列小标签 + 这组几根 + 整系列每根成本 */
+    function grpOf(sr) {
+      let g = Array.from($("f-lines").querySelectorAll(".po-grp")).find((x) => x.dataset.sr === sr);
+      if (g) return g;
+      g = document.createElement("div"); g.className = "po-grp"; g.dataset.sr = sr;
+      g.innerHTML = '<div class="po-gh"><span class="lg-k k-ser">' + esc(sr) + '</span><small class="po-gn"></small><label class="po-gc">整系列每根 $<input type="number" min="0" step="0.01" inputmode="decimal" data-sr="' + esc(sr) + '" value="' + esc(serVal[sr] != null ? serVal[sr] : "") + '" placeholder="同一个价" aria-label="' + esc(sr) + ' 整系列每根成本"></label></div><div class="po-grows"></div>';
+      const after = Array.from($("f-lines").querySelectorAll(".po-grp")).find((x) => SERS.indexOf(x.dataset.sr) > SERS.indexOf(sr));
+      $("f-lines").insertBefore(g, after || null);
+      return g;
+    }
     const rowOf = (sku) => Array.from($("f-lines").querySelectorAll(".line")).find((r) => $("f-sku-" + r.dataset.line).value === sku) || null;
     function addLine(sku, qty, unit) {
       const k = n++, it = itemBy(sku);
       const row = document.createElement("div");
       row.className = "line"; row.dataset.line = k;
-      row.innerHTML = '<input type="hidden" id="f-sku-' + k + '" value="' + esc(sku) + '"><span class="pick pl-name"><b>' + esc(seriesOf(it) + " " + enOf(it)) + "</b>" + (it && it.variant ? "<small>" + esc(it.name) + "</small>" : "") + "</span>" +
+      row.innerHTML = '<input type="hidden" id="f-sku-' + k + '" value="' + esc(sku) + '"><span class="pick pl-name"><b>' + esc(enOf(it)) + "</b>" + (it && it.variant ? "<small>" + esc(it.name) + "</small>" : "") + "</span>" +
         '<label class="pl-f"><small>根数</small><input id="f-qty-' + k + '" type="number" min="1" step="1" inputmode="numeric" value="' + (qty || 1) + '" aria-label="' + esc(enOf(it)) + ' 订多少根"></label>' +
         '<label class="pl-f"><small>单根成本 $</small><input id="f-ucost-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" aria-label="' + esc(enOf(it)) + ' 单根成本" value="' + (unit == null ? "" : esc(unit)) + '"></label>' +
         '<button type="button" class="btn ghost small" data-rm="' + k + '" aria-label="删掉这一行">×</button>';
-      $("f-lines").append(row);
+      grpOf(seriesOf(it)).querySelector(".po-grows").append(row);
       if (sku && unit == null) setDefaultCost(k);
       return k;
     }
-    const serVal = {}; let serKey = "";
     function setDefaultCost(k) { const it = itemBy($("f-sku-" + k).value), c = $("f-ucost-" + k); if (!it || c.value !== "") return; const sv = serVal[seriesOf(it)];
       if (sv != null && sv !== "") c.value = sv; else if (it.cost_aud != null) c.value = it.cost_aud; else { const d = defaultPickCost(seriesOf(it)); if (d != null) c.value = d; } }
     /* 点格子 / 粘贴识别：已选的加根数（set = 直接改成这个数），没选的加一行 */
@@ -2575,17 +2591,17 @@ details.restock > summary::-webkit-details-marker { display: none; }
     function flavSync() {
       const rows = $("f-lines").querySelectorAll(".line");
       $("f-allbox").hidden = rows.length < 2;
-      const sers = [...new Set(Array.from(rows).map((r) => seriesOf(itemBy($("f-sku-" + r.dataset.line).value))).filter(Boolean))], key = sers.join("|");
-      if (key !== serKey) { serKey = key; $("f-serp").hidden = !sers.length; $("f-serp").innerHTML = serpHtml(sers, serVal); }
+      $("f-lines").querySelectorAll(".po-grp").forEach((g) => { const rs = g.querySelectorAll(".line"); if (!rs.length) { g.remove(); return; }
+        g.querySelector(".po-gn").textContent = Array.from(rs).reduce((a, r) => a + (Number($("f-qty-" + r.dataset.line).value) || 0), 0) + " 根"; });
       renderTiles(); recalc();
     }
     function parsePaste() {
       const txt = $("f-paste").value; if (!txt.trim()) { toast("先把清单粘贴进来。"); return; }
       const r = window.FBParse.parseOrder(txt, list.map((i) => ({ sku: i.sku, series: seriesOf(i), variant: i.variant, name: i.name })), { series: pTab });
       for (const l of r.lines) addSku(l.sku, l.qty, true);
-      const lab = (sku) => seriesOf(itemBy(sku)) + " " + enOf(itemBy(sku)), as = r.lines.filter((l) => l.assumed), nq = r.lines.filter((l) => l.noQty);
+      const lab = (sku) => enOf(itemBy(sku)), as = r.lines.filter((l) => l.assumed), nq = r.lines.filter((l) => l.noQty);
       $("f-parsed").innerHTML = (r.lines.length ? "认出 <b>" + r.lines.length + "</b> 种、共 <b>" + r.lines.reduce((a, l) => a + l.qty, 0) + "</b> 根，已加到下面。" : "一种口味也没认出来。") +
-        (as.length ? '<br><span class="warn">系列是猜的，看一下对不对：</span>' + esc(as.map((l) => lab(l.sku)).join("、")) : "") +
+        (as.length ? '<br><span class="warn">系列是猜的，看一下对不对：</span>' + esc(as.map((l) => lab(l.sku) + "（按 " + seriesOf(itemBy(l.sku)) + "）").join("、")) : "") +
         (nq.length ? '<br><span class="warn">没写根数，先按 1：</span>' + esc(nq.map((l) => lab(l.sku)).join("、")) : "") +
         (r.unknown.length ? '<br><span class="warn">没认出（在下面点口味手动加）：</span>' + esc(r.unknown.join(" ／ ")) : "");
       $("f-parsed").hidden = false;
@@ -2651,16 +2667,17 @@ details.restock > summary::-webkit-details-marker { display: none; }
       for (const l of flavLines) addLine(l.sku, l.qty, l.unit_cost);
       if (flavLines.length) pTab = seriesOf(itemBy(flavLines[0].sku)) || pTab;
       $("f-lines").addEventListener("click", (e) => { const k = e.target.dataset && e.target.dataset.rm; if (k == null) return; e.target.closest(".line").remove(); flavSync(); });
-      $("f-lines").addEventListener("input", (e) => { if (/^f-qty-/.test(e.target.id)) renderTiles(); });
+      $("f-lines").addEventListener("input", (e) => {
+        const sr = e.target.dataset && e.target.dataset.sr;
+        if (sr) { serVal[sr] = e.target.value; e.target.closest(".po-grp").querySelectorAll(".line").forEach((r) => { $("f-ucost-" + r.dataset.line).value = e.target.value; }); recalc(); }
+        else if (/^f-qty-/.test(e.target.id)) flavSync(); });
       $("f-ptiles").addEventListener("click", (e) => { const a = e.target.closest("[data-padd]"), m = e.target.closest("[data-psub]");
         if (a) addSku(a.dataset.padd, 1); else if (m) addSku(m.dataset.psub, -1); });
       $("f-ptabs").addEventListener("click", (e) => { const c = e.target.closest("[data-pt]"); if (!c) return; pTab = c.dataset.pt; pQ = ""; $("f-pq").value = ""; renderTiles(); });
       $("f-pq").addEventListener("input", () => { pQ = $("f-pq").value; renderTiles(); });
       $("f-pastebtn").addEventListener("click", () => { const box = $("f-pastebox"); box.hidden = !box.hidden; $("f-pastebtn").setAttribute("aria-expanded", String(!box.hidden)); if (!box.hidden) $("f-paste").focus(); });
       $("f-parse").addEventListener("click", parsePaste);
-      $("f-allq").addEventListener("input", () => { const q = Number($("f-allq").value); if (!Number.isInteger(q) || q < 1) return; $("f-lines").querySelectorAll(".line").forEach((r) => { $("f-qty-" + r.dataset.line).value = q; }); renderTiles(); recalc(); });
-      $("f-serp").addEventListener("input", (e) => { const sr = e.target.dataset && e.target.dataset.sr; if (!sr) return; serVal[sr] = e.target.value;
-        $("f-lines").querySelectorAll(".line").forEach((r) => { if (seriesOf(itemBy($("f-sku-" + r.dataset.line).value)) === sr) $("f-ucost-" + r.dataset.line).value = e.target.value; }); recalc(); });
+      $("f-allq").addEventListener("input", () => { const q = Number($("f-allq").value); if (!Number.isInteger(q) || q < 1) return; $("f-lines").querySelectorAll(".line").forEach((r) => { $("f-qty-" + r.dataset.line).value = q; }); flavSync(); });
       flavSync();
       sheetOn("click", (e) => { const b = e.target.closest("[data-step]"); if (!b) return; const i = $(b.dataset.for); i.value = Math.max(0, (Number(i.value) || 0) + Number(b.dataset.step)); recalc(); });
       sheetOn("input", recalc); sheetOn("change", recalc); recalc();
