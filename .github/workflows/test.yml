@@ -31,6 +31,8 @@ jobs:
         run: node tests/v2_cases.js
       - name: 对账单改往来单价（旧结构 / 新结构）
         run: python tests/test_xfer_price.py
+      - name: 合伙人对账同系列互抵（旧结构 / 新结构）
+        run: python tests/test_offset.py
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
