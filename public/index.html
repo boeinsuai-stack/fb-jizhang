@@ -1219,6 +1219,16 @@ details.restock > summary::-webkit-details-marker { display: none; }
     if (left > 0) { const m = main || "合伙人"; out[m] = (out[m] || 0) + left; }
     return out;
   }
+  /* 分开拿的单已经从其中一个人那拿到了一部分：剩下没拿的只按 pick_split 里还没拿够的人分
+     （以前拿到甲的那根以后，剩下该找乙拿的那根又算回甲头上） */
+  function pickSplitLeft(o) {
+    if (!o || !o.pick_split) return (o && o.pick_split) || null;
+    const got = {};
+    for (const m of S.moves) if (m.order_id === o.id && m.type === "in" && /-pick$/.test(m.batch_id || "")) { const w = m.partner || whoFrom(o), g = got[m.sku] || (got[m.sku] = {}); g[w] = (g[w] || 0) + (Number(m.qty) || 0); }
+    const left = {};
+    for (const [sku, by] of Object.entries(o.pick_split)) { left[sku] = {}; for (const [w, n] of Object.entries(by || {})) { const r = (Number(n) || 0) - ((got[sku] || {})[w] || 0); if (r > 0) left[sku][w] = r; } }
+    return left;
+  }
   /* 「分开拿：每根找不同的人」：在「找谁拿」下面，每根一行，点人名 */
   function pickSplitter(init) {
     const sel = {};
@@ -1265,7 +1275,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     if (!picks.length) return "，库存已扣。";
     const bid = oid + "-pick", o0 = S.orders.find((x) => x.id === oid), name = (pfrom != null ? pfrom : (o0 && o0.pick_from) || "") || null;
     if (name && (!o0 || o0.pick_from !== name)) await db.doc("orders/" + oid).update({ pick_from: name });
-    { const spl = split !== undefined ? split : (o0 && o0.pick_split) || null, parts = [];
+    { const spl = split !== undefined ? split : pickSplitLeft(o0), parts = [];
       for (const x of picks) for (const [w, n] of Object.entries(splitPick(spl, name, x.l.sku, x.qty))) parts.push({ l: x.l, qty: n, who: w === "合伙人" && !name ? null : w });
       picks.length = 0; picks.push(...parts); }
     const priced = picks.map((x) => { const c = numOrNull((itemBy(x.l.sku) || {}).cost_aud); return c == null ? null : r2(c * x.qty); });
@@ -1467,14 +1477,14 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const mine = S.moves.filter((m) => m.order_id === id && m.type === "in");
       for (const m of mine) got[m.sku] = (got[m.sku] || 0) + (Number(m.qty) || 0);
       const free = mine.filter((m) => got[m.sku] > (want[m.sku] || 0)), freeN = free.reduce((a, m) => a + (Number(m.qty) || 0), 0);
-      await Promise.all(free.map((m) => db.doc("movements/" + m.id).update({ order_id: null, note: "预定改了，拿到的货留作库存" })));
+      const rel = await releasePicks(edit, free, "预定改了");
       if (date !== edit.date) {
         await Promise.all(S.moves.filter((m) => m.order_id === id && !free.includes(m)).map((m) => db.doc("movements/" + m.id).update({ date })));
         const px = S.expenses.find((x) => x.batch_id === id + "-pick");
-        if (px) await db.doc("expenses/" + px.id).update({ date });
+        if (px && !rel.exGone) await db.doc("expenses/" + px.id).update({ date });
       }
       if (onDone) onDone();
-      return "预定已更新" + (freeN ? "；已经拿到的 " + freeN + " 根留在库存里。" : "。");
+      return "预定已更新" + (freeN ? "；拿到的 " + freeN + " 根留在库存" + owedTail(rel) + "。" : "。");
     }
     openSheet(edit ? "编辑预定" : reserve ? "记一笔预定" : "记一笔卖出", html, submit, () => {
       splitter.bind();
@@ -1541,13 +1551,16 @@ details.restock > summary::-webkit-details-marker { display: none; }
       needDb();
       const o = S.orders.find((x) => x.id === id);
       if (o && oSids(o).length && !isReserved(o)) throw userError("这单的拿货已经跟合伙人结过账，先在财务底部「和合伙人的结账记录」里撤销那次结账。");
-      if (o && isReserved(o) && oSids(o).length) {
-        /* paid the partner already: the sticks stay as stock, only the reservation goes */
-        await Promise.all(S.moves.filter((m) => m.order_id === id && m.type === "in").map((m) => db.doc("movements/" + m.id).update({ order_id: null, note: "预定取消，拿到的货留作库存" })));
-        await db.doc("orders/" + id).delete();
-        toast("已取消这个预定；已经跟合伙人结过账的货留在库存里。"); return;
-      }
       const ms = S.moves.filter((m) => m.order_id === id);
+      if (o && isReserved(o) && ms.some((m) => m.type === "in")) {
+        /* 预定的货已经从合伙人那拿到了：只取消预定，货留作库存；没结账的照样欠他（改记成一笔往来），不能跟着预定一起消失 */
+        const mine = ms.filter((m) => m.type === "in"), n = mine.reduce((a, m) => a + (Number(m.qty) || 0), 0);
+        const rel = await releasePicks(o, mine, "预定取消");
+        if (o.follow_up && !o.follow_up.done && o.customer) await db.collection("followups").doc(rid("fu")).set(Object.assign({ customer: o.customer, suburb: o.suburb || null, wants: [], note: o.follow_up.note || "", date: o.follow_up.date || null, done: false, created_at: new Date().toISOString() }, o.follow_up.contacted_at ? { contacted_at: o.follow_up.contacted_at } : {}));
+        await db.doc("orders/" + id).delete();
+        if (assets && Array.isArray(o.photos)) for (const ph of o.photos) { try { await assets.delete(ph); } catch (_) {} }
+        toast("已取消预定；拿到的 " + n + " 根留在库存" + owedTail(rel) + "。"); return;
+      }
       if (o && o.follow_up && !o.follow_up.done && o.customer) await db.collection("followups").doc(rid("fu")).set(Object.assign({ customer: o.customer, suburb: o.suburb || null, wants: [], note: o.follow_up.note || "", date: o.follow_up.date || null, done: false, created_at: new Date().toISOString() }, o.follow_up.contacted_at ? { contacted_at: o.follow_up.contacted_at } : {}));
       await Promise.all(ms.map((m) => db.doc("movements/" + m.id).delete()));
       await db.doc("orders/" + id).delete();
@@ -2841,8 +2854,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }
     const groups = [], RW = {};
     for (const [oid, need] of Object.entries(RS)) {
-      const o = S.orders.find((x) => x.id === oid), per = {};
-      for (const [sku, q] of Object.entries(need)) for (const [w, n] of Object.entries(splitPick(o.pick_split, o.pick_from, sku, q))) (per[w] = per[w] || {})[sku] = n;
+      const o = S.orders.find((x) => x.id === oid), per = {}, spl = pickSplitLeft(o);
+      for (const [sku, q] of Object.entries(need)) for (const [w, n] of Object.entries(splitPick(spl, o.pick_from, sku, q))) (per[w] = per[w] || {})[sku] = n;
       for (const [w, need2] of Object.entries(per)) {
         const moves = Object.entries(need2).map(([sku, q]) => { const c = numOrNull((itemBy(sku) || {}).cost_aud); return { id: null, sku, name: nm(sku), qty: q, cost: c == null ? null : r2(c * q) }; });
         const qty = {}; for (const m of moves) { const sr = seriesOf(itemBy(m.sku)); qty[sr] = (qty[sr] || 0) + m.qty; }
@@ -2867,6 +2880,36 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }
     if (!g.o.pick_from) await db.doc("orders/" + g.oid).update({ pick_from: whoFrom(g.o) === "合伙人" ? null : whoFrom(g.o) });
   }
+  /* 预定上已经从合伙人拿到的货，不再属于这一单了（预定改了 / 取消了）：货留作库存。
+     还没跟他结账的 → 改记成一笔「他给我货」的往来：对账单调入里照样算、能结账；货退回去了就撤销那笔往来。
+     （以前只把流水的 order_id 清空，这笔欠款就从对账单里消失了。）已经结过账的 → 变成普通库存。
+     o = 改之前的订单；ms = 要放下来的拿货流水。返回 { owed: {人: 根数}, exGone: 拿货支出是不是删掉了 } */
+  async function releasePicks(o, ms, why) {
+    const by = {}, owed = {}, gone = new Set();
+    for (const m of ms) { const w = m.partner || whoFrom(o); (by[w] = by[w] || []).push(m); }
+    const at = new Date().toISOString(), note = why + "，拿到的货留作库存";
+    for (const [w, list] of Object.entries(by)) {
+      if (oSidFor(o, w)) { await Promise.all(list.map((m) => db.doc("movements/" + m.id).update({ order_id: null, note }))); continue; }
+      const L = {};
+      for (const m of list) { const q = Number(m.qty) || 0, l = L[m.sku] || (L[m.sku] = { sku: m.sku, name: m.name, qty: 0, cost: 0, known: true }); l.qty += q; if (m.cost == null) l.known = false; else l.cost += Number(m.cost); }
+      const inn = Object.values(L).map((l) => ({ sku: l.sku, name: l.name, qty: l.qty, unit: l.known && l.qty ? r2(l.cost / l.qty) : null }));
+      const tid = rid("t"), date = list[0].date || today();
+      await db.collection("transfers").doc(tid).set({ date, at, partner: w === "合伙人" ? null : w, out: [], in: inn, note });
+      await Promise.all(inn.map((l) => db.collection("movements").doc(tid + "-in-" + l.sku).set({ type: "in", sku: l.sku, name: l.name, qty: l.qty, cost: l.unit == null ? null : r2(l.qty * l.unit), date, at, transfer_id: tid, note: "合伙人往来：" + w + " 给的" })));
+      await Promise.all(list.map((m) => db.doc("movements/" + m.id).delete()));
+      list.forEach((m) => gone.add(m.id)); owed[w] = (owed[w] || 0) + list.reduce((a, m) => a + (Number(m.qty) || 0), 0);
+    }
+    /* 拿货支出只算还挂在这一批上的货（往来不另记支出） */
+    let exGone = false;
+    const bid = o.id + "-pick", ex = gone.size ? S.expenses.find((x) => x.batch_id === bid) : null;
+    if (ex) {
+      const rest = S.moves.filter((m) => m.batch_id === bid && m.type === "in" && !gone.has(m.id));
+      if (!rest.length) { await db.doc("expenses/" + ex.id).delete(); exGone = true; }
+      else await db.doc("expenses/" + ex.id).update({ amount: r2(rest.reduce((a, m) => a + (Number(m.cost) || 0), 0)) });
+    }
+    return { owed, exGone };
+  }
+  const owedTail = (rel) => { const ws = Object.keys(rel.owed); return ws.length ? "，照样欠" + ws.join("、") + "（见往来记录）" : ""; };
   /* ---------- partner exchanges (合伙人往来): goods between me and a partner, valued in money until settled ----------
      out = sticks I gave the partner (he owes me their value); in = sticks the partner gave me (offsets / I owe).
      net > 0: the partner owes me; net < 0: I owe the partner. An even swap is closed at once. */

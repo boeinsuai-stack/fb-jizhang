@@ -118,9 +118,12 @@ with sync_playwright() as p:
 
     # 3. 已经拿到货的预定：芒果 → 葡萄，拿到的那根芒果留在库存
     open_resv(pg, "r2"); pick(pg, 0, "Grape"); ok = save(pg)
-    mv = pg.evaluate("__dump('movements')")["r2-pick-XF-02"]
-    check("换掉口味后，已经拿到的芒果留作库存", ok and mv.get("order_id") is None and "留作库存" in (mv.get("note") or ""))
-    check("拿货支出还在（还欠合伙人）", "r2-pick-cost" in pg.evaluate("__dump('expenses')"))
+    # （2026-11-15 改）没结账的拿货不再只是清掉 order_id（那样应付会从对账单里消失），而是改记成一笔「他给我货」的往来
+    mvs = {k: v for k, v in pg.evaluate("__dump('movements')").items() if not v.get("_deleted")}
+    ts = [t for t in pg.evaluate("__dump('transfers')").values() if not t.get("_deleted")]
+    tin = [m for m in mvs.values() if m.get("transfer_id") and m.get("sku") == "XF-02" and m.get("type") == "in"]
+    check("换掉口味后，已经拿到的芒果留作库存（改记成往来调入，成本 20）", ok and "r2-pick-XF-02" not in mvs and len(tin) == 1 and tin[0]["qty"] == 1 and tin[0]["cost"] == 20, str(tin))
+    check("还欠合伙人乙：一笔没结账的往来（乙给我芒果 ×1 @20）", len(ts) == 1 and ts[0].get("partner") == "合伙人乙" and ts[0].get("in") == [{"sku": "XF-02", "name": "芒果", "qty": 1, "unit": 20}] and not ts[0].get("partner_settlement_id") and "留作库存" in ts[0].get("note", ""), str(ts))
 
     # 4. 已经卖出的单：还是原来的编辑表（数量锁住）
     pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(300)

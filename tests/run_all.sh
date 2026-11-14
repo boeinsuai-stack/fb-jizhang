@@ -13,6 +13,7 @@ run python3 tests/test_v2_failsafe.py
 run python3 tests/test_xfer_price.py
 run python3 tests/test_offset.py
 run python3 tests/test_restore.py
+run python3 tests/test_resv_release.py
 run node tests/v2_cases.js
 if [ -n "$F" ]; then
   [ -n "$S" ] || { S=$(mktemp --suffix=.json); node tests/v2_seed.js "$F" "$S" > /dev/null; }
