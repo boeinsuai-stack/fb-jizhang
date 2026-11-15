@@ -1795,6 +1795,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="field"><label for="f-series">系列</label><select id="f-series">' + allSeries().map((sr) => "<option" + ((it ? it.series : (invFilter.startsWith("s:") ? invFilter.slice(2) : SERIES[0])) === sr ? " selected" : "") + ">" + esc(sr) + "</option>").join("") + '<option value="__new">＋ 新系列…</option></select></div>' +
       '<div class="field" id="f-series-new-wrap" hidden><label for="f-series-new">新系列名字</label><input id="f-series-new" placeholder="例如 Lost Mary"></div>' +
       '<div class="field"><label for="f-variant">英文名</label><input id="f-variant" value="' + v("variant") + '" placeholder="例如 Mango ice"></div>' +
+      '<div class="field"><label for="f-fruits">里面是什么水果（复制口味时写在名字后面的括号里，名字看不出来时才填）</label><input id="f-fruits" value="' + v("fruits") + '" placeholder="例如 FTP 填 Blackberry Dragon Fruit"></div>' +
       '<div class="field"><label for="f-name">中文名</label><input id="f-name" value="' + v("name") + '" placeholder="例如 芒果冰"></div>' +
       '<div class="field"><label for="f-ref">参考口味（内部）</label><input id="f-ref" value="' + v("ref_flavor") + '"></div>' +
       '<div class="grid2"><div class="field"><label for="f-price">售价 $</label><input id="f-price" type="number" min="0" step="0.01" inputmode="decimal" value="' + v("price_aud") + '"></div>' +
@@ -1816,7 +1817,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       if (costA != null && costA < 0) throw userError("拿货价不能是负数。");
       let series = $("f-series").value;
       if (series === "__new") { series = titleCase($("f-series-new").value.trim()); if (!series) throw userError("请填新系列的名字。"); }
-      const data = { series, name, variant: titleCase($("f-variant").value.trim()), ref_flavor: $("f-ref").value.trim(), price_aud: price, floor_price_aud: floor, cost_aud: costA, photo_links: photosArr, status: $("f-status").value, notes: $("f-notes").value.trim(), last_updated: today() };
+      const data = { series, name, variant: titleCase($("f-variant").value.trim()), ref_flavor: $("f-ref").value.trim(), price_aud: price, floor_price_aud: floor, cost_aud: costA, photo_links: photosArr, status: $("f-status").value, notes: $("f-notes").value.trim(), fruits: $("f-fruits").value.trim().replace(/^[(（]\s*|\s*[)）]$/g, ""), last_updated: today() };
       if (it) { await db.doc("items/" + it.sku).update(data); return "已保存。"; }
       await db.collection("items").doc(nextSku).set(Object.assign({ sku: nextSku, created_at: new Date().toISOString() }, data));
       return "已新增 " + name + "。";
@@ -4011,7 +4012,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
   const titleCase = (t) => t.split(" ").map((w) => (w.length > 1 && w === w.toUpperCase()) ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   /* plain list of what can be sold right now (stock minus reservations), one flavour per line, series separated by a blank line.
      带售价、按价钱从低到高（Bowen 2026-11-15）：一个系列都是一个价 → 写在标题右边「【Ali】$60」；同系列有不同价 → 每行后面写价钱。
-     系列按最低价排，同价按原来的系列顺序；系列里按价钱、再按名字。没填售价的排最后、不写价 */
+     系列按最低价排，同价按原来的系列顺序；系列里按价钱、再按名字。没填售价的排最后、不写价。
+     名字看不出是什么水果的（FTP、California Sunset…）：香型里填了「里面是什么水果」(fruits) 就写在后面括号里「FTP (Blackberry Dragon Fruit)」 */
   function plainFlavours() {
     const D = derive(), RV = reservedQty();
     const items = S.items.filter((i) => !isGeneric(i) && (D.st[i.sku] || 0) - (RV[i.sku] || 0) > 0);
@@ -4022,7 +4024,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const list = items.filter((i) => seriesOf(i) === sr).sort((a, b) => key(pr(a)) - key(pr(b)) || enOf(a).localeCompare(enOf(b)));
       const ps = [...new Set(list.map(pr).filter((v) => v != null))], one = ps.length === 1 && list.every((i) => pr(i) != null);
       return { sr, low: list.length ? key(pr(list[0])) : Infinity, rank: order.indexOf(sr),
-        text: "【" + sr + "】" + (one ? $p(ps[0]) : "") + "\n" + list.map((i) => enOf(i) + (!one && pr(i) != null ? " " + $p(pr(i)) : "")).join("\n"), n: list.length };
+        text: "【" + sr + "】" + (one ? $p(ps[0]) : "") + "\n" + list.map((i) => enOf(i) + (i.fruits && String(i.fruits).trim() ? " (" + String(i.fruits).trim() + ")" : "") + (!one && pr(i) != null ? " " + $p(pr(i)) : "")).join("\n"), n: list.length };
     }).filter((b) => b.n).sort((a, b) => a.low - b.low || a.rank - b.rank);
     return { text: blocks.map((b) => b.text).join("\n\n"), n: items.length };
   }
