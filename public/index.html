@@ -1142,7 +1142,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
     lockPage(); $("sheet").hidden = false; $("sheet").querySelector(".sheet-card").scrollTop = 0;
     if (onMount) onMount();
     // 不自动聚焦日期框、下拉框（iPhone 上一聚焦就弹出滚轮）；opts.focus === false 整页都不聚焦（免得一打开就弹键盘）
-    const first = opts && opts.focus === false ? null : $("sheet-form").querySelector('input:not([type="date"]):not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), textarea');
+    // 也不聚焦口味搜索框（.pick-q）：一聚焦就弹出口味下拉
+    const first = opts && opts.focus === false ? null : $("sheet-form").querySelector('input:not([type="date"]):not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not(.pick-q), textarea');
     if (first) first.focus();
   }
   /* 合伙人输入框：下面放常用合伙人按钮，点一下就填上（iPhone 浏览器不太显示下拉候选，还会把它当成「姓名」去填你自己的名字） */
@@ -1525,7 +1526,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       sheetOn("input", recalc); sheetOn("change", recalc);
       $("f-resv").addEventListener("change", () => { $("sheet-title").textContent = $("f-resv").checked ? "记一笔预定" : "记一笔卖出"; recalc(); });
       recalc();
-    });
+    }, { focus: false });
   }
 
   function orderEditForm(id) {
@@ -3503,7 +3504,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       $("f-none").addEventListener("click", () => { open.forEach((g, k) => { $("f-g-" + k).checked = false; }); xs.forEach((t, k) => { $("f-x-" + k).checked = false; }); pos.forEach((x, k) => { $("f-po-" + k).checked = false; }); upd(); });
       sheetOn("change", upd); upd();
       $("sheet-save").textContent = "确认结账";
-    });
+    }, { focus: false });
   }
   async function unsettle(sid) {
     try {

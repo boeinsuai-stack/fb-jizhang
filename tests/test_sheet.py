@@ -84,6 +84,20 @@ with sync_playwright() as p:
     pg.click("#po-new"); pg.wait_for_selector("#f-ptiles .tile", timeout=4000); pg.click('[data-padd="XF-03"]'); pg.click("#sheet-save"); pg.wait_for_timeout(800)
     TODAY = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).date().isoformat()
     check("不改就是今天", sorted(x["date"] for x in pg.evaluate("window.__GM.S.purchases"))[-1] == TODAY)
+    # 快速下单 → 下单 / 预定、财务页记一笔：口味下拉不能自己弹出来，也不弹键盘（2026-11-15：自动聚焦跳过勾选框以后，光标落到了口味搜索框上）
+    QUIET = """(() => { const a = document.activeElement, open = [...document.querySelectorAll('#sheet .pick-list')].filter((u) => !u.hidden).length;
+      return (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) ? '光标在 ' + a.id : '') + (open ? ' 口味下拉弹出 ' + open : ''); })()"""
+    for btn, name in (("#cb-go", "下单"), ("#cb-resv", "预定")):
+        pg.evaluate("location.hash = '#inventory'"); pg.wait_for_timeout(300)
+        if not pg.is_visible(btn): pg.click('#qo-tiles [data-add="XF-01"]')
+        pg.click(btn); pg.wait_for_selector("#f-skuq-0", timeout=4000); pg.wait_for_timeout(300)
+        check("快速下单点「" + name + "」：口味已经带进来，下拉不弹、光标不进输入框", pg.evaluate(QUIET) == "" and pg.input_value("#f-sku-0") == "XF-01", pg.evaluate(QUIET))
+        pg.click("#f-skuq-0"); pg.wait_for_timeout(200)
+        check("自己点口味框，下拉照样出来", pg.evaluate("!document.getElementById('f-pl-0').hidden"))
+        pg.click("#sheet-close"); pg.wait_for_timeout(250)
+    pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(300); pg.click("#fin-sale"); pg.wait_for_selector("#f-skuq-0", timeout=4000); pg.wait_for_timeout(300)
+    check("财务页「记一笔」：下拉不自己弹", pg.evaluate(QUIET) == "", pg.evaluate(QUIET))
+    pg.click("#sheet-close"); pg.wait_for_timeout(250)
     br.close()
 
 print(f"\n{sum(results)}/{len(results)} 通过")
