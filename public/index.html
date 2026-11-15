@@ -447,19 +447,9 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 #f-owe .owe-line + .owe-line { border-top: 1px dashed var(--warn); }
 .owe-line b { font-family: var(--font-display); font-size: 1.3rem; }
 .ptx-b .owe-line { padding: 0; }
-.lg-sum { margin: 0; font-size: 1.05rem; font-weight: 700; } .lg-sum b { font-family: var(--font-display); font-size: 1.9rem; margin-left: 4px; }
-.lg-sum.l-owe { color: var(--warn); } .lg-sum.l-due { color: var(--accent); }
-.lg-eq { margin: -6px 0 0; color: var(--muted); font-size: .84rem; font-variant-numeric: tabular-nums; }
-.lg-g { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.lg-gh { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 12px; font-weight: 700; }
-.lg-g.l-owe .lg-gh { background: var(--warn-soft); color: var(--warn); } .lg-g.l-due .lg-gh { background: var(--accent-soft); color: var(--accent); }
-.lg-gh b { font-family: var(--font-display); font-size: 1.3rem; font-variant-numeric: tabular-nums; }
-.lg-g ul { list-style: none; margin: 0; padding: 0; }
-.lg-g li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--line); font-size: .92rem; }
-.lg-g li > span { display: grid; gap: 2px; min-width: 0; }
-.lg-g li small { color: var(--muted); font-size: .78rem; }
-.lg-g li b { flex: none; font-variant-numeric: tabular-nums; }
-.lg-even { margin: 0; color: var(--muted); font-size: .84rem; }
+.lg-sum { margin: 0; font-size: 1rem; } .lg-sum b { font-family: var(--font-display); font-size: 1.7rem; margin-left: 4px; }
+.lg-sum.l-owe b { color: var(--warn); } .lg-sum.l-due b { color: var(--accent); }
+.lg-tot b.neg { color: var(--warn); } .lg-tot b.pos { color: var(--accent); }
 .lg { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 10px; }
 .lg-d { padding: 6px 12px; font-size: .76rem; font-weight: 700; letter-spacing: .04em; color: var(--muted); background: var(--bg); }
 .lg-d:not(:first-child) { border-top: 1px solid var(--line); }
@@ -1026,6 +1016,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
   /* the money of one order split by how it came in, for the payment summaries */
   const payParts = (o, amt) => { if (o.payment === MIX && amt != null) { const c = Math.min(Number(o.pay_cash) || 0, amt); return [["现金", r2(c)], [o.pay_other || "PayID", r2(amt - c)]]; } return [[o.payment, amt]]; };
   const payBadgeO = (o) => { if (o.payment !== MIX) return payBadge(o.payment); const t = orderTotal(o), c = Number(o.pay_cash) || 0; return payBadge("现金", c) + payBadge(o.pay_other || "PayID", t == null ? null : r2(t - c)); };
+  /* 结账记录的付款方式：现金+转账 写成「现金 $50 + PayID $100」（转账那部分 = 实付 − 现金） */
+  const settlePay = (s) => { if (s.payment !== MIX) return s.payment || ""; const t = Math.abs(numOrNull(s.paid) ?? numOrNull(s.amount) ?? 0), c = Number(s.pay_cash) || 0; return "现金 " + money(c) + " + " + (s.pay_other || "PayID") + " " + money(r2(t - c)); };
   const payText = (o) => { if (o.payment !== MIX) return o.payment || ""; const t = orderTotal(o), c = Number(o.pay_cash) || 0; return "现金 " + c + " + " + (o.pay_other || "PayID") + " " + (t == null ? "?" : r2(t - c)); };
   /* live total of an open form, or null while prices are missing */
   const formTotalNum = (ls, fee) => { if (lumpOn()) { const v = numOrNull($("f-lump").value); return v == null ? null : r2(v + fee); } if (!ls.length || ls.some((l) => l.price == null)) return null; return r2(ls.reduce((a, l) => a + l.qty * l.price, 0) + fee); };
@@ -3116,21 +3108,19 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const W = esc(w);
     const days = (list) => '<ul class="lg">' + byDay(list).map((d) => '<li class="lg-d">' + esc(fmtD(d.date)) + "</li>" + d.lines.map((l) => '<li class="lg-l"><span>' + esc(l.k) + "</span><b>×" + l.q + "</b></li>").join("")).join("") + "</ul>";
     const sec = (cls, label, sub, amt, inner) => '<section class="lg-sec"><div class="lg-sh"><span class="lg-k ' + cls + '">' + label + "</span><small>" + sub + "</small><b>" + amt + "</b></div>" + inner + "</section>";
-    const sp = debtSplit(x.ser), tm = r2(x.tin + x.tpo), th = x.tout;
-    const li = (name, sub, amt) => "<li><span>" + name + (sub ? "<small>" + sub + "</small>" : "") + "</span><b>" + amt + "</b></li>";
-    const grp = (cls, label, tot, lis) => '<section class="lg-g ' + cls + '"><div class="lg-gh"><span>' + label + "</span><b>" + money(tot) + "</b></div><ul>" + lis + "</ul></section>";
-    const serLi = (r) => li(esc(r.sr) + " " + r.rq + " 根", r.m ? esc(serIO(r)) : "", money(r.rv));
+    /* 2026-11-16 Bowen：大色框太杂 → 回到以前的排法（小标签 + 带颜色的数字），只把字换成「你欠他 / 他欠你」，不写正负号 */
+    const serRow = (r) => '<li class="lg-sr"><div class="lg-sr-h"><b>' + esc(r.sr) + "</b><small>" + esc(serIO(r)) + "</small></div>" +
+      '<div class="lg-sr-r">' + (r.side ? '<span class="lg-k ' + (r.side === "in" ? "k-in" : "k-out") + '">' + (r.side === "in" ? "你欠他" : "他欠你") + "</span><span>" + r.rq + ' 根</span><b class="' + (r.side === "in" ? "neg" : "pos") + '">' + money(r.rv) + "</b>" : '<span class="muted">抵完两清</span>') + "</div></li>";
+    const tr = (label, v, cls) => '<span>' + label + '</span><b class="' + cls + '">' + money(v) + "</b>";
     const html = '<p class="lg-sum' + (x.net > 0 ? " l-owe" : x.net < 0 ? " l-due" : "") + '">' + esc(owedTxt(w, x.net)) + (Math.abs(x.net) >= 0.01 ? " <b>" + money(Math.abs(x.net)) + "</b>" : "") + "</p>" +
-      (tm && th ? '<p class="lg-eq">你欠他 ' + money(tm) + " − 他欠你 " + money(th) + "</p>" : "") +
-      (sp.mine.length || x.tpo ? grp("l-owe", "你欠 " + W, tm, sp.mine.map(serLi).join("") + (x.tpo ? li("订货（还没付）", "", money(x.tpo)) : "")) : "") +
-      (sp.his.length ? grp("l-due", W + " 欠你", th, sp.his.map(serLi).join("")) : "") +
-      (sp.even.length ? '<p class="lg-even">抵平了：' + sp.even.map((r) => esc(r.sr) + "（各 " + r.m + " 根）").join("、") + "</p>" : "") +
-      (x.ser.some((r) => r.m) ? '<p class="lg-even">同一个系列，你拿他的和他拿你的一根抵一根，抵完剩下的照价算。</p>' : "") +
+      (x.ser.length ? sec("k-swap", "按系列算", "同系列一根抵一根，抵完剩下的照价算", "", '<ul class="lg lg-ser">' + x.ser.map(serRow).join("") + "</ul>") : "") +
       (x.po.length ? sec("k-po", "订货", "还没付", money(x.tpo), '<ul class="lg">' + x.po.map((q) => '<li class="lg-d"><span>' + esc(fmtD(q.date)) + '</span><span><b>' + money(q.amt) + '</b> <button class="linkbtn" type="button" data-lg="po-pay" data-id="' + esc(q.id) + '">结款</button></span></li>' +
         q.lines.map((l) => '<li class="lg-l"><span>' + esc(l.k) + "</span><b>×" + l.q + "</b></li>").join("")).join("") + "</ul>") : "") +
+      '<div class="lg-tot">' + (x.tin ? tr("你欠他 · 拿的货", x.tin, "neg") : "") + (x.tpo ? tr("你欠他 · 订货", x.tpo, "neg") : "") + (x.tout ? tr("他欠你 · 拿的货", x.tout, "pos") : "") +
+        '<span class="g">' + esc(owedTxt(w, x.net)) + '</span><b class="g">' + money(Math.abs(x.net)) + "</b></div>" +
       (x.inn.length || x.out.length ? '<p class="lg-mx">明细 · 按日期（只记货）</p>' : "") +
-      (x.inn.length ? sec("k-in", "你拿 " + W + " 的货", "", "", days(x.inn)) : "") +
-      (x.out.length ? sec("k-out", W + " 拿你的货", "", "", days(x.out)) : "") +
+      (x.inn.length ? sec("k-in", "调入", "从" + W + "拿的货", "", days(x.inn)) : "") +
+      (x.out.length ? sec("k-out", "调出", W + "拿走的货", "", days(x.out)) : "") +
       (x.pend.length ? sec("k-resv", "预定", "还没拿 · 不算进来", "", '<ul class="lg lg-pend">' + x.pend.map((q) => '<li class="lg-d"><span>' + esc(fmtD(q.date)) + '</span><button class="linkbtn" type="button" data-lg="picked" data-id="' + esc(q.oid) + '">已拿到</button></li>' +
         q.lines.map((l) => '<li class="lg-l"><span>' + esc(l.k) + "</span><b>×" + l.q + "</b></li>").join("")).join("") + "</ul>") : "") +
       (x.unk ? '<p class="hint">＋ 有的货拿货价还没填，金额可能偏少。</p>' : "") +
@@ -3508,12 +3498,14 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const html =
       '<div class="field"><label for="f-date">结账日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
       '<div class="actions"><button type="button" class="btn ghost small" id="f-all">全选</button><button type="button" class="btn ghost small" id="f-none">全不选</button></div>' +
-      (open.length ? '<p class="xs-h">你拿他的 · 随客户订单拿的货</p><div class="picks">' + open.map((g, k) => '<label class="check"><input type="checkbox" id="f-g-' + k + '"' + (on(gWho(g)) ? " checked" : "") + "><span>" + fmtD(g.date) + " · " + esc(gWho(g)) + " · " + esc(qtyText(g.qty)) + " · " + (g.known ? money(g.cost) : "未填拿货价") + (g.pending ? "（预定" + ((g.o.note || "").split(/[（(，,·]/)[0].trim() ? " · " + esc((g.o.note || "").split(/[（(，,·]/)[0].trim()) : "") + "，还没拿货；结账时记成已拿货）" : "") + "</span></label>").join("") + "</div>" : "") +
+      (open.length ? '<p class="xs-h">调入 · 随客户订单拿的货</p><div class="picks">' + open.map((g, k) => '<label class="check"><input type="checkbox" id="f-g-' + k + '"' + (on(gWho(g)) ? " checked" : "") + "><span>" + fmtD(g.date) + " · " + esc(gWho(g)) + " · " + esc(qtyText(g.qty)) + " · " + (g.known ? money(g.cost) : "未填拿货价") + (g.pending ? "（预定" + ((g.o.note || "").split(/[（(，,·]/)[0].trim() ? " · " + esc((g.o.note || "").split(/[（(，,·]/)[0].trim()) : "") + "，还没拿货；结账时记成已拿货）" : "") + "</span></label>").join("") + "</div>" : "") +
       (pos.length ? '<p class="xs-h">订货 · 还没付</p><div class="picks">' + pos.map((x, k) => '<label class="check"><input type="checkbox" id="f-po-' + k + '"' + (on(poWho(x)) ? " checked" : "") + "><span>" + fmtD(x.date) + " · " + esc(poWho(x)) + " · " + esc(poLinesTxt(x)) + " · " + money(poOweAmt(x)) + "</span></label>").join("") + "</div>" : "") +
-      (xs.length ? '<p class="xs-h">往来 · 你拿他的 / 他拿你的 / 换货</p><div class="picks">' + xs.map((t, k) => '<label class="check"><input type="checkbox" id="f-x-' + k + '"' + (on(xWho(t)) ? " checked" : "") + "><span>" + fmtD(t.date) + " · " + esc(xferText(t)) + "</span></label>").join("") + "</div>" : "") +
+      (xs.length ? '<p class="xs-h">往来 · 调入 / 调出 / 换货</p><div class="picks">' + xs.map((t, k) => '<label class="check"><input type="checkbox" id="f-x-' + k + '"' + (on(xWho(t)) ? " checked" : "") + "><span>" + fmtD(t.date) + " · " + esc(xferText(t)) + "</span></label>").join("") + "</div>" : "") +
       '<p class="total" id="f-net">–</p><p class="err" id="f-part" hidden></p>' +
-      '<div class="grid2"><div class="field"><label for="f-paid" id="f-paid-l">实际金额 $</label><input id="f-paid" type="number" min="0" step="0.01" inputmode="decimal" placeholder="和上面一样就空着"></div>' +
-      '<div class="field"><label for="f-pay">付款方式</label><select id="f-pay"><option value="">未选择</option>' + PAY.map((p) => "<option>" + p + "</option>").join("") + "</select></div></div>" +
+      /* 付款方式（2026-11-16 Bowen）：跟下单一样一排小标签，也能「现金+转账」分开付（以前是最下面的下拉框，没有分开付） */
+      '<div class="field"><span class="lbl">付款方式</span><div class="chips" id="f-paychips" role="radiogroup" aria-label="付款方式">' + PAY.concat([MIX]).map((x) => '<label class="chip"><input type="radio" name="f-payr" value="' + esc(x) + '"> ' + esc(x) + "</label>").join("") + "</div></div>" +
+      mixRowHtml(null) +
+      '<div class="field"><label for="f-paid" id="f-paid-l">实际金额 $</label><input id="f-paid" type="number" min="0" step="0.01" inputmode="decimal" placeholder="和上面一样就空着"></div>' +
       '<div class="field"><label for="f-note">备注</label><input id="f-note"></div>' +
       '<p class="hint">结账只是标记这些账已经两边算清，不会再记一次成本（拿货时已经记过）。</p>';
     const selG = () => open.filter((g, k) => $("f-g-" + k).checked), selX = () => xs.filter((t, k) => $("f-x-" + k).checked), selP = () => pos.filter((x, k) => $("f-po-" + k).checked);
@@ -3523,10 +3515,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
       needDb();
       const { gs, ts, ps, net } = netOf(); if (!gs.length && !ts.length && !ps.length) throw userError("至少勾一笔。");
       const paidIn = numOrNull($("f-paid").value); if (paidIn != null && paidIn < 0) throw userError("金额不能是负数。");
-      const sid = rid("s"), date = $("f-date").value || today(), paid = paidIn == null ? net : (net < 0 ? -paidIn : paidIn);
+      const sid = rid("s"), date = $("f-date").value || today(), paid = paidIn == null ? net : (net < 0 ? -paidIn : paidIn), P = readPay(false, Math.abs(paid));
       for (const g of gs.filter((g) => g.pending)) await recordPrePick(g, date);
       const whos = [...new Set(gs.map(gWho).concat(ts.map(xWho)).concat(ps.map(poWho)))];
-      await db.collection("settlements").doc(sid).set({ date, at: new Date().toISOString(), order_ids: gs.map((g) => g.oid), transfer_ids: ts.map((t) => t.id), po_ids: ps.map((x) => x.id), qty: addQty(gs), amount: net, partner: whos.join("、"), paid, payment: $("f-pay").value || null, note: $("f-note").value.trim() });
+      await db.collection("settlements").doc(sid).set({ date, at: new Date().toISOString(), order_ids: gs.map((g) => g.oid), transfer_ids: ts.map((t) => t.id), po_ids: ps.map((x) => x.id), qty: addQty(gs), amount: net, partner: whos.join("、"), paid, payment: P.payment, pay_cash: P.pay_cash, pay_other: P.pay_other, note: $("f-note").value.trim() });
       /* 只找一个人拿的单照旧记 partner_settlement_id；分开找几个人拿的单按人记 partner_settlements */
       const byO = {}; for (const g of gs) (byO[g.oid] = byO[g.oid] || []).push(g);
       const allW = (oid) => new Set(pickups().filter((g) => g.oid === oid).concat(resvAlloc().groups.filter((g) => g.oid === oid)).map(gWho));
@@ -3534,9 +3526,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
         if (ws.size <= 1 && !o.partner_settlements) return db.doc("orders/" + oid).update({ partner_settlement_id: sid });
         const mp = Object.assign({}, o.partner_settlements || {}); list.forEach((g) => { mp[gWho(g)] = sid; }); return db.doc("orders/" + oid).update({ partner_settlements: mp }); });
       await Promise.all(oMarks.concat(ts.map((t) => db.doc("transfers/" + t.id).update({ partner_settlement_id: sid })))
-        .concat(ps.map((x) => db.doc("purchases/" + x.id).update({ paid: true, paid_date: date, settlement_id: sid, payment: $("f-pay").value || null }))));
+        .concat(ps.map((x) => db.doc("purchases/" + x.id).update({ paid: true, paid_date: date, settlement_id: sid, payment: P.payment }))));
       const w = whos.join("、");
-      return "已跟" + w + "结账：" + (paid > 0 ? "你付" + w + " " + money(paid) : paid < 0 ? w + "付你 " + money(-paid) : "两清") + "。";
+      return "已跟" + w + "结账：" + (paid > 0 ? "你付" + w + " " + money(paid) : paid < 0 ? w + "付你 " + money(-paid) : "两清") + (P.payment ? "（" + settlePay({ payment: P.payment, pay_cash: P.pay_cash, pay_other: P.pay_other, paid }) + "）" : "") + "。";
     }, () => {
       const upd = () => { const { gs, ts, ps, pick, poSum, off, net } = netOf(), w = whoTxt();
         const tk = r2(ts.reduce((a, t) => a + xLineVal(t.out), 0) - off.outV), gv = r2(ts.reduce((a, t) => a + xLineVal(t.in), 0) + pick - off.inV);
@@ -3547,6 +3539,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
           (tk || sp.his.length ? side(W + " 欠你", tk, sp.his.map(serLeft)) : "") +
           "<b>" + (net > 0 ? "= 你给 " + W + " " + money(net) : net < 0 ? "= " + W + " 给你 " + money(-net) : "= 两清") + "</b>";
         $("f-paid-l").textContent = net < 0 ? "实际收到 $" : "实际付款 $";
+        const pIn = numOrNull($("f-paid").value); mixSync(pIn == null ? Math.abs(net) : pIn);
         /* 同系列一根抵一根只在「一起结」的里面抵。没勾的里有跟勾了的同系列、反方向的货时，分开结合计会跟余额差出单价差 → 写明差多少 */
         const rG = open.filter((g) => !gs.includes(g)), rX = xs.filter((t) => !ts.includes(t)), rP = pos.filter((x) => !ps.includes(x));
         const some = gs.length || ts.length || ps.length, gap = some && (rG.length || rX.length) ? r2(net + netOf(rG, rX, rP).net - netOf(open, xs, pos).net) : 0;
@@ -3554,7 +3547,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
         if (Math.abs(gap) >= 0.01) $("f-part").textContent = "没勾的里有同系列的货，一起结才一根抵一根。分开结，合计会" + (gap > 0 ? "多付 " : "少付 ") + money(Math.abs(gap)) + "。"; };
       $("f-all").addEventListener("click", () => { open.forEach((g, k) => { $("f-g-" + k).checked = true; }); xs.forEach((t, k) => { $("f-x-" + k).checked = true; }); pos.forEach((x, k) => { $("f-po-" + k).checked = true; }); upd(); });
       $("f-none").addEventListener("click", () => { open.forEach((g, k) => { $("f-g-" + k).checked = false; }); xs.forEach((t, k) => { $("f-x-" + k).checked = false; }); pos.forEach((x, k) => { $("f-po-" + k).checked = false; }); upd(); });
-      sheetOn("change", upd); upd();
+      sheetOn("change", upd); sheetOn("input", (e) => { if (e.target.id === "f-paycash" || e.target.id === "f-paid") upd(); }); upd();
+      let payWas = ""; $("f-paychips").addEventListener("click", (e) => { const r = e.target.closest('input[name="f-payr"]'); if (!r) return; if (r.value === payWas) { r.checked = false; payWas = ""; upd(); } else payWas = r.value; });
       $("sheet-save").textContent = "确认结账";
     }, { focus: false });
   }
@@ -3629,7 +3623,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     $("pt-settles").innerHTML = ss.length ? ss.map((s) => {
       const paid = numOrNull(s.paid), amt = numOrNull(s.amount);
       const v = paid ?? amt ?? 0, w = s.partner || "合伙人";
-      const sub = [(s.order_ids || []).length ? (s.order_ids || []).length + " 笔拿货" : "", (s.transfer_ids || []).length ? (s.transfer_ids || []).length + " 笔往来" : "", (s.po_ids || []).length ? (s.po_ids || []).length + " 张订货单" : "", s.payment, paid != null && amt != null && paid !== amt ? "应结 " + money(Math.abs(amt)) : "", s.note].filter(Boolean).join(" · ");
+      const sub = [(s.order_ids || []).length ? (s.order_ids || []).length + " 笔拿货" : "", (s.transfer_ids || []).length ? (s.transfer_ids || []).length + " 笔往来" : "", (s.po_ids || []).length ? (s.po_ids || []).length + " 张订货单" : "", settlePay(s), paid != null && amt != null && paid !== amt ? "应结 " + money(Math.abs(amt)) : "", s.note].filter(Boolean).join(" · ");
       return '<div class="lrow"><div><span class="l-date">' + fmtD(s.date) + " · 结账 · " + esc(w) + "</span>" +
         '<span class="l-desc">' + esc(v > 0 ? "你付" + w : v < 0 ? w + "付你" : "两清") + (Object.keys(s.qty || {}).length ? " · " + esc(qtyText(s.qty || {})) : "") + '</span><span class="l-sub">' + esc(sub) + "</span></div>" +
         '<div class="l-amt">' + money(Math.abs(v)) + "</div>" +
@@ -3891,7 +3885,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       let desc = "", amt = "", act = "", st = r.done ? '<small>' + esc(r.done) + "</small>" : r.t === "settle" ? "" : '<small class="open">未结</small>';
       if (r.t === "settle") {
         const s0 = r.s, v = numOrNull(s0.paid) ?? numOrNull(s0.amount) ?? 0;
-        desc = (v > 0 ? "付给" + W : v < 0 ? W + "付你" : "两清") + '<span class="l-sub">' + esc([(s0.order_ids || []).length ? (s0.order_ids || []).length + " 笔随单调入" : "", (s0.transfer_ids || []).length ? (s0.transfer_ids || []).length + " 笔往来" : "", (s0.po_ids || []).length ? (s0.po_ids || []).length + " 张订货" : "", s0.payment, s0.note].filter(Boolean).join(" · ")) + "</span>";
+        desc = (v > 0 ? "付给" + W : v < 0 ? W + "付你" : "两清") + '<span class="l-sub">' + esc([(s0.order_ids || []).length ? (s0.order_ids || []).length + " 笔随单调入" : "", (s0.transfer_ids || []).length ? (s0.transfer_ids || []).length + " 笔往来" : "", (s0.po_ids || []).length ? (s0.po_ids || []).length + " 张订货" : "", settlePay(s0), s0.note].filter(Boolean).join(" · ")) + "</span>";
         amt = money(Math.abs(v));
         act = '<div class="l-actions"><button class="btn small" type="button" data-copy-settle="' + esc(s0.id) + '">复制明细</button><button class="btn small ghost danger" type="button" data-unsettle="' + esc(s0.id) + '">撤销结账</button></div>';
       } else {
@@ -4237,7 +4231,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
         }
         return rows; })(), [11, 22, 14, 11, 8, 8, 30, 10, 8, 22, 11, 6, 30, 20]],
       ["合伙人结账", [["结账日期", "结账单号", "Bar Pro 根数", "Ali 根数", "应付 $", "实付 $", "付款方式", "包含订单", "备注", "记录时间", "合伙人", "包含往来"]]
-        .concat(S.settles.slice().sort(moveSort).map((x) => [x.date, x.id, (x.qty || {})["Bar Pro"] || 0, (x.qty || {})["Ali"] || 0, num(x.amount), num(x.paid), x.payment || "", (x.order_ids || []).join(" "), x.note || "", x.at || "", x.partner || "", (x.transfer_ids || []).join(" ")])), [11, 22, 11, 8, 9, 9, 10, 40, 20, 24, 10, 30]],
+        .concat(S.settles.slice().sort(moveSort).map((x) => [x.date, x.id, (x.qty || {})["Bar Pro"] || 0, (x.qty || {})["Ali"] || 0, num(x.amount), num(x.paid), settlePay(x), (x.order_ids || []).join(" "), x.note || "", x.at || "", x.partner || "", (x.transfer_ids || []).join(" ")])), [11, 22, 11, 8, 9, 9, 10, 40, 20, 24, 10, 30]],
       ["合伙人往来", (() => {
         const rows = [["日期", "往来单号", "合伙人", "方向", "编号", "名称", "数量", "单价 $", "小计 $", "结账单号", "两边相等", "备注", "记录时间"]];
         for (const t of S.transfers.slice().sort(moveSort)) {
