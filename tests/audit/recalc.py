@@ -103,27 +103,42 @@ def recalc(D):
         tq = sum(x[0] for x in ls)
         if tq > 0 and all(x[1] is not None for x in ls): return sum(x[0] * x[1] for x in ls) / tq
         return None
+    # 出库那天账上不够的：先欠着，下一批到货先补它（按那批的价）；一直没补上的最后才按口味默认成本
+    owing = defaultdict(list); outs = []
     for key, t, sku, q, unit, oid, tag, _ in ev:
         ls = layers[sku]
         if q > 0:
             u = unit
             if u is None:
                 a = avg(ls); u = a if a is not None else fb(sku)
-            ls.append([q, u]); continue
-        need, cost, known = -q, 0.0, True
+            left = q
+            while left > 1e-9 and owing[sku]:
+                d = owing[sku][0]; take = min(d[1], left)
+                if u is None: d[0]["known"] = False
+                else: d[0]["cost"] += take * u
+                d[1] -= take; left -= take
+                if d[1] <= 1e-9: owing[sku].pop(0)
+            if left > 1e-9: ls.append([left, u])
+            continue
+        need = -q; rec = dict(cost=0.0, known=True, q=-q, sku=sku, oid=oid, tag=tag)
         while need > 1e-9 and ls:
             x = ls[0]; take = min(need, x[0])
-            if x[1] is None: known = False
-            else: cost += take * x[1]
+            if x[1] is None: rec["known"] = False
+            else: rec["cost"] += take * x[1]
             x[0] -= take; need -= take
             if x[0] <= 1e-9: ls.pop(0)
-        if need > 1e-9:
-            u = fb(sku); fallback_used.append((sku, need, oid or (tag and tag[1]["id"])))
-            if u is None: known = False
-            else: cost += need * u
-        if oid: OC[oid][sku] = (-q, js_round2(cost), known)
-        if tag and tag[0] == "shrink": shrink.append((tag[1].get("date") or "", -q, js_round2(cost), tag[1]["sku"]))
-        if tag and tag[0] == "xfer": xfer_cost += cost
+        if need > 1e-9: owing[sku].append([rec, need])
+        outs.append(rec)
+    for sku, ds in owing.items():
+        for rec, need in ds:
+            u = fb(sku); fallback_used.append((sku, need, rec["oid"] or (rec["tag"] and rec["tag"][1]["id"])))
+            if u is None: rec["known"] = False
+            else: rec["cost"] += need * u
+    for rec in outs:
+        oid, tag, sku = rec["oid"], rec["tag"], rec["sku"]
+        if oid: OC[oid][sku] = (rec["q"], js_round2(rec["cost"]), rec["known"])
+        if tag and tag[0] == "shrink": shrink.append((tag[1].get("date") or "", rec["q"], js_round2(rec["cost"]), tag[1]["sku"]))
+        if tag and tag[0] == "xfer": xfer_cost += rec["cost"]
     unit_now = {}
     for sku, ls in layers.items():
         a = avg(ls)
@@ -289,7 +304,8 @@ def invariants(D, R):
         if b not in seen and bcost[b]: bad.append(f"批次 {b} 有成本 {bcost[b]:g} 没有支出")
     out.append(("每批进货/拿货的支出 = 流水成本合计", not bad, bad[:8]))
     # c2. 从合伙人拿的货不能「脱单」：拿货流水没有订单了，这笔欠款就从对账单里消失
-    orphan = [f"{m['id']} {m.get('sku')} ×{num(m.get('qty')):g} 成本 {num(m.get('cost')):g}" for m in moves if m.get("type") == "in" and str(m.get("batch_id") or "").endswith("-pick") and not m.get("order_id") and "已经跟合伙人结过账" not in str(m.get("note") or "") and not m.get("paid_partner")]
+    paid_orders = {oid for st_ in D.get("settlements", []) for oid in (st_.get("order_ids") or [])}  # 已经跟合伙人结过账的拿货，脱单后是普通库存，不算丢
+    orphan = [f"{m['id']} {m.get('sku')} ×{num(m.get('qty')):g} 成本 {num(m.get('cost')):g}" for m in moves if m.get("type") == "in" and str(m.get("batch_id") or "").endswith("-pick") and not m.get("order_id")]
     out.append(("从合伙人拿的货都还挂在账上（没有脱单的拿货）", not orphan, orphan[:5]))
     # d. 往来单 ↔ 流水
     bad = []
@@ -354,13 +370,16 @@ def invariants(D, R):
     unknown_in = [m["id"] for m in moves if m.get("type") == "in" and m.get("cost") is None and num(m.get("qty")) > 0]
     cogs = sum(b["cost"] or 0 for d in R["days"].values() for b in d["orders"].values())
     shr = sum(d["shrink"] for d in R["days"].values())
-    rhs = cogs + shr + R["xfer_cost"] + R["stock_value"] + R["held_cost"]
+    fbv = sum(n * (num_or_none((items.get(s) or {}).get("cost_aud")) or 0) for s, n, _ in R["fallback_used"])
+    rhs = cogs + shr + R["xfer_cost"] + R["stock_value"] + R["held_cost"] - fbv
     out.append(("成本守恒：进货成本 = 卖出成本 + 损耗 + 调出 + 库存 + 预定占着的", abs(cin - rhs) < 0.5,
                 f"进 {cin:.2f} | 卖出 {cogs:.2f} + 损耗 {shr:.2f} + 调出 {R['xfer_cost']:.2f} + 库存 {R['stock_value']:.2f} + 预定占着 {R['held_cost']:.2f} = {rhs:.2f}，差 {cin-rhs:+.2f}；没记成本的进货 {len(unknown_in)} 条；先进先出算不够、用口味默认成本顶的 {len(R['fallback_used'])} 次"))
     # h. 库存不为负；先进先出剩的根数 = 库存
     neg = {k: v for k, v in R["st"].items() if v < -1e-9}
     out.append(("库存没有负数", not neg, neg))
-    lq = lambda k: R["layer_qty"].get(k, 0) + R["held_q"].get(k, 0)
+    short = defaultdict(float)
+    for s_, n_, _ in R["fallback_used"]: short[s_] += n_
+    lq = lambda k: R["layer_qty"].get(k, 0) + R["held_q"].get(k, 0) - short.get(k, 0)
     mis = {k: (R["st"].get(k, 0), lq(k)) for k in set(R["st"]) | set(R["layer_qty"]) | set(R["held_q"]) if abs(R["st"].get(k, 0) - lq(k)) > 1e-9}
     out.append(("成本账里剩的根数 = 库存根数", not mis, dict(list(mis.items())[:8])))
     return out

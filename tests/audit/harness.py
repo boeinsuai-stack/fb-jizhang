@@ -118,6 +118,11 @@ class App:
         if self.errs: bad.append("页面报错：" + "; ".join(self.errs[:2])); self.errs = []
         tag = f"[{self.name}·{self.mode}] {label}"
         if bad:
+            if any("脱单" in x for x in bad):
+                for m in Dd["movements"]:
+                    if str(m.get("batch_id") or "").endswith("-pick") and not m.get("order_id"):
+                        oid = m["batch_id"][:-5]; o = next((o for o in Dd["orders"] if o["id"] == oid), None)
+                        print("      [查] 流水", m["id"], "partner", m.get("partner"), "note", m.get("note"), "| 订单", o and {k: o.get(k) for k in ("status", "pick_from", "partner_settlement_id", "partner_settlements", "pick_split")}, "| 结账单里有它的", [(x["id"], x.get("partner")) for x in Dd["settlements"] if oid in (x.get("order_ids") or [])])
             self.fails.append((label, bad)); print("❌ " + tag)
             for b in bad: print("      " + b)
         else: print("✅ " + tag)
@@ -156,7 +161,7 @@ class App:
         self.go("finance"); pg.click("#fin-sale"); pg.wait_for_selector("#f-skuq-0")
         self._lines(lines)
         if resv: pg.check("#f-resv")
-        else: pg.select_option("#f-pay", pay)
+        else: pg.check(f'input[name="f-payr"][value="{pay}"]')
         if cust: pg.fill("#f-cust", cust)
         if who is not None and pg.is_visible("#f-pfrom"): pg.fill("#f-pfrom", who); pg.dispatch_event("#f-pfrom", "change")
         if split: split(pg)
