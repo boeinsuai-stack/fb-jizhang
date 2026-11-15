@@ -43,8 +43,6 @@ jobs:
         run: python tests/test_update.py
       - name: 成本账：卖出早于进货时先欠着、下一批补上
         run: python tests/test_fifo_gap.py
-      - name: 复制口味带售价、价钱从低到高
-        run: python tests/test_copy_flavours.py
       - name: 订货单点口味 + 粘贴清单识别
         run: node tests/orderparse_test.js && python tests/test_po_quick.py
       - name: 弹出页锁住后面的页面、不自动弹日期；订货日期默认今天

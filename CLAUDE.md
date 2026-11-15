@@ -25,7 +25,7 @@
 - `public/vendor/`：Firebase compat SDK 10.12.2（app/auth/firestore）和 xlsx 0.18.5，从 npm 包复制（去掉 sourceMappingURL）。
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；页面网络优先、3 秒超时用缓存；vendor 缓存优先；字体先用缓存
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-15 线上 fb-app-v22）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-15 线上 fb-app-v21）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -103,10 +103,6 @@
 - **合伙人页**：余额 0 但 `pendingPicks(w)` 不空的人也列出来
 - **有新版提示**（shim.js 最后）：打开 8 秒后 / 切回前台（5 分钟节流）/ 每半小时 fetch `sw.js`（no-store）取 CACHE，跟 `<meta name="app-version">` 不一样 → 标题下 `#update-bar`「有新版 · 点一下更新」→ 先 `cache:"reload"` 拿新文件再刷新。test_update
 - **成本账不漂**：`fifoBook` 出库时账上不够的先欠着（DEF），下一批到货先补它、按那批的价；一直没补上的最后才按口味默认成本。真实数据 golden 不变（现在没有这种情况）。test_fifo_gap
-
-## 复制口味带售价（fix-copy-price，2026-11-15）
-- 库存页「复制口味」= `plainFlavours()`：只列能卖的（库存减预定 > 0）；一个系列都是一个价 → 写在系列名后面「【Ali · $60】」，同系列有不同价 → 每行后面写价钱；
-  系列按最低价从低到高（同价按 SERIES 顺序），系列里按价钱、再按名字；没填售价（price_aud 空或 0）的排最后、不写价。测试 `tests/test_copy_flavours.py`
 
 ## 对账单改往来单价（feat13，2026-11-14）
 - 对账单（ledgerSheet）有没结账的往来时多一个「改单价」→ `xferPriceForm(w)`：列出没结账的往来每一行（调出、调入分开），每个系列一个「整系列每根」框，边改边显示改完后的应付/应收

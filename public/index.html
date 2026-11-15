@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v22"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v21"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -4009,22 +4009,13 @@ details.restock > summary::-webkit-details-marker { display: none; }
     return out.length ? out.join("") : "✨";
   }
   const titleCase = (t) => t.split(" ").map((w) => (w.length > 1 && w === w.toUpperCase()) ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-  /* plain list of what can be sold right now (stock minus reservations), one flavour per line, series separated by a blank line.
-     带售价、按价钱从低到高（Bowen 2026-11-15）：一个系列都是一个价 → 写在系列名后面「【Ali · $60】」；同系列有不同价 → 每行后面写价钱。
-     系列按最低价排，同价按原来的系列顺序；系列里按价钱、再按名字。没填售价的排最后、不写价 */
+  /* plain list of what can be sold right now (stock minus reservations), one flavour per line, series separated by a blank line */
   function plainFlavours() {
     const D = derive(), RV = reservedQty();
     const items = S.items.filter((i) => !isGeneric(i) && (D.st[i.sku] || 0) - (RV[i.sku] || 0) > 0);
     const order = SERIES.concat([...new Set(items.map(seriesOf))].filter((x) => !SERIES.includes(x)));
-    const pr = (i) => { const v = numOrNull(i.price_aud); return v != null && v > 0 ? v : null; };
-    const key = (v) => (v == null ? Infinity : v), $p = (v) => "$" + (Math.round(v * 100) / 100);
-    const blocks = order.map((sr) => {
-      const list = items.filter((i) => seriesOf(i) === sr).sort((a, b) => key(pr(a)) - key(pr(b)) || enOf(a).localeCompare(enOf(b)));
-      const ps = [...new Set(list.map(pr).filter((v) => v != null))], one = ps.length === 1 && list.every((i) => pr(i) != null);
-      return { sr, low: list.length ? key(pr(list[0])) : Infinity, rank: order.indexOf(sr),
-        text: "【" + sr + (one ? " · " + $p(ps[0]) : "") + "】\n" + list.map((i) => enOf(i) + (!one && pr(i) != null ? " " + $p(pr(i)) : "")).join("\n"), n: list.length };
-    }).filter((b) => b.n).sort((a, b) => a.low - b.low || a.rank - b.rank);
-    return { text: blocks.map((b) => b.text).join("\n\n"), n: items.length };
+    const blocks = order.map((sr) => [sr, items.filter((i) => seriesOf(i) === sr).sort((a, b) => enOf(a).localeCompare(enOf(b))).map(enOf)]).filter((b) => b[1].length);
+    return { text: blocks.map(([sr, names]) => "【" + sr + "】\n" + names.join("\n")).join("\n\n"), n: items.length };
   }
   async function copyPlain() {
     const { text, n } = plainFlavours();
