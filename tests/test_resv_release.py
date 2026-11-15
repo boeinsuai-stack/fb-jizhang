@@ -116,7 +116,7 @@ def books_ok(pg):
         for l in t.get("in") or []:
             mm = [m for m in S["m"] if m.get("transfer_id") == t["id"] and m["sku"] == l["sku"] and m["type"] == "in"]
             if sum(m["qty"] for m in mm) != l["qty"] or abs(sum(m.get("cost") or 0 for m in mm) - l["qty"] * (l.get("unit") or 0)) > 0.005: bad.append("往来 " + t["id"] + " 跟流水对不上")
-    bad += ["脱单的拿货 " + m["id"] for m in S["m"] if (m.get("batch_id") or "").endswith("-pick") and not m.get("order_id") and m["batch_id"][:-5] not in pg.evaluate("window.__GM.S.settles.flatMap((s) => s.order_ids || [])")]
+    bad += ["脱单的拿货 " + m["id"] for m in S["m"] if (m.get("batch_id") or "").endswith("-pick") and not m.get("order_id")]
     return bad
 
 
@@ -169,8 +169,13 @@ with sync_playwright() as p:
 
         # 4. 拿到并且已经跟甲结过账，再取消：货留作普通库存，不会又欠一次
         ctx, pg = open_app(br, seed)
-        oid = reserve(pg, "Grape Ice", 2, A); picked(pg, A, oid); settle(pg, A); cancel_resv(pg, oid)
-        check("已结账的预定取消：货留在库存，不欠甲，没有多出往来", stock(pg, "XF-02") == 2 and net(pg, A) == 0 and pg.evaluate("window.__GM.S.transfers.length") == 0, (stock(pg, "XF-02"), net(pg, A)))
+        oid = reserve(pg, "Grape Ice", 2, A); picked(pg, A, oid); sid = settle(pg, A); cancel_resv(pg, oid)
+        ts = pg.evaluate("window.__GM.S.transfers"); st = pg.evaluate("(s) => window.__GM.S.settles.find((x) => x.id === s)", sid)
+        check("已结账的预定取消：货留在库存，不欠甲；那 2 根记成一笔已结的往来，挂在原来那次结账下面", stock(pg, "XF-02") == 2 and net(pg, A) == 0 and len(ts) == 1 and ts[0].get("partner_settlement_id") == sid and ts[0]["id"] in (st.get("transfer_ids") or []) and oid not in (st.get("order_ids") or []), (stock(pg, "XF-02"), net(pg, A), ts, st))
+        check("提示里不写「照样欠」（已经结过了）", "照样欠" not in pg.inner_text("#toast"), pg.inner_text("#toast"))
+        check("账对得上", not books_ok(pg), books_ok(pg))
+        go(pg, "partner"); pg.evaluate(f"""() => {{ const b = document.querySelector('[data-unsettle="{sid}"]'); b.click(); b.click(); }}"""); pg.wait_for_timeout(900)
+        check("以后撤销那次结账：欠甲的 60 回来了（以前会丢）", net(pg, A) == 60 and stock(pg, "XF-02") == 2, (net(pg, A), stock(pg, "XF-02")))
         ctx.close()
 
         # 5. 一单分开找甲、乙拿，都拿到了，只跟甲结了，再取消：乙那 1 根照样欠

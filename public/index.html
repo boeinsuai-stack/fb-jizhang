@@ -1590,6 +1590,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
         /* 预定的货已经从合伙人那拿到了：只取消预定，货留作库存；没结账的照样欠他（改记成一笔往来），不能跟着预定一起消失 */
         const mine = ms.filter((m) => m.type === "in"), n = mine.reduce((a, m) => a + (Number(m.qty) || 0), 0);
         const rel = await releasePicks(o, mine, "预定取消");
+        for (const sid of oSids(o)) { const st = S.settles.find((x) => x.id === sid); if (st && (st.order_ids || []).includes(id)) await db.doc("settlements/" + sid).update({ order_ids: st.order_ids.filter((x) => x !== id) }); }
         if (o.follow_up && !o.follow_up.done && o.customer) await db.collection("followups").doc(rid("fu")).set(Object.assign({ customer: o.customer, suburb: o.suburb || null, wants: [], note: o.follow_up.note || "", date: o.follow_up.date || null, done: false, created_at: new Date().toISOString() }, o.follow_up.contacted_at ? { contacted_at: o.follow_up.contacted_at } : {}));
         await db.doc("orders/" + id).delete();
         if (assets && Array.isArray(o.photos)) for (const ph of o.photos) { try { await assets.delete(ph); } catch (_) {} }
@@ -3001,24 +3002,25 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }
     if (!g.o.pick_from) await db.doc("orders/" + g.oid).update({ pick_from: whoFrom(g.o) === "合伙人" ? null : whoFrom(g.o) });
   }
-  /* 预定上已经从合伙人拿到的货，不再属于这一单了（预定改了 / 取消了）：货留作库存。
-     还没跟他结账的 → 改记成一笔「他给我货」的往来：对账单调入里照样算、能结账；货退回去了就撤销那笔往来。
-     （以前只把流水的 order_id 清空，这笔欠款就从对账单里消失了。）已经结过账的 → 变成普通库存。
-     o = 改之前的订单；ms = 要放下来的拿货流水。返回 { owed: {人: 根数}, exGone: 拿货支出是不是删掉了 } */
+  /* 预定上已经从合伙人拿到的货，不再属于这一单了（预定改了 / 取消了）：货留作库存，改记成一笔「他给我货」的往来。
+     还没跟他结账的 → 对账单调入里照样算、能结账；货退回去了就撤销那笔往来。
+     已经结过账的 → 这笔往来挂在原来那次结账下面（已结）：以后撤销那次结账，欠款会回来。
+     （以前只把流水的 order_id 清空，这笔账就从对账单里消失了。）
+     o = 改之前的订单；ms = 要放下来的拿货流水。返回 { owed: {人: 根数（只算没结账的）}, exGone: 拿货支出是不是删掉了 } */
   async function releasePicks(o, ms, why) {
     const by = {}, owed = {}, gone = new Set();
     for (const m of ms) { const w = m.partner || whoFrom(o); (by[w] = by[w] || []).push(m); }
     const at = new Date().toISOString(), note = why + "，拿到的货留作库存";
     for (const [w, list] of Object.entries(by)) {
-      if (oSidFor(o, w)) { await Promise.all(list.map((m) => db.doc("movements/" + m.id).update({ order_id: null, note }))); continue; }
-      const L = {};
+      const sid = oSidFor(o, w), L = {};
       for (const m of list) { const q = Number(m.qty) || 0, l = L[m.sku] || (L[m.sku] = { sku: m.sku, name: m.name, qty: 0, cost: 0, known: true }); l.qty += q; if (m.cost == null) l.known = false; else l.cost += Number(m.cost); }
       const inn = Object.values(L).map((l) => ({ sku: l.sku, name: l.name, qty: l.qty, unit: l.known && l.qty ? r2(l.cost / l.qty) : null }));
       const tid = rid("t"), date = list[0].date || today();
-      await db.collection("transfers").doc(tid).set({ date, at, partner: w === "合伙人" ? null : w, out: [], in: inn, note });
+      await db.collection("transfers").doc(tid).set(Object.assign({ date, at, partner: w === "合伙人" ? null : w, out: [], in: inn, note }, sid ? { partner_settlement_id: sid } : {}));
+      if (sid) { const st = S.settles.find((x) => x.id === sid); if (st) await db.doc("settlements/" + sid).update({ transfer_ids: (st.transfer_ids || []).concat([tid]) }); }
       await Promise.all(inn.map((l) => db.collection("movements").doc(tid + "-in-" + l.sku).set({ type: "in", sku: l.sku, name: l.name, qty: l.qty, cost: l.unit == null ? null : r2(l.qty * l.unit), date, at, transfer_id: tid, note: "合伙人往来：" + w + " 给的" })));
       await Promise.all(list.map((m) => db.doc("movements/" + m.id).delete()));
-      list.forEach((m) => gone.add(m.id)); owed[w] = (owed[w] || 0) + list.reduce((a, m) => a + (Number(m.qty) || 0), 0);
+      list.forEach((m) => gone.add(m.id)); if (!sid) owed[w] = (owed[w] || 0) + list.reduce((a, m) => a + (Number(m.qty) || 0), 0);
     }
     /* 拿货支出只算还挂在这一批上的货（往来不另记支出） */
     let exGone = false;

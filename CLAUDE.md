@@ -75,7 +75,7 @@
   - 测试数据里合伙人用「合伙人甲/乙」，不要用真名
 
 ## 编辑预定（feat11，2026-11-09）
-- 预定的「编辑」= saleForm(null, true, null, null, 订单)：口味/数量/行都能改。已从合伙人拿到、但口味换掉或数量减少的货留作库存：没结账的改记成往来调入（见下面「预定的货拿到以后再改 / 取消」），已结账的才清 order_id
+- 预定的「编辑」= saleForm(null, true, null, null, 订单)：口味/数量/行都能改。已从合伙人拿到、但口味换掉或数量减少的货留作库存：都改记成往来调入（见下面「预定的货拿到以后再改 / 取消」）
 - 已卖出的单仍走 orderEditForm（数量锁住）
 
 ## 备份和恢复（fix-backup-restore，2026-11-15）
@@ -90,10 +90,10 @@
 - 测试 `tests/test_restore.py [真实 fixture]` 31/31：备份 → 把云端弄坏 → 恢复 → 数字一样 → 升级回新结构还一样（旧结构/新结构各开始一遍；GitHub 上跑编的数据）
 ## 预定的货拿到以后再改 / 取消（fix-resv-picks，2026-11-15）
 - `releasePicks(o, ms, why)`：预定上已经从合伙人拿到的货不再属于这单时（编辑预定换口味/减数量、取消预定）：
-  还没跟他结账的 → 改记成一笔「他给我货」的往来（`transfers` + `t-…-in-SKU` 流水，删掉原来的拿货流水，拿货支出减掉这部分）；已经结过账的 → 照旧只清 `order_id` 变普通库存
-  - 以前只清 `order_id`（取消预定时直接删流水）→ `pickups()` 找不到 → 应付从对账单里消失。**不要再把没结账的拿货流水的 order_id 清空**
+  改记成一笔「他给我货」的往来（`transfers` + `t-…-in-SKU` 流水，删掉原来的拿货流水，拿货支出减掉这部分）；已经结过账的 → 这笔往来带 `partner_settlement_id`、加进那次结账的 `transfer_ids`（撤销那次结账时欠款会回来）；取消预定时把订单从结账的 `order_ids` 里拿掉
+  - 以前只清 `order_id`（取消预定时直接删流水）→ `pickups()` 找不到 → 应付从对账单里消失。**不要再把拿货流水的 order_id 清空**
 - `pickSplitLeft(o)`：分开拿的预定已经拿到一部分时，剩下的只按 `pick_split` 里还没拿够的人分（`resvAlloc`、`commitSale` 结算预定时都用它）
-- 测试 `tests/test_resv_release.py` 45/45（编的数据，GitHub 上也跑）
+- 测试 `tests/test_resv_release.py` 53/53（编的数据，GitHub 上也跑）
 
 ## 体检第二批（fix-batch2-20261115）
 - **弹出页聚焦**：记一笔 / 预定 / 编辑预定、跟合伙人结账 `openSheet(..., { focus: false })`；`openSheet` 自动聚焦跳过口味搜索框 `.pick-q`
