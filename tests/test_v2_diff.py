@@ -112,14 +112,14 @@ with sync_playwright() as p:
     ids0 = A.evaluate("window.__GM.S.orders.map((x) => x.id)")
     def sale_stock(pg):
         pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(200); pg.click("#fin-sale")
-        pg.fill("#f-skuq-0", have); pg.press("#f-skuq-0", "Enter"); pg.select_option("#f-pay", "现金"); save(pg)
+        pg.fill("#f-skuq-0", have); pg.press("#f-skuq-0", "Enter"); pg.check('input[name="f-payr"][value="现金"]'); save(pg)
     both(A, B, sale_stock); compare("1 卖出（有货）", A, B)
     o_sold = new_ids(ids0, A); print("   新订单", o_sold)
 
     # 2 卖出（缺货，找合伙人拿）
     ids0 = A.evaluate("window.__GM.S.orders.map((x) => x.id)")
     def sale_pick(pg):
-        pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(200); pg.click("#fin-sale"); pg.fill("#f-skuq-0", none); pg.press("#f-skuq-0", "Enter"); pg.select_option("#f-pay", "现金")
+        pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(200); pg.click("#fin-sale"); pg.fill("#f-skuq-0", none); pg.press("#f-skuq-0", "Enter"); pg.check('input[name="f-payr"][value="现金"]')
         if pg.is_visible("#f-pfrom"): pg.fill("#f-pfrom", partner)
         save(pg)
     both(A, B, sale_pick); compare("2 卖出（缺货，找合伙人拿）", A, B)

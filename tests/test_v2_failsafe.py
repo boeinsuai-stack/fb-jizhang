@@ -68,7 +68,7 @@ def open_app(br, seed, offline, cache=None, remember=None):
 
 def sell(pg, flavour):
     pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(300); pg.click("#fin-sale")
-    pg.fill("#f-skuq-0", flavour); pg.press("#f-skuq-0", "Enter"); pg.select_option("#f-pay", "现金")
+    pg.fill("#f-skuq-0", flavour); pg.press("#f-skuq-0", "Enter"); pg.check('input[name="f-payr"][value="现金"]')
     pg.click("#sheet-save"); pg.wait_for_selector("#sheet", state="hidden", timeout=4000); pg.wait_for_timeout(400)
 
 

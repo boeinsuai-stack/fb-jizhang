@@ -89,7 +89,7 @@ with sync_playwright() as p:
     pg.wait_for_selector('[data-edit-order="r1"]', state="attached", timeout=8000)
     pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(300)
     pg.click("#fin-sale")
-    pick(pg, 0, "Apple"); pg.select_option("#f-pay", "现金")
+    pick(pg, 0, "Apple"); pg.check('input[name="f-payr"][value="现金"]')
     closed = save(pg)
     moves = pg.evaluate("__dump('movements')")
     out = [m for m in moves.values() if m.get("type") == "out" and m.get("sku") == "XF-01"]
@@ -144,7 +144,7 @@ with sync_playwright() as p:
     ctx, pg = open_app(browser, port, offline=False)
     pg.wait_for_selector('[data-edit-order="r1"]', state="attached", timeout=8000)
     pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(300)
-    pg.click("#fin-sale"); pick(pg, 0, "Grape"); pg.select_option("#f-pay", "现金")
+    pg.click("#fin-sale"); pick(pg, 0, "Grape"); pg.check('input[name="f-payr"][value="现金"]')
     check("有网时照常保存", save(pg))
 
     # 7. 回头客：打完名字直接点「保存」（不先点别处）
@@ -153,7 +153,7 @@ with sync_playwright() as p:
     pg.set_viewport_size({"width": 390, "height": 560})  # 小屏手机：表单超过一屏，按钮跟着内容往下挪（真实数据在大屏上也会）
     pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(300)
     before = set(pg.evaluate("Object.keys(__server('orders'))"))
-    pg.click("#fin-sale"); pick(pg, 0, "Apple"); pg.select_option("#f-pay", "现金")
+    pg.click("#fin-sale"); pick(pg, 0, "Apple"); pg.check('input[name="f-payr"][value="现金"]')
     pg.click("#f-cust"); pg.keyboard.type("Cat", delay=30)
     box = lambda: pg.evaluate("() => { const r = document.querySelector('#sheet-save').getBoundingClientRect(); return [Math.round(r.top), Math.round(r.left)]; }")
     y0 = box(); hint = pg.is_visible("#f-cust-hint")

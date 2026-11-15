@@ -201,6 +201,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 #sheet-form { display: grid; gap: 12px; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field label { font-size: .78rem; color: var(--muted); }
+.field .lbl { font-size: .78rem; color: var(--muted); }
+.field label.chip { font-size: .86rem; padding: 7px 12px; }
 .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .line, .lines-head { display: grid; grid-template-columns: minmax(0, 1fr) 64px 84px 34px; gap: 6px; align-items: center; }
 .lines-head { font-size: .74rem; color: var(--muted); }
@@ -240,6 +242,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .dates b.resv { color: var(--warn); font-weight: 500; }
 label.chip { display: inline-flex; align-items: center; gap: 6px; }
 label.chip input { width: auto; margin: 0; accent-color: var(--accent); }
+label.chip:has(input:checked) { background: var(--accent-soft); color: var(--accent); border-color: transparent; font-weight: 500; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: .9rem; padding: 10px 12px; border-radius: 8px; background: var(--bg); cursor: pointer; }
 .check input { width: auto; margin-top: 3px; accent-color: var(--accent); }
 #c-text { font-size: 15px; line-height: 1.5; }
@@ -1412,8 +1415,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div id="f-lines"></div>' +
       '<div><button type="button" class="btn ghost small" id="f-addline">+ 再加一种香型</button></div>' +
       lumpHtml(!!edit && edit.lump_total != null, edit ? edit.lump_total : null) +
-      '<div class="grid2"><div class="field"><label for="f-pay">付款方式</label><select id="f-pay">' + payOptions(edit ? edit.payment : "") + "</select></div>" +
-      '<div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="' + esc(edit && edit.delivery_fee ? edit.delivery_fee : "") + '"></div></div>' +
+      /* 付款方式：一排小标签，点一下（以前是下拉框，iPhone 上要 点开 → 滚轮 → 完成）；再点一下已选的 = 取消 */
+      '<div class="field"><span class="lbl">付款方式</span><div class="chips" id="f-paychips" role="radiogroup" aria-label="付款方式">' + PAY.concat([MIX]).map((x) => '<label class="chip"><input type="radio" name="f-payr" value="' + esc(x) + '"' + (edit && edit.payment === x ? " checked" : "") + "> " + esc(x) + "</label>").join("") + "</div></div>" +
+      '<div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="' + esc(edit && edit.delivery_fee ? edit.delivery_fee : "") + '"></div>' +
       mixRowHtml(edit || null) +
       custNameHtml(custPre) +
       '<p class="total">合计<b id="f-total">–</b></p>' +
@@ -1525,6 +1529,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
       wireCust(edit ? edit.id : null);
       sheetOn("input", recalc); sheetOn("change", recalc);
       $("f-resv").addEventListener("change", () => { $("sheet-title").textContent = $("f-resv").checked ? "记一笔预定" : "记一笔卖出"; recalc(); });
+      /* 再点一下已选的付款方式 = 取消（预定可以先不选） */
+      let payWas = curPay();
+      $("f-paychips").addEventListener("click", (e) => { const r = e.target.closest('input[name="f-payr"]'); if (!r) return; if (r.value === payWas) { r.checked = false; payWas = ""; recalc(); } else payWas = r.value; });
       recalc();
     }, { focus: false });
   }

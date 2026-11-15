@@ -98,6 +98,23 @@ with sync_playwright() as p:
     pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(300); pg.click("#fin-sale"); pg.wait_for_selector("#f-skuq-0", timeout=4000); pg.wait_for_timeout(300)
     check("财务页「记一笔」：下拉不自己弹", pg.evaluate(QUIET) == "", pg.evaluate(QUIET))
     pg.click("#sheet-close"); pg.wait_for_timeout(250)
+
+    # 付款方式是一排小标签，点一下就选好（以前是下拉框：点开 → 滚轮 → 完成）
+    pg.evaluate("location.hash = '#inventory'"); pg.wait_for_timeout(300)
+    if not pg.is_visible("#cb-go"): pg.click('#qo-tiles [data-add="XF-01"]')
+    pg.click("#cb-go"); pg.wait_for_selector("#f-paychips", timeout=4000)
+    check("下单表里付款方式是小标签，没有下拉框", pg.locator("#f-paychips input[name='f-payr']").count() == 5 and pg.locator("#sheet select#f-pay").count() == 0)
+    pg.click("#sheet-save"); pg.wait_for_timeout(400)
+    check("没选付款方式不让保存", pg.is_visible("#sheet-err") and "付款方式" in pg.inner_text("#sheet-err"))
+    pg.click('#f-paychips input[value="现金+转账"]'); pg.wait_for_timeout(150)
+    mix = pg.is_visible("#f-paycash")
+    pg.click('#f-paychips input[value="PayID"]'); pg.wait_for_timeout(150)
+    check("选「现金+转账」出现现金框，改选别的收起", mix and not pg.is_visible("#f-paycash"))
+    pg.click('#f-paychips input[value="PayID"]'); pg.wait_for_timeout(150)
+    check("再点一下已选的 = 取消", pg.locator("#f-paychips input:checked").count() == 0)
+    pg.click('#f-paychips input[value="现金"]'); n0 = len(pg.evaluate("window.__GM.S.orders")); pg.click("#sheet-save"); pg.wait_for_timeout(900)
+    od = pg.evaluate("window.__GM.S.orders")
+    check("点「现金」→ 保存：这单记成现金（格子 → 下单 → 现金 → 保存，4 下）", len(od) == n0 + 1 and sorted(od, key=lambda o: o["at"])[-1]["payment"] == "现金", str([o.get("payment") for o in od]))
     br.close()
 
 print(f"\n{sum(results)}/{len(results)} 通过")

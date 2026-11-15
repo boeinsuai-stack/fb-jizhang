@@ -118,7 +118,7 @@ with sync_playwright() as p:
         if it:
             pg.fill("#f-skuq-0", it); pg.press("#f-skuq-0", "Enter")
             nw = len(pg.evaluate("window.__writes"))
-            pg.select_option("#f-pay", "现金"); pg.click("#sheet-save"); pg.wait_for_timeout(800)
+            pg.check('input[name="f-payr"][value="现金"]'); pg.click("#sheet-save"); pg.wait_for_timeout(800)
             check("③ 界面上点「保存」：没写进数据库，顶上提示只读", len(pg.evaluate("window.__writes")) == nw and "要改请在手机 App 里改" in pg.inner_text("#mirror-bar"), (pg.inner_text("#mirror-bar")[:60], pg.evaluate("window.__writes.length") - nw, errs[:2]))
         pg.keyboard.press("Escape")
 

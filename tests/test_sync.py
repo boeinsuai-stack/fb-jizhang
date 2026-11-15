@@ -143,7 +143,7 @@ with sync_playwright() as p:
     # 场景 9：业务代码照常工作（打开 App、记一笔卖出）
     pg = open_app(ctx, port, server5, cache=cache5)
     pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(300)
-    pg.click("#fin-sale"); pg.fill("#f-skuq-0", "Mango"); pg.press("#f-skuq-0", "Enter"); pg.select_option("#f-pay", "现金")
+    pg.click("#fin-sale"); pg.fill("#f-skuq-0", "Mango"); pg.press("#f-skuq-0", "Enter"); pg.check('input[name="f-payr"][value="现金"]')
     pg.click("#sheet-save"); pg.wait_for_selector("#sheet", state="hidden", timeout=3000)
     pg.wait_for_timeout(300)
     srv = pg.evaluate("Object.values(__server('movements')).filter(m => m.type === 'out' && m.sku === 'XF-02' && !m._deleted).length")
