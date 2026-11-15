@@ -88,7 +88,7 @@ with sync_playwright() as p:
         pg.fill("#f-xu-2", "45")
         sm = pg.inner_text("#f-xsum")
         # 调出 3×36=108，调入 2×45=90 → 应收 18
-        check("改的时候就显示改完后的账：调出 $90 → $108、应收 18", "$108" in sm and "应收" in sm and "18" in sm, sm.replace("\n", " / "))
+        check("改的时候就显示改完后的账：他拿你的 $90 → $108、他欠你 18", "$108" in sm and "欠你" in sm and "18" in sm, sm.replace("\n", " / "))
         pg.click("#sheet-save"); pg.wait_for_timeout(1200)
         S = pg.evaluate("(() => { const S = window.__GM.S; return { t: S.transfers, m: S.moves.filter((m) => m.transfer_id) }; })()")
         t = {x["id"]: x for x in S["t"]}

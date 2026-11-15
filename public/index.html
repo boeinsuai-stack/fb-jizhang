@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v22"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v23"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -447,7 +447,19 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 #f-owe .owe-line + .owe-line { border-top: 1px dashed var(--warn); }
 .owe-line b { font-family: var(--font-display); font-size: 1.3rem; }
 .ptx-b .owe-line { padding: 0; }
-.lg-sum { margin: 0; font-size: 1rem; } .lg-sum b { font-family: var(--font-display); font-size: 1.7rem; margin-left: 4px; }
+.lg-sum { margin: 0; font-size: 1.05rem; font-weight: 700; } .lg-sum b { font-family: var(--font-display); font-size: 1.9rem; margin-left: 4px; }
+.lg-sum.l-owe { color: var(--warn); } .lg-sum.l-due { color: var(--accent); }
+.lg-eq { margin: -6px 0 0; color: var(--muted); font-size: .84rem; font-variant-numeric: tabular-nums; }
+.lg-g { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.lg-gh { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 12px; font-weight: 700; }
+.lg-g.l-owe .lg-gh { background: var(--warn-soft); color: var(--warn); } .lg-g.l-due .lg-gh { background: var(--accent-soft); color: var(--accent); }
+.lg-gh b { font-family: var(--font-display); font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.lg-g ul { list-style: none; margin: 0; padding: 0; }
+.lg-g li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--line); font-size: .92rem; }
+.lg-g li > span { display: grid; gap: 2px; min-width: 0; }
+.lg-g li small { color: var(--muted); font-size: .78rem; }
+.lg-g li b { flex: none; font-variant-numeric: tabular-nums; }
+.lg-even { margin: 0; color: var(--muted); font-size: .84rem; }
 .lg { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 10px; }
 .lg-d { padding: 6px 12px; font-size: .76rem; font-weight: 700; letter-spacing: .04em; color: var(--muted); background: var(--bg); }
 .lg-d:not(:first-child) { border-top: 1px solid var(--line); }
@@ -766,7 +778,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     <div class="summary" aria-label="合伙人拿货概览">
       <div class="stat"><span class="k">未结 Bar Pro（根）</span><span class="v" id="t-bp">–</span></div>
       <div class="stat"><span class="k">未结 Ali（根）</span><span class="v" id="t-ali">–</span></div>
-      <div class="stat"><span class="k">未结应付</span><span class="v" id="t-owe">–</span></div>
+      <div class="stat"><span class="k">随单拿 · 你欠</span><span class="v" id="t-owe">–</span></div>
       <div class="stat"><span class="k">本月拿货（根）</span><span class="v" id="t-month">–</span></div>
     </div>
     <div class="callout" id="t-unk" hidden></div>
@@ -2832,7 +2844,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const rlist = Object.entries(rcpts).sort((a, b) => (a[1].date || "").localeCompare(b[1].date || ""));
       return '<article class="po">' +
         '<div class="po-head"><div><span class="l-date">订货 ' + fmtD(po.date) + (po.supplier ? " · " + esc(po.supplier) : "") + '</span><b class="po-title">' + esc(po.note || poLinesTxt(po)) + "</b>" +
-          '<span class="l-sub">' + (poUnpaid(po) ? "还没付" + (po.supplier ? "，记在应付" + esc(po.supplier) + "里" : "") : "已付" + (po.paid_date ? " " + fmtD(po.paid_date) : "") + (po.settlement_id ? " · 跟" + esc(poWho(po)) + "结账时一起付" : po.payment ? " · " + esc(po.payment) : "")) + "</span></div>" +
+          '<span class="l-sub">' + (poUnpaid(po) ? "还没付" + (po.supplier ? "，记在你欠 " + esc(po.supplier) + " 的账里" : "") : "已付" + (po.paid_date ? " " + fmtD(po.paid_date) : "") + (po.settlement_id ? " · 跟" + esc(poWho(po)) + "结账时一起付" : po.payment ? " · " + esc(po.payment) : "")) + "</span></div>" +
         '<div class="po-amt"><span>' + money(poPaid(po)) + '</span><span class="pill ' + (poUnpaid(po) ? "bad" : "") + '">' + (poUnpaid(po) ? "未付" : "已付") + '</span><span class="pill ' + lab[1] + '">' + lab[0] + "</span></div></div>" +
         '<div class="tblwrap"><table class="po-tbl"><thead><tr><th>订的</th><th>订</th><th>已到</th><th>未到</th><th>$/根</th></tr></thead><tbody>' +
         (po.lines || []).map((l) => { const g = recv[lineKey(l)] || 0, lf = Math.max(0, l.qty - g);
@@ -3068,8 +3080,12 @@ details.restock > summary::-webkit-details-marker { display: none; }
     return { inV: r2(inV), outV: r2(outV), list, rows };
   }
   const offTxt = (list) => list.map((o) => o.sr + " " + o.q + " 根").join("、");
-  const serIO = (r) => [r.iq ? "调入 " + r.iq : "", r.oq ? "调出 " + r.oq : "", r.m ? "抵 " + r.m : ""].filter(Boolean).join(" · ");
-  const serRest = (r) => (r.side === "in" ? "调入 " + r.rq + " 根 " + money(r.rv) : r.side === "out" ? "调出 " + r.rq + " 根 " + money(r.rv) : "抵完两清");
+  /* 谁欠谁（Bowen 2026-11-16：「调入/调出」「还要结」「+/−」看不出是他欠我还是我欠他）→ 钱一律写成「你欠 X」「X 欠你」两组，不写正负号。
+     me = 复制发给合伙人的文字（Bowen 的口吻：我 = Bowen，你 = 合伙人） */
+  const serIO = (r, me) => [r.iq ? (me ? "我拿你 " : "你拿他 ") + r.iq + " 根" : "", r.oq ? (me ? "你拿我 " : "他拿你 ") + r.oq + " 根" : "", r.m ? "抵掉 " + r.m + " 根" : ""].filter(Boolean).join(" · ");
+  const serLeft = (r) => r.sr + " " + r.rq + " 根 " + money(r.rv);
+  /* xOffset 的 rows 分两组：mine = 你拿他的、抵完还剩（你欠他）；his = 他拿你的、抵完还剩（他欠你）；even = 抵平的系列 */
+  const debtSplit = (rows) => ({ mine: rows.filter((r) => r.side === "in"), his: rows.filter((r) => r.side === "out"), even: rows.filter((r) => !r.side && r.m) });
   function ledgerFrom(gs, xs, ps, pend) {
     const by = {};
     const W = (w) => by[w] || (by[w] = { inn: [], out: [], po: [], pend: [], tin: 0, tout: 0, tpo: 0, tpend: 0, unk: false, gs: [], ts: [] });
@@ -3093,25 +3109,29 @@ details.restock > summary::-webkit-details-marker { display: none; }
   }
   const ledgerOf = (w) => ledgerFrom(partnerItems(w), openXfers(w), openPOs(w), pendingPicks(w))[w] || null;
   const ledgerNet = (w) => { const x = ledgerOf(w); return x ? x.net : 0; };
-  const owedTxt = (w, n) => (n > 0 ? "应付 " + w : n < 0 ? "应收 " + w : "跟 " + w + " 两清");
+  const owedTxt = (w, n) => (n > 0 ? "你欠 " + w : n < 0 ? w + " 欠你" : "跟 " + w + " 两清");
   function ledgerSheet(w) {
     const x = ledgerOf(w);
     if (!x || (!x.inn.length && !x.out.length && !x.po.length && !x.pend.length)) { toast("跟" + w + "没有没结的账。"); return; }
     const W = esc(w);
     const days = (list) => '<ul class="lg">' + byDay(list).map((d) => '<li class="lg-d">' + esc(fmtD(d.date)) + "</li>" + d.lines.map((l) => '<li class="lg-l"><span>' + esc(l.k) + "</span><b>×" + l.q + "</b></li>").join("")).join("") + "</ul>";
     const sec = (cls, label, sub, amt, inner) => '<section class="lg-sec"><div class="lg-sh"><span class="lg-k ' + cls + '">' + label + "</span><small>" + sub + "</small><b>" + amt + "</b></div>" + inner + "</section>";
-    const serRow = (r) => '<li class="lg-sr"><div class="lg-sr-h"><b>' + esc(r.sr) + "</b><small>" + esc(serIO(r)) + "</small></div>" +
-      '<div class="lg-sr-r">' + (r.side ? '<span class="lg-k ' + (r.side === "in" ? "k-in" : "k-out") + '">' + (r.side === "in" ? "调入" : "调出") + "</span><span>还要结 " + r.rq + ' 根</span><b class="' + (r.side === "in" ? "neg" : "pos") + '">' + (r.side === "in" ? "+" : "−") + money(r.rv) + "</b>" : '<span class="muted">抵完两清</span>') + "</div></li>";
-    const html = '<p class="lg-sum">' + esc(owedTxt(w, x.net)) + " <b>" + money(Math.abs(x.net)) + "</b></p>" +
-      (x.ser.length ? sec("k-swap", "按系列算", "同系列一根抵一根，抵完剩下的照价算", "", '<ul class="lg lg-ser">' + x.ser.map(serRow).join("") + "</ul>") : "") +
+    const sp = debtSplit(x.ser), tm = r2(x.tin + x.tpo), th = x.tout;
+    const li = (name, sub, amt) => "<li><span>" + name + (sub ? "<small>" + sub + "</small>" : "") + "</span><b>" + amt + "</b></li>";
+    const grp = (cls, label, tot, lis) => '<section class="lg-g ' + cls + '"><div class="lg-gh"><span>' + label + "</span><b>" + money(tot) + "</b></div><ul>" + lis + "</ul></section>";
+    const serLi = (r) => li(esc(r.sr) + " " + r.rq + " 根", r.m ? esc(serIO(r)) : "", money(r.rv));
+    const html = '<p class="lg-sum' + (x.net > 0 ? " l-owe" : x.net < 0 ? " l-due" : "") + '">' + esc(owedTxt(w, x.net)) + (Math.abs(x.net) >= 0.01 ? " <b>" + money(Math.abs(x.net)) + "</b>" : "") + "</p>" +
+      (tm && th ? '<p class="lg-eq">你欠他 ' + money(tm) + " − 他欠你 " + money(th) + "</p>" : "") +
+      (sp.mine.length || x.tpo ? grp("l-owe", "你欠 " + W, tm, sp.mine.map(serLi).join("") + (x.tpo ? li("订货（还没付）", "", money(x.tpo)) : "")) : "") +
+      (sp.his.length ? grp("l-due", W + " 欠你", th, sp.his.map(serLi).join("")) : "") +
+      (sp.even.length ? '<p class="lg-even">抵平了：' + sp.even.map((r) => esc(r.sr) + "（各 " + r.m + " 根）").join("、") + "</p>" : "") +
+      (x.ser.some((r) => r.m) ? '<p class="lg-even">同一个系列，你拿他的和他拿你的一根抵一根，抵完剩下的照价算。</p>' : "") +
       (x.po.length ? sec("k-po", "订货", "还没付", money(x.tpo), '<ul class="lg">' + x.po.map((q) => '<li class="lg-d"><span>' + esc(fmtD(q.date)) + '</span><span><b>' + money(q.amt) + '</b> <button class="linkbtn" type="button" data-lg="po-pay" data-id="' + esc(q.id) + '">结款</button></span></li>' +
         q.lines.map((l) => '<li class="lg-l"><span>' + esc(l.k) + "</span><b>×" + l.q + "</b></li>").join("")).join("") + "</ul>") : "") +
-      '<div class="lg-tot">' + (x.tin ? "<span>调入</span><b>+" + money(x.tin) + "</b>" : "") + (x.tpo ? "<span>订货</span><b>+" + money(x.tpo) + "</b>" : "") + (x.tout ? "<span>调出</span><b>−" + money(x.tout) + "</b>" : "") +
-        '<span class="g">' + esc(owedTxt(w, x.net)) + '</span><b class="g">' + money(Math.abs(x.net)) + "</b></div>" +
       (x.inn.length || x.out.length ? '<p class="lg-mx">明细 · 按日期（只记货）</p>' : "") +
-      (x.inn.length ? sec("k-in", "调入", "从" + W + "拿的货", "", days(x.inn)) : "") +
-      (x.out.length ? sec("k-out", "调出", W + "拿走的货", "", days(x.out)) : "") +
-      (x.pend.length ? sec("k-resv", "预定", "还没拿 · 不算进应付", "", '<ul class="lg lg-pend">' + x.pend.map((q) => '<li class="lg-d"><span>' + esc(fmtD(q.date)) + '</span><button class="linkbtn" type="button" data-lg="picked" data-id="' + esc(q.oid) + '">已拿到</button></li>' +
+      (x.inn.length ? sec("k-in", "你拿 " + W + " 的货", "", "", days(x.inn)) : "") +
+      (x.out.length ? sec("k-out", W + " 拿你的货", "", "", days(x.out)) : "") +
+      (x.pend.length ? sec("k-resv", "预定", "还没拿 · 不算进来", "", '<ul class="lg lg-pend">' + x.pend.map((q) => '<li class="lg-d"><span>' + esc(fmtD(q.date)) + '</span><button class="linkbtn" type="button" data-lg="picked" data-id="' + esc(q.oid) + '">已拿到</button></li>' +
         q.lines.map((l) => '<li class="lg-l"><span>' + esc(l.k) + "</span><b>×" + l.q + "</b></li>").join("")).join("") + "</ul>") : "") +
       (x.unk ? '<p class="hint">＋ 有的货拿货价还没填，金额可能偏少。</p>' : "") +
       '<div class="actions"><button class="btn small" type="button" data-lg="copy">复制发给' + W + '</button><button class="btn small ghost" type="button" data-lg="xfer">记往来</button>' +
@@ -3121,7 +3141,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       sheetOn("click", (e) => { const b = e.target.closest("[data-lg]"); if (!b) return; const a = b.dataset.lg;
         if (a === "copy") copyText(statementText(partnerItems(w), w + " · 对账单（截至 " + fmtD(today()) + "）", null, openXfers(w), openPOs(w), pendingPicks(w)));
         else if (a === "picked") { const g = pendingPicks(w).find((z) => z.oid === b.dataset.id); if (!g) return;
-          arm(b, "确认已拿到？", async () => { try { needDb(); await recordPrePick(g, today()); toast("已记成调入，算进应付 " + w + "。"); closeSheet(); setTimeout(() => ledgerSheet(w), 300); } catch (e2) { toast(e2.userMsg || errText(e2)); } }); }
+          arm(b, "确认已拿到？", async () => { try { needDb(); await recordPrePick(g, today()); toast("已记成你拿 " + w + " 的货，算进你欠 " + w + " 的账。"); closeSheet(); setTimeout(() => ledgerSheet(w), 300); } catch (e2) { toast(e2.userMsg || errText(e2)); } }); }
         else if (a === "xfer") { closeSheet(); xferForm(w); }
         else if (a === "xprice") { closeSheet(); xferPriceForm(w); }
         else if (a === "po-pay") { closeSheet(); poPayForm(b.dataset.id); } });
@@ -3141,7 +3161,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       return '<p class="xs-h">' + label + '</p><div class="serp" data-side="' + side + '">' + serpHtml([...new Set(rs.map((r) => r.sr))], {}) + '</div><div class="pt-lines">' +
         rs.map((r) => { const k = rows.indexOf(r); return '<div class="pt-line"><span class="pt-name"><small style="white-space:nowrap">' + esc(fmtD(r.t.date)) + "</small> " + esc(r.sr + " " + nm(r.l.sku, r.l.name)) + '</span><span class="pt-q">×' + r.q + '</span><label class="pt-u"><span>$</span><input id="f-xu-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(r.l.unit != null ? r2(Number(r.l.unit)) : "") + '" aria-label="' + esc(nm(r.l.sku, r.l.name)) + ' 每根多少钱"></label></div>'; }).join("") + "</div>";
     };
-    const html = block("out", "调出 · " + esc(w) + "拿走的货") + block("in", "调入 · " + esc(w) + "给我的货（往来）") + '<p class="callout xsum" id="f-xsum">–</p>';
+    const html = block("out", esc(w) + " 拿你的货（" + esc(w) + " 欠你）") + block("in", "你拿 " + esc(w) + " 的货（你欠 " + esc(w) + "）") + '<p class="callout xsum" id="f-xsum">–</p>';
     const x0 = ledgerOf(w) || { net: 0 };
     const tot = (side, now) => r2(rows.filter((r) => r.side === side).reduce((a, r) => a + r.q * ((now ? val(rows.indexOf(r)) : numOrNull(r.l.unit)) || 0), 0));
     function recalc() {
@@ -3150,7 +3170,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       rows.forEach((r, k) => { const u = val(k); if (u != null) xs1[xs.indexOf(r.t)][r.side][r.i].unit = u; });
       const L1 = ledgerFrom(partnerItems(w), xs1, openPOs(w), [])[w], n1 = L1 ? L1.net : 0;
       const ch = (a, b) => money(a) + (a !== b ? " → <b>" + money(b) + "</b>" : "");
-      $("f-xsum").innerHTML = (rows.some((r) => r.side === "out") ? "调出 " + ch(o0, o1) + "<br>" : "") + (rows.some((r) => r.side === "in") ? "调入（往来） " + ch(i0, i1) + "<br>" : "") +
+      $("f-xsum").innerHTML = (rows.some((r) => r.side === "out") ? esc(w) + " 拿你的 " + ch(o0, o1) + "<br>" : "") + (rows.some((r) => r.side === "in") ? "你拿 " + esc(w) + " 的 " + ch(i0, i1) + "<br>" : "") +
         esc(owedTxt(w, x0.net)) + " " + money(Math.abs(x0.net)) + (n1 !== x0.net ? " → <b>" + esc(owedTxt(w, n1)) + " " + money(Math.abs(n1)) + "</b>" : "");
     }
     openSheet(w + " · 改往来单价", html, async () => {
@@ -3488,9 +3508,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const html =
       '<div class="field"><label for="f-date">结账日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
       '<div class="actions"><button type="button" class="btn ghost small" id="f-all">全选</button><button type="button" class="btn ghost small" id="f-none">全不选</button></div>' +
-      (open.length ? '<p class="xs-h">调入 · 随客户订单拿的货</p><div class="picks">' + open.map((g, k) => '<label class="check"><input type="checkbox" id="f-g-' + k + '"' + (on(gWho(g)) ? " checked" : "") + "><span>" + fmtD(g.date) + " · " + esc(gWho(g)) + " · " + esc(qtyText(g.qty)) + " · " + (g.known ? money(g.cost) : "未填拿货价") + (g.pending ? "（预定" + ((g.o.note || "").split(/[（(，,·]/)[0].trim() ? " · " + esc((g.o.note || "").split(/[（(，,·]/)[0].trim()) : "") + "，还没拿货；结账时记成已拿货）" : "") + "</span></label>").join("") + "</div>" : "") +
+      (open.length ? '<p class="xs-h">你拿他的 · 随客户订单拿的货</p><div class="picks">' + open.map((g, k) => '<label class="check"><input type="checkbox" id="f-g-' + k + '"' + (on(gWho(g)) ? " checked" : "") + "><span>" + fmtD(g.date) + " · " + esc(gWho(g)) + " · " + esc(qtyText(g.qty)) + " · " + (g.known ? money(g.cost) : "未填拿货价") + (g.pending ? "（预定" + ((g.o.note || "").split(/[（(，,·]/)[0].trim() ? " · " + esc((g.o.note || "").split(/[（(，,·]/)[0].trim()) : "") + "，还没拿货；结账时记成已拿货）" : "") + "</span></label>").join("") + "</div>" : "") +
       (pos.length ? '<p class="xs-h">订货 · 还没付</p><div class="picks">' + pos.map((x, k) => '<label class="check"><input type="checkbox" id="f-po-' + k + '"' + (on(poWho(x)) ? " checked" : "") + "><span>" + fmtD(x.date) + " · " + esc(poWho(x)) + " · " + esc(poLinesTxt(x)) + " · " + money(poOweAmt(x)) + "</span></label>").join("") + "</div>" : "") +
-      (xs.length ? '<p class="xs-h">往来 · 调入 / 调出 / 换货</p><div class="picks">' + xs.map((t, k) => '<label class="check"><input type="checkbox" id="f-x-' + k + '"' + (on(xWho(t)) ? " checked" : "") + "><span>" + fmtD(t.date) + " · " + esc(xferText(t)) + "</span></label>").join("") + "</div>" : "") +
+      (xs.length ? '<p class="xs-h">往来 · 你拿他的 / 他拿你的 / 换货</p><div class="picks">' + xs.map((t, k) => '<label class="check"><input type="checkbox" id="f-x-' + k + '"' + (on(xWho(t)) ? " checked" : "") + "><span>" + fmtD(t.date) + " · " + esc(xferText(t)) + "</span></label>").join("") + "</div>" : "") +
       '<p class="total" id="f-net">–</p><p class="err" id="f-part" hidden></p>' +
       '<div class="grid2"><div class="field"><label for="f-paid" id="f-paid-l">实际金额 $</label><input id="f-paid" type="number" min="0" step="0.01" inputmode="decimal" placeholder="和上面一样就空着"></div>' +
       '<div class="field"><label for="f-pay">付款方式</label><select id="f-pay"><option value="">未选择</option>' + PAY.map((p) => "<option>" + p + "</option>").join("") + "</select></div></div>" +
@@ -3520,8 +3540,12 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }, () => {
       const upd = () => { const { gs, ts, ps, pick, poSum, off, net } = netOf(), w = whoTxt();
         const tk = r2(ts.reduce((a, t) => a + xLineVal(t.out), 0) - off.outV), gv = r2(ts.reduce((a, t) => a + xLineVal(t.in), 0) + pick - off.inV);
-        const parts = [gv ? "调入 " + money(gv) : "", poSum ? "订货 " + money(poSum) : ""].filter(Boolean).join(" + ");
-        $("f-net").innerHTML = !gs.length && !ts.length && !ps.length ? "没选" : (off.list.length ? "<small>同系列一根抵一根，抵完还要结：</small><br>" + (off.rows.filter((r) => r.side).map((r) => esc(r.sr + " " + serRest(r))).join("<br>") || "无") + "<br>" : "") + (parts || "$0") + (tk ? " − 调出 " + money(tk) : "") + "<br><b>= " + esc(owedTxt(w, net)) + " " + money(Math.abs(net)) + "</b>";
+        const sp = debtSplit(off.rows), mine = r2(gv + poSum), W = esc(w);
+        const side = (label, tot, items) => "<span>" + label + " " + money(tot) + "</span>" + (items.length ? "<br><small>" + items.map(esc).join(" · ") + "</small>" : "") + "<br>";
+        $("f-net").innerHTML = !gs.length && !ts.length && !ps.length ? "没选" :
+          (mine || sp.mine.length ? side("你欠 " + W, mine, sp.mine.map(serLeft).concat(poSum ? ["订货 " + money(poSum)] : [])) : "") +
+          (tk || sp.his.length ? side(W + " 欠你", tk, sp.his.map(serLeft)) : "") +
+          "<b>" + (net > 0 ? "= 你给 " + W + " " + money(net) : net < 0 ? "= " + W + " 给你 " + money(-net) : "= 两清") + "</b>";
         $("f-paid-l").textContent = net < 0 ? "实际收到 $" : "实际付款 $";
         /* 同系列一根抵一根只在「一起结」的里面抵。没勾的里有跟勾了的同系列、反方向的货时，分开结合计会跟余额差出单价差 → 写明差多少 */
         const rG = open.filter((g) => !gs.includes(g)), rX = xs.filter((t) => !ts.includes(t)), rP = pos.filter((x) => !ps.includes(x));
@@ -3551,12 +3575,20 @@ details.restock > summary::-webkit-details-marker { display: none; }
     let net = 0;
     for (const [w, x] of Object.entries(by)) {
       out.push("");
-      if (x.ser.length) out.push("【按系列算 · 同系列一根抵一根】", ...x.ser.map((r) => r.sr + "：" + serIO(r) + " → " + (r.side ? "还要结 " : "") + serRest(r)), ...(x.unk ? ["（有拿货价没填，金额可能偏少）"] : []), "");
-      if (x.po.length) { out.push("【订货 · 还没付】"); for (const q of x.po) { out.push(fmtD(q.date) + "  " + money(q.amt)); for (const l of q.lines) out.push("  " + l.k + " ×" + l.q); } out.push("订货合计 " + money(x.tpo), ""); }
-      out.push([x.tin ? "调入 " + money(x.tin) : "", x.tpo ? "+ 订货 " + money(x.tpo) : "", x.tout ? "− 调出 " + money(x.tout) : ""].filter(Boolean).join(" ").replace(/^\+ /, "") + " = " + owedTxt(w, x.net) + " " + money(Math.abs(x.net)));
-      if (x.inn.length) out.push("", "【明细 · 调入（从" + w + "拿的货）】", ...days(x.inn));
-      if (x.out.length) out.push("", "【明细 · 调出（" + w + "拿走的货）】", ...days(x.out));
-      if (x.pend.length) out.push("", "【预定 · 还没拿，不算进合计】", ...days(x.pend));
+      /* 发给合伙人的：我 = Bowen 这边，你 = 他；一次复制几个人的就写名字 */
+      const sp = debtSplit(x.ser), many = Object.keys(by).length > 1, I = "我", U = many ? w : "你";
+      if (many) out.push("—— " + w + " ——");
+      const mine = r2(x.tin + x.tpo), sub = (r) => "  " + serLeft(r) + (r.m ? "（" + serIO(r, true) + "）" : "");
+      if (sp.mine.length || x.tpo) out.push(I + "欠" + U + " " + money(mine), ...sp.mine.map(sub), ...(x.tpo ? ["  订货（还没付）" + money(x.tpo)] : []));
+      if (sp.his.length) out.push(U + "欠" + I + " " + money(x.tout), ...sp.his.map(sub));
+      if (sp.even.length) out.push("抵平了：" + sp.even.map((r) => r.sr + "（各 " + r.m + " 根）").join("、"));
+      if (x.ser.some((r) => r.m)) out.push("（同一个系列一根抵一根，抵完剩下的照价算）");
+      if (x.unk) out.push("（有拿货价没填，金额可能偏少）");
+      out.push("", x.net > 0 ? "两边一抵：" + I + "给" + U + " " + money(x.net) : x.net < 0 ? "两边一抵：" + U + "给" + I + " " + money(-x.net) : "两边一抵：两清");
+      if (x.po.length) { out.push("", "【订货 · 还没付】"); for (const q of x.po) { out.push(fmtD(q.date) + "  " + money(q.amt)); for (const l of q.lines) out.push("  " + l.k + " ×" + l.q); } }
+      if (x.inn.length) out.push("", "【明细 · " + I + "拿" + U + "的货】", ...days(x.inn));
+      if (x.out.length) out.push("", "【明细 · " + U + "拿" + I + "的货】", ...days(x.out));
+      if (x.pend.length) out.push("", "【预定 · 还没拿，不算进来】", ...days(x.pend));
       net += x.net;
     }
     net = r2(net);
@@ -3576,7 +3608,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     $("t-ali").textContent = L ? oq["Ali"] || 0 : "–";
     $("t-owe").textContent = L ? money(owe) + (unk ? "+" : "") : "–"; $("t-owe").className = "v" + (owe > 0 ? " warn" : "");
     $("t-month").textContent = L ? Object.values(mq).reduce((a, n) => a + n, 0) : "–";
-    $("t-unk").hidden = !unk; $("t-unk").textContent = unk ? "有 " + unk + " 笔拿货没填拿货价，应付金额没算全。点那一笔的「改拿货价」补上。" : "";
+    $("t-unk").hidden = !unk; $("t-unk").textContent = unk ? "有 " + unk + " 笔拿货没填拿货价，你欠的金额没算全。点那一笔的「改拿货价」补上。" : "";
     $("pt-settle").disabled = !open.length || !db; $("pt-copy").disabled = !open.length; $("pt-new").disabled = !db;
     const list = P.filter((g) => ptFilter === "all" || (ptFilter === "open" ? !g.sid : !!g.sid));
     $("pt-list").innerHTML = list.length ? list.map((g) => {

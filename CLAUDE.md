@@ -25,7 +25,7 @@
 - `public/vendor/`：Firebase compat SDK 10.12.2（app/auth/firestore）和 xlsx 0.18.5，从 npm 包复制（去掉 sourceMappingURL）。
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；页面网络优先、3 秒超时用缓存；vendor 缓存优先；字体先用缓存
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-15 线上 fb-app-v22）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-15 线上 fb-app-v22，分支 fix-ledger-words 是 v23）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -121,6 +121,13 @@
 - 当场换货：`xferEff(t)`（一笔往来自己算互抵）= 0 就自动关单（以前要两边钱一样）；往来列表/记录里一笔的金额也用 xferEff
 - 纯计算，不改数据，新旧结构一样。测试 `tests/test_offset.py` 33/33（编的数据，GitHub 上也跑）
 
+## 对账单写「谁欠谁」（fix-ledger-words，2026-11-16）
+- Bowen：「调入/调出」「还要结 N 根」「+/−」看不出是他欠我还是我欠他 → 钱一律写成两组「你欠 X」「X 欠你」，不写正负号
+  - `owedTxt` = 「你欠 X」/「X 欠你」/「跟 X 两清」（财务页、合伙人页、对账单、改单价都用它；以前是 应付/应收）
+  - 对账单：顶上「X 欠你 $30」（橙 = 你欠他，绿 = 他欠你）+ 一行「你欠他 $60 − 他欠你 $90」→ 两组，每组按系列「Ali 1 根 $60」，有互抵的写小字「你拿他 3 根 · 他拿你 2 根 · 抵掉 2 根」；订货算进「你欠」那组；抵平的系列一行灰字 → 订货明细 → 明细（「你拿 X 的货」「X 拿你的货」）
+  - `debtSplit(xOffset rows)`、`serIO(r, me)`、`serLeft(r)`；结账弹窗同样两组 +「= 你给 X $」/「= X 给你 $」
+  - 复制给合伙人的文字是 Bowen 的口吻：「我欠你 / 你欠我 / 两边一抵：你给我 $」；一次复制几个人时写名字
+  - 纯显示，不改数据和算法。测试 test_offset（43）、test_xfer_price
 ## 订货单「点口味 + 粘贴清单」（feat15，2026-11-15）
 - 新建/编辑订货（2026-11-15 去掉了「供货人 / 备注」框和底部长说明，以前的 note 保存时照旧保留）：先「指定口味」：按系列的口味格子（跟快速下单一样，点一下 +1、「−」减一、格子上显示已选根数和现在库存，可搜中英文）→ 下面每行「根数 / 单根成本 $」→「选中的每种都订 N 根」→「整系列每根」成本。「只知道系列，口味到货再分」收进折叠（有系列行时展开）
 - 「粘贴清单」：`public/orderparse.js`（`FBParse.parseOrder(text, items, {series})`，浏览器 + node 都能用，sw.js SHELL 里有）。认出来的按清单根数加进来（已选的改成清单的数），系列是猜的、没写根数、没认出的分别列出来
