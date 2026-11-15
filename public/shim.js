@@ -658,4 +658,36 @@
   window.appSignOut = () => auth.signOut().then(() => location.reload());
 
   if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+
+  /* 有新版：主屏幕 App 在后台能活好几天，不划掉就一直跑旧代码（另一台手机可能还在用修好之前的版本记账）。
+     打开 8 秒后、每次切回前台（5 分钟内不重复查）、开着时每半小时：看一眼线上 sw.js 的 CACHE 版本号，
+     跟这一页自己的（index.html 里的 <meta name="app-version">）不一样，就在标题下显示一行，点一下更新 */
+  (function () {
+    const meta = document.querySelector('meta[name="app-version"]'), mine = meta && meta.content;
+    if (!mine || !window.fetch) return;
+    let last = 0, bar = null;
+    async function check() {
+      if (bar || document.hidden || navigator.onLine === false || Date.now() - last < 5 * 60e3) return;
+      last = Date.now();
+      try {
+        const r = await fetch("sw.js", { cache: "no-store" }); if (!r.ok) return;
+        const m = /CACHE\s*=\s*"([^"]+)"/.exec(await r.text());
+        const host = document.querySelector("header.top");
+        if (!m || m[1] === mine || !host || bar) return;
+        bar = document.createElement("button"); bar.type = "button"; bar.id = "update-bar"; bar.textContent = "有新版 · 点一下更新";
+        bar.style.cssText = "display:block;width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--accent,#2f6b5a);background:var(--accent-soft,#e2efe9);color:var(--accent,#2f6b5a);font:inherit;font-size:.9rem;font-weight:600;text-align:center;cursor:pointer";
+        bar.addEventListener("click", async () => {
+          bar.disabled = true; bar.textContent = "正在更新…";
+          try { await Promise.all(["./", "index.html", "shim.js", "v2.js", "orderparse.js", "firebase-config.js"].map((u) => fetch(u, { cache: "reload" }).catch(() => {}))); } catch (_) {} // 先把新文件拿下来，免得刷新后还是浏览器存的旧文件
+          try { const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) reg.update().catch(() => {}); } catch (_) {}
+          location.reload();
+        });
+        host.insertAdjacentElement("afterend", bar);
+      } catch (_) {} // 没网、读不到：下次再查
+    }
+    window.addEventListener("load", () => setTimeout(check, 8000));
+    document.addEventListener("visibilitychange", check);
+    setInterval(check, 30 * 60e3);
+    window.__fbCheckUpdate = () => { last = 0; return check(); }; // 测试用
+  })();
 })();

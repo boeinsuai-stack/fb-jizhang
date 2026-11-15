@@ -14,6 +14,8 @@ run python3 tests/test_xfer_price.py
 run python3 tests/test_offset.py
 run python3 tests/test_restore.py
 run python3 tests/test_resv_release.py
+run python3 tests/test_update.py
+run python3 tests/test_fifo_gap.py
 run node tests/orderparse_test.js
 run python3 tests/test_po_quick.py
 run python3 tests/test_sheet.py

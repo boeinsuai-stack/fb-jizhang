@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v21"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2089,7 +2089,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
   /* ---------- accounting: income when a sale is settled; cost of goods follows the sticks actually sold ---------- */
   /* average purchase cost per stick from stock batches and deliveries (partner pick-ups are costed per order instead) */
   /* FIFO: every sale takes the oldest sticks still on hand, at the price that batch cost.
-     Worked out in date order, so a batch bought later can never change what an earlier sale cost. */
+     Worked out in date order, so a batch bought later can never change what an earlier sale cost.
+     例外（2026-11-15）：出库那天账上的货不够（补记、撤销让卖出排到了进货前面）→ 不够的那几根先欠着（DEF），
+     下一批到货先补它、按那批的价算；一直没补上的最后才按口味默认成本算。
+     以前当场就按默认成本算，后到的那批永远剩在账上：利润少算一根的成本、库存货值多一根。 */
   function fifoBook(PK) {
     PK = PK || pickIndex();
     const ev = [], tkey = (date, at) => { const t = Date.parse(at || ""); return (date || "") + "|" + (isNaN(t) ? "" : new Date(t).toISOString()); };
@@ -2106,14 +2109,24 @@ details.restock > summary::-webkit-details-marker { display: none; }
       for (const [sku, q] of Object.entries(need)) { const fromStock = q - Math.min(q, picks[sku] || 0); if (fromStock > 0) ev.push({ k: tkey(o.date, o.at), t: 1, sku, q: -fromStock, oid: o.id }); }
     }
     ev.sort((a, b) => (a.k < b.k ? -1 : a.k > b.k ? 1 : a.t - b.t));
-    const L = {}, OC = {}, SH = [], fb = (sku) => numOrNull((itemBy(sku) || {}).cost_aud);
+    const L = {}, OC = {}, SH = [], DEF = {}, recs = [], fb = (sku) => numOrNull((itemBy(sku) || {}).cost_aud);
     const avgOf = (ls) => { const tq = ls.reduce((a, x) => a + x.q, 0); return tq > 0 && ls.every((x) => x.u != null) ? ls.reduce((a, x) => a + x.q * x.u, 0) / tq : null; };
     for (const e of ev) {
       const ls = L[e.sku] || (L[e.sku] = []);
-      if (e.q > 0) { let u = e.unit; if (u == null) { const a = avgOf(ls); u = a != null ? a : fb(e.sku); } ls.push({ q: e.q, u }); continue; }
-      let need = -e.q, cost = 0, known = true;
-      while (need > 1e-9 && ls.length) { const x = ls[0], take = Math.min(need, x.q); if (x.u == null) known = false; else cost += take * x.u; x.q -= take; need -= take; if (x.q <= 1e-9) ls.shift(); }
-      if (need > 1e-9) { const u = fb(e.sku); if (u == null) known = false; else cost += need * u; }
+      if (e.q > 0) {
+        let u = e.unit, q = e.q; if (u == null) { const a = avgOf(ls); u = a != null ? a : fb(e.sku); }
+        const ds = DEF[e.sku] || [];
+        while (q > 1e-9 && ds.length) { const d = ds[0], take = Math.min(d.need, q); if (u == null) d.rec.known = false; else d.rec.cost += take * u; d.need -= take; q -= take; if (d.need <= 1e-9) ds.shift(); }
+        if (q > 1e-9) ls.push({ q, u });
+        continue;
+      }
+      let need = -e.q; const rec = { e, cost: 0, known: true };
+      while (need > 1e-9 && ls.length) { const x = ls[0], take = Math.min(need, x.q); if (x.u == null) rec.known = false; else rec.cost += take * x.u; x.q -= take; need -= take; if (x.q <= 1e-9) ls.shift(); }
+      if (need > 1e-9) (DEF[e.sku] || (DEF[e.sku] = [])).push({ rec, need });
+      recs.push(rec);
+    }
+    for (const [sku, ds] of Object.entries(DEF)) for (const d of ds) { const u = fb(sku); if (u == null) d.rec.known = false; else d.rec.cost += d.need * u; }
+    for (const { e, cost, known } of recs) {
       if (e.oid) (OC[e.oid] || (OC[e.oid] = {}))[e.sku] = { qty: -e.q, cost: r2(cost), known };
       if (e.shrink) SH.push({ m: e.shrink, date: e.shrink.date || "", qty: -e.q, cost: r2(cost) });
     }
