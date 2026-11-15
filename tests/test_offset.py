@@ -106,6 +106,15 @@ with sync_playwright() as p:
         fn = pg.inner_text("#f-net").replace("\n", " ")
         check("结账弹窗：写明抵完还要结什么，= 应收 $30", "抵完还要结" in fn and "Ali 调入 1 根 $60" in fn and "Bar Pro 调出 3 根 $90" in fn and "应收" in fn and "$30" in fn, fn.replace("\n", " / "))
         if SHOT and mode == "新结构": pg.screenshot(path=SHOT + "-结账.png", full_page=False)
+        # 少勾一笔：同系列的货分开结就不互抵了，合计会跟余额差出单价差 → 弹窗要写明差多少（2026-11-15）
+        check("全勾：没有「分开结」的提示", pg.is_hidden("#f-part"))
+        nx = pg.locator("#sheet input[id^='f-x-']").count(); gaps = []
+        for k in range(nx):
+            pg.uncheck(f"#f-x-{k}"); pg.wait_for_timeout(150)
+            if pg.is_visible("#f-part"): gaps.append(pg.inner_text("#f-part"))
+            pg.check(f"#f-x-{k}"); pg.wait_for_timeout(150)
+        check("少勾一笔同系列的往来：写明分开结合计差多少钱", len(gaps) >= 1 and all(("多付 $" in g or "少付 $" in g) and "一起结" in g for g in gaps), str(gaps))
+        check("勾回来：提示消失，金额还是应收 $30", pg.is_hidden("#f-part") and "$30" in pg.inner_text("#f-net"))
         pg.click("#sheet-save"); pg.wait_for_timeout(1200)
         st = pg.evaluate("window.__GM.S.settles.map((x) => x.amount)")
         check("结账记的金额 = −30（他付我 30）", st == [-30], str(st))

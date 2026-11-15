@@ -3468,13 +3468,13 @@ details.restock > summary::-webkit-details-marker { display: none; }
       (open.length ? '<p class="xs-h">调入 · 随客户订单拿的货</p><div class="picks">' + open.map((g, k) => '<label class="check"><input type="checkbox" id="f-g-' + k + '"' + (on(gWho(g)) ? " checked" : "") + "><span>" + fmtD(g.date) + " · " + esc(gWho(g)) + " · " + esc(qtyText(g.qty)) + " · " + (g.known ? money(g.cost) : "未填拿货价") + (g.pending ? "（预定" + ((g.o.note || "").split(/[（(，,·]/)[0].trim() ? " · " + esc((g.o.note || "").split(/[（(，,·]/)[0].trim()) : "") + "，还没拿货；结账时记成已拿货）" : "") + "</span></label>").join("") + "</div>" : "") +
       (pos.length ? '<p class="xs-h">订货 · 还没付</p><div class="picks">' + pos.map((x, k) => '<label class="check"><input type="checkbox" id="f-po-' + k + '"' + (on(poWho(x)) ? " checked" : "") + "><span>" + fmtD(x.date) + " · " + esc(poWho(x)) + " · " + esc(poLinesTxt(x)) + " · " + money(poOweAmt(x)) + "</span></label>").join("") + "</div>" : "") +
       (xs.length ? '<p class="xs-h">往来 · 调入 / 调出 / 换货</p><div class="picks">' + xs.map((t, k) => '<label class="check"><input type="checkbox" id="f-x-' + k + '"' + (on(xWho(t)) ? " checked" : "") + "><span>" + fmtD(t.date) + " · " + esc(xferText(t)) + "</span></label>").join("") + "</div>" : "") +
-      '<p class="total" id="f-net">–</p>' +
+      '<p class="total" id="f-net">–</p><p class="err" id="f-part" hidden></p>' +
       '<div class="grid2"><div class="field"><label for="f-paid" id="f-paid-l">实际金额 $</label><input id="f-paid" type="number" min="0" step="0.01" inputmode="decimal" placeholder="和上面一样就空着"></div>' +
       '<div class="field"><label for="f-pay">付款方式</label><select id="f-pay"><option value="">未选择</option>' + PAY.map((p) => "<option>" + p + "</option>").join("") + "</select></div></div>" +
       '<div class="field"><label for="f-note">备注</label><input id="f-note"></div>' +
       '<p class="hint">结账只是标记这些账已经两边算清，不会再记一次成本（拿货时已经记过）。</p>';
     const selG = () => open.filter((g, k) => $("f-g-" + k).checked), selX = () => xs.filter((t, k) => $("f-x-" + k).checked), selP = () => pos.filter((x, k) => $("f-po-" + k).checked);
-    const netOf = () => { const gs = selG(), ts = selX(), ps = selP(); const pick = r2(gs.reduce((a, g) => a + g.cost, 0)), poSum = r2(ps.reduce((a, x) => a + poOweAmt(x), 0)), owe = r2(pick + poSum), recv = r2(ts.reduce((a, t) => a + xferNet(t), 0)), off = xOffset(gs, ts); return { gs, ts, ps, pick, poSum, owe, recv, off, net: r2(owe - recv - off.inV + off.outV) }; };
+    const netOf = (gs0, ts0, ps0) => { const gs = gs0 || selG(), ts = ts0 || selX(), ps = ps0 || selP(); const pick = r2(gs.reduce((a, g) => a + g.cost, 0)), poSum = r2(ps.reduce((a, x) => a + poOweAmt(x), 0)), owe = r2(pick + poSum), recv = r2(ts.reduce((a, t) => a + xferNet(t), 0)), off = xOffset(gs, ts); return { gs, ts, ps, pick, poSum, owe, recv, off, net: r2(owe - recv - off.inV + off.outV) }; };
     const whoTxt = () => { const { gs, ts, ps } = netOf(); const ws = [...new Set(gs.map(gWho).concat(ts.map(xWho)).concat(ps.map(poWho)))]; return ws.length === 1 ? ws[0] : "合伙人"; };
     openSheet(who ? "跟" + who + "结账" : "跟合伙人结账", html, async () => {
       needDb();
@@ -3499,7 +3499,12 @@ details.restock > summary::-webkit-details-marker { display: none; }
         const tk = r2(ts.reduce((a, t) => a + xLineVal(t.out), 0) - off.outV), gv = r2(ts.reduce((a, t) => a + xLineVal(t.in), 0) + pick - off.inV);
         const parts = [gv ? "调入 " + money(gv) : "", poSum ? "订货 " + money(poSum) : ""].filter(Boolean).join(" + ");
         $("f-net").innerHTML = !gs.length && !ts.length && !ps.length ? "没选" : (off.list.length ? "<small>同系列一根抵一根，抵完还要结：</small><br>" + (off.rows.filter((r) => r.side).map((r) => esc(r.sr + " " + serRest(r))).join("<br>") || "无") + "<br>" : "") + (parts || "$0") + (tk ? " − 调出 " + money(tk) : "") + "<br><b>= " + esc(owedTxt(w, net)) + " " + money(Math.abs(net)) + "</b>";
-        $("f-paid-l").textContent = net < 0 ? "实际收到 $" : "实际付款 $"; };
+        $("f-paid-l").textContent = net < 0 ? "实际收到 $" : "实际付款 $";
+        /* 同系列一根抵一根只在「一起结」的里面抵。没勾的里有跟勾了的同系列、反方向的货时，分开结合计会跟余额差出单价差 → 写明差多少 */
+        const rG = open.filter((g) => !gs.includes(g)), rX = xs.filter((t) => !ts.includes(t)), rP = pos.filter((x) => !ps.includes(x));
+        const some = gs.length || ts.length || ps.length, gap = some && (rG.length || rX.length) ? r2(net + netOf(rG, rX, rP).net - netOf(open, xs, pos).net) : 0;
+        $("f-part").hidden = Math.abs(gap) < 0.01;
+        if (Math.abs(gap) >= 0.01) $("f-part").textContent = "没勾的里有同系列的货，一起结才一根抵一根。分开结，合计会" + (gap > 0 ? "多付 " : "少付 ") + money(Math.abs(gap)) + "。"; };
       $("f-all").addEventListener("click", () => { open.forEach((g, k) => { $("f-g-" + k).checked = true; }); xs.forEach((t, k) => { $("f-x-" + k).checked = true; }); pos.forEach((x, k) => { $("f-po-" + k).checked = true; }); upd(); });
       $("f-none").addEventListener("click", () => { open.forEach((g, k) => { $("f-g-" + k).checked = false; }); xs.forEach((t, k) => { $("f-x-" + k).checked = false; }); pos.forEach((x, k) => { $("f-po-" + k).checked = false; }); upd(); });
       sheetOn("change", upd); upd();
