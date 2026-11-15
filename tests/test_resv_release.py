@@ -129,6 +129,10 @@ with sync_playwright() as p:
         check("用的是" + mode, pg.evaluate("!!window.__fbV2store") == (mode == "新结构"))
         oid = reserve(pg, "Grape Ice", 2, A)
         check("预定还没拿：不算应付", net(pg, A) == 0 and stock(pg, "XF-02") == 0)
+        go(pg, "partner")
+        row = pg.inner_text(f'#ptx-bal [data-lg-open="{A}"]') if pg.locator(f'#ptx-bal [data-lg-open="{A}"]').count() else ""
+        check("合伙人页也列出甲（余额 0，但有 1 笔预定还没拿），能从这里进对账单", "两清" in row and "1 笔预定还没拿" in row, row)
+        pg.click(f'#ptx-bal [data-lg-open="{A}"]'); pg.wait_for_selector(f'#sheet [data-lg="picked"][data-id="{oid}"]'); pg.click("#sheet-close"); pg.wait_for_timeout(250)
         picked(pg, A, oid)
         check("点「已拿到」：应付甲 60，库存 2", net(pg, A) == 60 and stock(pg, "XF-02") == 2, (net(pg, A), stock(pg, "XF-02")))
         edit_resv(pg, oid, lambda g: g.fill("#f-qty-0", "1"))

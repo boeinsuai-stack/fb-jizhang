@@ -3813,8 +3813,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
   function renderPartnerPage() {
     const D = derive(), RV = reservedQty(), st = (i) => Math.max(0, D.st[i.sku] || 0) - (RV[i.sku] || 0), take = ptDir === "take";
     /* who owes whom, only where it isn't settled */
-    const rows = S.loaded ? partnerNames().map((w) => [w, ptBal(w)]).filter((x) => Math.abs(x[1]) >= 0.01) : [];
-    $("ptx-bal").innerHTML = !S.loaded ? "" : rows.length ? rows.map(([w, b]) => '<div class="ptx-b"><button class="owe-line" type="button" data-lg-open="' + esc(w) + '"><span>' + esc(owedTxt(w, -b)) + " <b>" + money(Math.abs(b)) + "</b>" + '</span><span class="pt-more">看账 ›</span></button><button class="btn small" type="button" data-ptx-settle="' + esc(w) + '">结账</button></div>').join("") : '<div class="ptx-b"><span>跟合伙人都两清了。</span></div>';
+    /* 余额是 0 但有预定还没拿的人也列出来（不然「已拿到」只能从财务页进），写法跟财务页应付行一样 */
+    const rows = S.loaded ? partnerNames().map((w) => [w, ptBal(w), pendingPicks(w).length]).filter((x) => Math.abs(x[1]) >= 0.01 || x[2]) : [];
+    $("ptx-bal").innerHTML = !S.loaded ? "" : rows.length ? rows.map(([w, b, pn]) => '<div class="ptx-b"><button class="owe-line" type="button" data-lg-open="' + esc(w) + '"><span>' + esc(owedTxt(w, -b)) + (Math.abs(b) >= 0.01 ? " <b>" + money(Math.abs(b)) + "</b>" : "") + (pn ? ' <small class="pend-n">· ' + pn + " 笔预定还没拿</small>" : "") + '</span><span class="pt-more">看账 ›</span></button><button class="btn small" type="button" data-ptx-settle="' + esc(w) + '">结账</button></div>').join("") : '<div class="ptx-b"><span>跟合伙人都两清了。</span></div>';
     $("ptx-dir").querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.pd === ptDir)));
     $("ptx-sec").classList.toggle("give", !take);
     $("ptx-h").textContent = take ? "点他拿走的口味" : "点你拿的口味";
