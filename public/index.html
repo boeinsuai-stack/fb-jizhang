@@ -379,22 +379,16 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 .toast { bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important; }
 .daylist { display: grid; gap: 12px; }
 /* 每周（2026-11-16 Bowen：财务要能看每一周，不只是本周）：一周一行，点一下 = 上面的数字换成那一周 */
-/* 每周（2026-11-17 Bowen：要能左右滑、像指针条、有震动反馈；往下一划就是这一周每天的明细）：
-   一周一根柱子（高低 = 净赚），左右滑，正中间小三角指着的那一周 = 上面和「每天」显示的那一周 */
-.wkpick { position: relative; margin-top: -4px; }
-.wkpick::before { content: ""; position: absolute; left: 50%; top: 0; transform: translateX(-50%); border: 7px solid transparent; border-top-color: var(--accent); border-bottom: 0; z-index: 1; }
-.wkstrip { display: flex; gap: 4px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 14px calc(50% - 32px) 2px; scrollbar-width: none; overscroll-behavior-x: contain;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); }
-.wkstrip::-webkit-scrollbar { display: none; }
-.wkcol { flex: 0 0 64px; scroll-snap-align: center; display: grid; grid-template-rows: 18px 58px 20px; justify-items: center; align-items: end; gap: 4px; padding: 0; border: 0; background: none; font: inherit; color: var(--muted); cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.wkcol .amt { font-size: .74rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.wkcol .bar { width: 26px; min-height: 3px; border-radius: 6px 6px 2px 2px; background: var(--line); transition: background-color .15s ease; }
-.wkcol .bar.neg { background: var(--bad-soft, #f6d9d6); }
-.wkcol .lab { font-size: .76rem; white-space: nowrap; font-variant-numeric: tabular-nums; align-self: start; }
-.wkcol.on { color: var(--fg); }
-.wkcol.on .bar { background: var(--accent); }
-.wkcol.on .amt { color: var(--accent); font-weight: 700; }
-.wkcol.on .lab { font-weight: 700; }
+/* 每周（2026-11-17 Bowen：一点开就看到本周总数、往下就是每天每一单，不要多出来的条）：
+   不加新的一行。在净赚那一块里：左右滑这一块 = 换一周（震一下），右上角 ‹ › 也能点 */
+.hero-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wkarr { display: flex; gap: 6px; }
+.wkarr button { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font-size: 1.15rem; line-height: 1; cursor: pointer; }
+.wkarr button[disabled] { opacity: .3; cursor: default; }
+.hero.wk-l { animation: wkL .22s ease; } .hero.wk-r { animation: wkR .22s ease; }
+@keyframes wkL { from { transform: translateX(24px); opacity: .4; } to { transform: none; opacity: 1; } }
+@keyframes wkR { from { transform: translateX(-24px); opacity: .4; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .hero.wk-l, .hero.wk-r { animation: none; } }
 .day { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; min-width: 0; }
 .day-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 16px; background: var(--hover); border-bottom: 1px solid var(--line); }
 .day-head > div:first-child { display: grid; gap: 2px; min-width: 0; }
@@ -457,11 +451,13 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 .owe > div { display: grid; gap: 6px; min-width: 0; }
 .owe > div > div { display: grid; gap: 1px; }
 .owe .pt-blk + .pt-blk { border-top: 1px dashed var(--warn); padding-top: 8px; }
-#f-owe { display: block; padding: 4px 14px; }
+#f-owe { display: flex; flex-wrap: wrap; gap: 0 18px; padding: 2px 14px; } /* 一行写完（2026-11-17：以前两行，挡住下面每天的明细） */
+#f-owe .owe-line { flex: 0 1 auto; width: auto; justify-content: flex-start; padding: 8px 0; }
+#f-owe .owe-line b { font-size: 1.1rem; }
 .pt-list { display: grid; }
 .owe-line { all: unset; box-sizing: border-box; flex: 1; min-width: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; width: 100%; padding: 10px 0; cursor: pointer; }
 .owe-line:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
-#f-owe .owe-line + .owe-line { border-top: 1px dashed var(--warn); }
+
 .owe-line b { font-family: var(--font-display); font-size: 1.3rem; }
 .ptx-b .owe-line { padding: 0; }
 .lg-sum { margin: 0; font-size: 1rem; } .lg-sum b { font-family: var(--font-display); font-size: 1.7rem; margin-left: 4px; }
@@ -931,10 +927,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <button class="chip" type="button" data-p="year" aria-pressed="false">今年</button>
       <button class="chip" type="button" data-p="all" aria-pressed="false">全部</button>
     </div>
-    <div class="wkpick" id="f-wkpick" hidden><div class="wkstrip" id="f-wkstrip" role="listbox" aria-label="左右滑选一周"></div></div>
     <div class="callout pe-hint" id="f-empty" hidden></div>
-    <div class="hero" aria-label="财务概览">
-      <div class="hero-main"><span class="k" id="f-hero-k">本月净赚</span><span class="v" id="f-profit">–</span></div>
+    <div class="hero" id="f-hero" aria-label="财务概览">
+      <div class="hero-main"><div class="hero-top"><span class="k" id="f-hero-k">本月净赚</span><span class="wkarr" id="f-wkarr" hidden><button type="button" data-wk="-1" aria-label="上一周">‹</button><button type="button" data-wk="1" aria-label="下一周">›</button></span></div><span class="v" id="f-profit">–</span></div>
       <div class="hero-row">
         <div><span class="k">收入（含配送费）</span><b id="f-inc">–</b></div>
         <div><span class="k">成本</span><b id="f-exp">–</b></div>
@@ -2343,37 +2338,17 @@ details.restock > summary::-webkit-details-marker { display: none; }
       lab.click();
     } catch (_) {}
   }; })();
-  const kMoney = (v) => { const a = Math.abs(v), t = a >= 1000 ? "$" + (Math.round(a / 100) / 10) + "k" : money(a); return v < 0 ? "−" + t : t; };
-  let wkSig = "", wkHot = "", wkBusy = false, wkProg = false, wkT = null;
-  function wkCenter(b, smooth) {
-    const strip = $("f-wkstrip"); if (!b || !strip.clientWidth) return;
-    wkProg = !smooth;
-    strip.scrollTo({ left: b.offsetLeft + b.offsetWidth / 2 - strip.clientWidth / 2, behavior: smooth ? "smooth" : "auto" });
-    if (!smooth) setTimeout(() => { wkProg = false; }, 60);
-  }
-  function wkMark(mon) { wkHot = mon; $("f-wkstrip").querySelectorAll(".wkcol").forEach((b) => { const on = b.dataset.mon === mon; b.classList.toggle("on", on); b.setAttribute("aria-selected", String(on)); }); }
   function renderWeeks() {
-    const box = $("f-wkpick"), strip = $("f-wkstrip"), thisMon = monOf(today()), mon = curMon();
-    box.hidden = !isWeekP() || !S.loaded;
-    if (box.hidden) return;
-    const FA = finBook(() => true), W = {};
-    for (const d of FA.list) {
-      if (!d.date) continue;
-      const k = monOf(d.date), w = (W[k] = W[k] || { mon: k, n: 0, qty: 0, net: 0 });
-      w.n += d.n; w.qty += d.qty; w.net += d.net;
-    }
-    const first = Object.keys(W).sort()[0] || thisMon, weeks = [];
-    for (let m = first < mon ? first : mon; m <= thisMon; m = addDays(m, 7)) weeks.push(W[m] || { mon: m, n: 0, qty: 0, net: 0 }); // 旧的在左、本周在最右
-    const max = Math.max(1, ...weeks.map((w) => Math.abs(w.net)));
-    const sig = JSON.stringify(weeks.map((w) => [w.mon, r2(w.net), w.n, w.mon === thisMon]));
-    if (sig !== wkSig) {
-      wkSig = sig;
-      strip.innerHTML = weeks.map((w) => '<button class="wkcol" type="button" role="option" data-mon="' + w.mon + '" aria-label="' + wkRange(w.mon) + " 净赚 " + money(r2(w.net)) + "，" + w.n + ' 单">' +
-        '<span class="amt">' + (w.n || w.net ? kMoney(r2(w.net)) : "–") + '</span><span class="bar' + (w.net < 0 ? " neg" : "") + '" style="height:' + Math.max(3, Math.round((Math.abs(w.net) / max) * 58)) + 'px"></span>' +
-        '<span class="lab">' + (w.mon === thisMon ? "本周" : (+w.mon.slice(5, 7)) + "/" + (+w.mon.slice(8))) + "</span></button>").join("");
-    }
-    wkMark(mon);
-    if (!wkBusy) requestAnimationFrame(() => wkCenter(strip.querySelector(".wkcol.on"), false)); // 财务页刚显示出来时宽度才有，等一帧
+    const arr = $("f-wkarr"); arr.hidden = !isWeekP();
+    if (!arr.hidden) arr.querySelector('[data-wk="1"]').disabled = curMon() >= monOf(today());
+  }
+  function stepWeek(dir) {
+    const m = addDays(curMon(), 7 * dir);
+    if (m > monOf(today())) return false;
+    period = m >= monOf(today()) ? "week" : "w:" + m; try { localStorage.setItem("mk-period", "week"); } catch (_) {}
+    renderFinance(); haptic();
+    const h = $("f-hero"); h.classList.remove("wk-l", "wk-r"); void h.offsetWidth; h.classList.add(dir > 0 ? "wk-l" : "wk-r");
+    return true;
   }
   function renderFinance() {
     ["period", "period2"].forEach((id) => $(id).querySelectorAll(".chip").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.p === period || (x.dataset.p === "week" && isWeekP())))));
@@ -2622,23 +2597,15 @@ details.restock > summary::-webkit-details-marker { display: none; }
   $("period").addEventListener("click", pickPeriod);
   $("period2").addEventListener("click", pickPeriod);
   $("f-empty").addEventListener("click", pickPeriod);
-  /* 左右滑：每滑过一周轻震一下；停下来以后，正中间那一周就是选中的 */
-  $("f-wkstrip").addEventListener("scroll", () => {
-    const strip = $("f-wkstrip"), c = strip.scrollLeft + strip.clientWidth / 2;
-    let best = null, bd = Infinity;
-    for (const b of strip.children) { const d = Math.abs(b.offsetLeft + b.offsetWidth / 2 - c); if (d < bd) { bd = d; best = b; } }
-    if (!best) return;
-    if (best.dataset.mon !== wkHot) { wkMark(best.dataset.mon); if (!wkProg) haptic(); }
-    if (wkProg) return;
-    wkBusy = true; clearTimeout(wkT);
-    wkT = setTimeout(() => {
-      wkBusy = false;
-      const m = wkHot; if (!m || m === curMon()) return;
-      period = m >= monOf(today()) ? "week" : "w:" + m; try { localStorage.setItem("mk-period", "week"); } catch (_) {}
-      renderFinance();
-    }, 160);
-  }, { passive: true });
-  $("f-wkstrip").addEventListener("click", (e) => { const b = e.target.closest(".wkcol"); if (b) wkCenter(b, true); });
+  /* 换一周：点 ‹ ›；或者在净赚那一块上左右滑（往左滑 = 下一周，往右滑 = 上一周，跟翻页一样）。只有选「本周」时才有 */
+  $("f-wkarr").addEventListener("click", (e) => { const b = e.target.closest("[data-wk]"); if (b && !b.disabled) stepWeek(Number(b.dataset.wk)); });
+  { let x0 = null, y0 = 0;
+    $("f-hero").addEventListener("touchstart", (e) => { if (!isWeekP() || e.touches.length !== 1) { x0 = null; return; } x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+    $("f-hero").addEventListener("touchend", (e) => {
+      if (x0 == null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) stepWeek(dx < 0 ? 1 : -1);
+    }, { passive: true });
+  }
   $("fin-sale").addEventListener("click", () => saleForm(""));
   $("fin-exp").addEventListener("click", () => expenseForm(null));
   $("fin-xfer").addEventListener("click", () => xferForm(""));

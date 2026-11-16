@@ -178,13 +178,14 @@
 
 ## 财务「每周」（feat-weeks，2026-11-17）
 - Bowen：财务要能看每一周，不只是本周。period 多了 `"w:<周一日期>"`（以前的某一周），`"week"` 仍是本周；`inPeriod`、`plabel()`（标题文字，以前是 PERIOD_LABEL[period]）都认它
-- 第一版是竖着的一周一行列表，Bowen 不要：挡住了下面每天的明细。现在是**左右滑的柱子条**（`#f-wkpick` / `#f-wkstrip`，只在「本周」时显示，在时间范围下面）：
-  一周一根柱子（高低 = 净赚，上面写 $3.5k 这样的数，下面写周一日期 / 「本周」），旧的在左、本周在最右，scroll-snap 居中；正中间小三角指着的那一周 = 选中的
-  - 滑动时每过一周 `haptic()`：安卓 `navigator.vibrate(8)`；iPhone 没有 vibrate，点一个隐藏的 `<input type=checkbox switch>`（iOS 18 Safari 会轻震；滑动中是否算用户操作没在真机上验过）
-  - 停下 160ms 后才换 period、重算（滑的过程中只换高亮）；点一根柱子 = 平滑滑到它；程序自己居中时（`wkProg`）不震、不触发选择
-  - 数字 = `finBook(() => true)` 的每天按周一归组相加，跟选那一周时上面显示的、跟「全部」加起来都对得上。周一到周日、按手机所在时区
+- 试过两版 Bowen 都不要：竖着的一周一行列表、左右滑的柱子条——都在净赚和「每天」之间多出一大块。他要的是：一点开就是本周总数，往下一划就是每天每一单
+- 现在**不加新的一行**：选「本周」时，净赚那一块（`#f-hero`）右上角 ‹ ›（`#f-wkarr`，本周时 › 灰着）；在这一块上左右滑也能换（往左滑 = 下一周，跟翻页一样；横向 >50px 且比竖向大 1.5 倍才算）
+  - `stepWeek(dir)`：换 period、重算、`haptic()`、这一块轻轻滑进来（prefers-reduced-motion 时不动）
+  - `haptic()`：安卓 `navigator.vibrate(8)`；iPhone 没有 vibrate，点一个隐藏的 `<input type=checkbox switch>`（iOS 18 Safari 会轻震；没在真机上验过）
+  - 欠合伙人的那一块（`#f-owe`）改成一行写完（以前两行，Bowen 说挡住了每天的明细）
+  - 数字就是 `finBook(inPeriod)`，跟别的时间范围一个算法
 - localStorage `mk-period` 只记 week/month/…，选了以前某一周下次打开回到本周
-- 测试 `tests/test_weeks.py` 22/22（编的数据，旧/新结构，GitHub 上也跑；用 scrollBy 模拟滑动，stub navigator.vibrate 数震了几下）
+- 测试 `tests/test_weeks.py` 26/26（编的数据，旧/新结构，GitHub 上也跑；has_touch + 合成 TouchEvent 模拟滑动，stub navigator.vibrate 数震了几下——stub 的 evaluate 字符串末尾要加 `; 0`，不然 Playwright 会把那个函数执行一次）
 - 同时给 Bowen 看过三个苹果风格预览（iOS 原生 / 玻璃 / Bento），他说都不如现在清楚，不用。他要「清晰且好看」：在现在这版上改，保留框线、粗数字和对比度
 
 ## 已知问题
