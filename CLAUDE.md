@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-16 线上 fb-app-v25）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-16 线上 fb-app-v25，分支 feat-weeks 是 v26）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -175,6 +175,15 @@
 - 顺手：预定后的提示、「只是预定」那行字缩短；shim 没有本地数据库又没网时 20 秒后把空结果交出去（以前会一直「正在读取」）
 - 查过没问题、所以没动的：①「常用」格子按库存多少排：用 11-03 以来 150 次点选回放，改成按卖得多少排并不更好（平均第 9.7 格 vs 10.4 格）②点口味、切页面的反应时间（电脑慢 4 倍模拟：点口味 52 ms、切页 ~110 ms）③320/375/390 宽度没有横向溢出 ④真实数据独立重算 1720 项一致、守恒成立 ⑤两个人改同一条记录：266 条里只有 1 条
 - 测试 `tests/test_rank.py` 38/38（编的数据，旧/新结构，GitHub 上也跑）
+
+## 财务「每周」（feat-weeks，2026-11-17）
+- Bowen：财务要能看每一周，不只是本周。period 多了 `"w:<周一日期>"`（以前的某一周），`"week"` 仍是本周；`inPeriod`、`plabel()`（标题文字，以前是 PERIOD_LABEL[period]）都认它
+- 选了本周或以前的某一周时，时间范围下面多一行「‹ 上一周 · 11月2日–8日 · 下一周 ›」（`#f-wknav`），本周不能再往后
+- 「每周」一节（`#f-weeks`，在合伙人欠款和「每天」之间）：从本周往回排到有账的第一周，一周一行：几单 · 几根、净赚、收入、一条按净赚长短的条；最近 8 周，多的折叠；点一行 = 上面换成那一周并滑回顶上
+  数字 = `finBook(() => true)` 的每天按周一归组相加，跟选那一周时上面显示的、跟「全部」加起来都对得上（test_weeks 查）。周一到周日、按手机所在时区
+- localStorage `mk-period` 只记 week/month/…，选了以前某一周下次打开回到本周
+- 测试 `tests/test_weeks.py` 24/24（编的数据，旧/新结构，GitHub 上也跑）
+- 同时给 Bowen 看了三个苹果风格的预览（只是截图，没进代码）：iOS 原生 / 玻璃 / Bento，样式文件在仓库外 /home/claude/style/
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超

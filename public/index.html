@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v25"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v26"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -378,6 +378,23 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 .cartbar { bottom: calc(62px + env(safe-area-inset-bottom, 0px)) !important; padding-bottom: 10px !important; }
 .toast { bottom: calc(78px + env(safe-area-inset-bottom, 0px)) !important; }
 .daylist { display: grid; gap: 12px; }
+/* 每周（2026-11-16 Bowen：财务要能看每一周，不只是本周）：一周一行，点一下 = 上面的数字换成那一周 */
+.wknav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: -6px; }
+.wknav b { font-variant-numeric: tabular-nums; }
+.wknav .btn[disabled] { visibility: hidden; }
+.wklist { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.wkrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; width: 100%; padding: 11px 14px; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.wkrow:first-child { border-top: 0; }
+.wkrow[aria-current="true"] { background: var(--accent-soft); }
+.wkrow .wk-d { font-weight: 700; font-variant-numeric: tabular-nums; }
+.wkrow .wk-sub { grid-column: 1; color: var(--muted); font-size: .84rem; }
+.wkrow .wk-net { grid-row: 1 / span 2; grid-column: 2; display: grid; justify-items: end; align-content: center; gap: 1px; }
+.wkrow .wk-net b { font-family: var(--font-display); font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.wkrow .wk-net b.neg { color: var(--danger, #b3261e); }
+.wkrow .wk-net small { color: var(--muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
+.wkrow .wk-bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; margin-top: 6px; }
+.wkrow .wk-bar i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+.wkmore { padding: 10px 14px; border-top: 1px solid var(--line); text-align: center; }
 .day { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; min-width: 0; }
 .day-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 16px; background: var(--hover); border-bottom: 1px solid var(--line); }
 .day-head > div:first-child { display: grid; gap: 2px; min-width: 0; }
@@ -914,6 +931,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <button class="chip" type="button" data-p="year" aria-pressed="false">今年</button>
       <button class="chip" type="button" data-p="all" aria-pressed="false">全部</button>
     </div>
+    <div class="wknav" id="f-wknav" hidden></div>
     <div class="callout pe-hint" id="f-empty" hidden></div>
     <div class="hero" aria-label="财务概览">
       <div class="hero-main"><span class="k" id="f-hero-k">本月净赚</span><span class="v" id="f-profit">–</span></div>
@@ -933,6 +951,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <button class="btn ghost" id="fin-xfer" type="button" hidden>合伙人往来</button>
     </div>
     <div class="owe" id="f-owe" hidden></div>
+    <section id="f-weeks-sec" hidden>
+      <h2>每周（点一周看那一周的账）</h2>
+      <div class="wklist" id="f-weeks"></div>
+    </section>
     <section>
       <h2>每天（点开看每一单）</h2>
       <input id="f-oq" type="search" placeholder="搜订单：客户、口味、日期（如 11/3）" aria-label="搜订单" style="margin-bottom:10px">
@@ -1050,6 +1072,13 @@ details.restock > summary::-webkit-details-marker { display: none; }
   let movesN = 10;
   let view = "inventory", query = "", invFilter = "all", period = "month", openSku = null;
   try { const pp = localStorage.getItem("mk-period"); if (["week", "month", "last", "year", "all"].includes(pp)) period = pp; } catch (_) {}
+  /* 周：一周从周一到周日。period = "week"（本周）或 "w:2026-11-03"（那一周的周一） */
+  const monOf = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ""); if (!m) return ""; const d = new Date(+m[1], +m[2] - 1, +m[3]); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return ymd(d); };
+  const addDays = (s, n) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s); const d = new Date(+m[1], +m[2] - 1, +m[3] + n); return ymd(d); };
+  const wkRange = (mon) => { const sun = addDays(mon, 6); return fmtD(mon) + "–" + (sun.slice(5, 7) === mon.slice(5, 7) ? (+sun.slice(8)) + "日" : fmtD(sun)); };
+  const isWeekP = () => period === "week" || period.startsWith("w:");
+  const curMon = () => (period.startsWith("w:") ? period.slice(2) : monOf(today()));
+  const plabel = () => (period.startsWith("w:") ? wkRange(period.slice(2)) : PERIOD_LABEL[period]);
 
   /* ---------- derived data ---------- */
   function derive() {
@@ -2176,6 +2205,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const now = new Date(), ym = now.getFullYear() + "-" + pad(now.getMonth() + 1);
     if (period === "month") return date.startsWith(ym);
     if (period === "week") { const m = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7)); return date >= m.getFullYear() + "-" + pad(m.getMonth() + 1) + "-" + pad(m.getDate()) && date <= today(); }
+    if (period.startsWith("w:")) { const mon = period.slice(2); return date >= mon && date <= addDays(mon, 6); }
     if (period === "last") { const d = new Date(now.getFullYear(), now.getMonth() - 1, 1); return date.startsWith(d.getFullYear() + "-" + pad(d.getMonth() + 1)); }
     if (period === "year") return date.startsWith(String(now.getFullYear()));
     return true;
@@ -2308,16 +2338,43 @@ details.restock > summary::-webkit-details-marker { display: none; }
   const ptOpen = new Set();
   const PERIOD_LABEL = { week: "本周", month: "本月", last: "上月", year: "今年", all: "全部" };
   const mc = (v) => (v ? money(v) : "–");
+  let wkAll = false;
+  function renderWeeks() {
+    const nav = $("f-wknav"), L = S.loaded, thisMon = monOf(today()), mon = curMon();
+    nav.hidden = !isWeekP();
+    if (isWeekP()) nav.innerHTML = '<button class="btn small ghost" type="button" data-wk="-1">‹ 上一周</button><b>' + (mon === thisMon ? "本周 · " : "") + wkRange(mon) + "</b>" +
+      '<button class="btn small ghost" type="button" data-wk="1"' + (mon >= thisMon ? " disabled" : "") + ">下一周 ›</button>";
+    if (!L) { $("f-weeks-sec").hidden = true; return; }
+    const FA = finBook(() => true), W = {};
+    for (const d of FA.list) {
+      if (!d.date) continue;
+      const k = monOf(d.date), w = (W[k] = W[k] || { mon: k, n: 0, qty: 0, rev: 0, net: 0, flag: 0 });
+      w.n += d.n; w.qty += d.qty; w.rev += d.rev; w.net += d.net; w.flag += d.miss + d.unk;
+    }
+    const first = Object.keys(W).sort()[0];
+    $("f-weeks-sec").hidden = !first;
+    if (!first) return;
+    const weeks = []; for (let m = thisMon; m >= first; m = addDays(m, -7)) weeks.push(W[m] || { mon: m, n: 0, qty: 0, rev: 0, net: 0, flag: 0 });
+    const TOP = 8, show = wkAll ? weeks : weeks.slice(0, TOP), max = Math.max(1, ...weeks.map((w) => Math.abs(w.net)));
+    $("f-weeks").innerHTML = show.map((w) => {
+      const on = isWeekP() && w.mon === mon;
+      return '<button class="wkrow" type="button" data-p="' + (w.mon === thisMon ? "week" : "w:" + w.mon) + '" aria-current="' + on + '"><span class="wk-d">' + (w.mon === thisMon ? "本周 · " : "") + wkRange(w.mon) + "</span>" +
+        '<span class="wk-net"><b' + (w.net < 0 ? ' class="neg"' : "") + ">" + money(r2(w.net)) + "</b><small>收入 " + money(r2(w.rev)) + "</small></span>" +
+        '<span class="wk-sub">' + (w.n ? w.n + " 单 · " + w.qty + " 根" : "没卖") + (w.flag ? ' · <span class="pill warn">' + w.flag + " 单没填卖价</span>" : "") + "</span>" +
+        '<span class="wk-bar" aria-hidden="true"><i style="width:' + Math.round((Math.max(0, w.net) / max) * 100) + '%"></i></span></button>';
+    }).join("") + (weeks.length > TOP ? '<div class="wkmore"><button class="linkbtn" type="button" id="wk-more">' + (wkAll ? "只看最近 " + TOP + " 周" : "看更早的 " + (weeks.length - TOP) + " 周") + "</button></div>" : "");
+  }
   function renderFinance() {
-    ["period", "period2"].forEach((id) => $(id).querySelectorAll(".chip").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.p === period))));
-    $("f-rpt-sum").textContent = "详细报表 · " + PERIOD_LABEL[period] + "（利润表 · 现金与库存）";
+    ["period", "period2"].forEach((id) => $(id).querySelectorAll(".chip").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.p === period || (x.dataset.p === "week" && isWeekP())))));
+    renderWeeks();
+    $("f-rpt-sum").textContent = "详细报表 · " + plabel() + "（利润表 · 现金与库存）";
     const L = S.loaded, FB = finBook(inPeriod), T = FB.T;
     const PQ = serQty(FB.list.flatMap((d) => d.orders.map((x) => x.o)));
-    $("f-hero-k").textContent = PERIOD_LABEL[period] + "净赚";
+    $("f-hero-k").textContent = plabel() + "净赚";
     /* a new month starts empty: say so, so the old numbers don't look lost */
     const emptyHere = L && !FB.list.length && (S.orders.length || S.expenses.length);
     $("f-empty").hidden = !emptyHere;
-    if (emptyHere) $("f-empty").innerHTML = PERIOD_LABEL[period] + "还没有账目，以前的账都还在。" +
+    if (emptyHere) $("f-empty").innerHTML = plabel() + "还没有账目，以前的账都还在。" +
       (period !== "last" ? '<button class="btn small" type="button" data-p="last">看上月</button>' : "") + '<button class="btn small" type="button" data-p="all">看全部</button>';
     $("f-profit").textContent = L ? money(T.net) : "–"; $("f-profit").className = "v" + (T.net < 0 ? " bad" : "");
     $("f-inc").textContent = L ? money(T.rev) : "–";
@@ -2337,7 +2394,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     /* income statement */
     const row = (label, v, cls) => '<div class="st-row' + (cls ? " " + cls : "") + '"><span>' + label + "</span><b>" + v + "</b></div>";
     const catRows = Object.entries(FB.cats).sort((a, b) => b[1] - a[1]);
-    $("f-stmt").innerHTML = "<h3>利润表 · " + PERIOD_LABEL[period] + "</h3>" +
+    $("f-stmt").innerHTML = "<h3>利润表 · " + plabel() + "</h3>" +
       row("商品销售额", money(T.goods)) + row("配送费收入", money(T.fee)) + row("营业收入", money(T.rev), "sub") +
       row("减：销货成本（" + T.cqty + " 根）", T.cost ? "−" + money(T.cost) : money(0)) +
       row("毛利" + (T.rev ? "（毛利率 " + Math.round((T.gross / T.rev) * 100) + "%）" : ""), money(T.gross), "sub") +
@@ -2357,7 +2414,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     let pay = 0, recv = 0;
     for (const w of partnerNames()) { const b = ptBal(w); if (b > 0) recv += b; else pay -= b; }
     pay = r2(pay); recv = r2(recv);
-    $("f-cash").innerHTML = "<h3>现金与库存 · " + PERIOD_LABEL[period] + "</h3>" +
+    $("f-cash").innerHTML = "<h3>现金与库存 · " + plabel() + "</h3>" +
       row("收款（已填单价的订单）", money(T.cash)) + row("进货付款", batchBuy ? "−" + money(batchBuy) : money(0)) + row("和合伙人结账（拿货、往来、订货）", settled > 0 ? "−" + money(settled) : settled < 0 ? "+" + money(-settled) : money(0)) + row("经营费用付款", T.opex ? "−" + money(T.opex) : money(0)) +
       row("现金净流入", money(cashNet), "sub" + (cashNet < 0 ? " bad" : "")) +
       row("现有库存（按进价）", units + " 根 · " + money(r2(value)) + (noCost ? "*" : "")) +
@@ -2548,12 +2605,23 @@ details.restock > summary::-webkit-details-marker { display: none; }
   });
   const pickPeriod = (e) => {
     const c = e.target.closest("[data-p]"); if (!c) return;
-    period = c.dataset.p; try { localStorage.setItem("mk-period", period); } catch (_) {}
+    period = c.dataset.p; try { localStorage.setItem("mk-period", period.startsWith("w:") ? "week" : period); } catch (_) {}
     renderFinance();
   };
   $("period").addEventListener("click", pickPeriod);
   $("period2").addEventListener("click", pickPeriod);
   $("f-empty").addEventListener("click", pickPeriod);
+  $("f-weeks").addEventListener("click", (e) => {
+    if (e.target.closest("#wk-more")) { wkAll = !wkAll; renderWeeks(); return; }
+    if (!e.target.closest("[data-p]")) return;
+    pickPeriod(e); window.scrollTo({ top: 0, behavior: "smooth" }); // 上面的数字换成那一周：滑回去看
+  });
+  $("f-wknav").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-wk]"); if (!b) return;
+    const m = addDays(curMon(), 7 * Number(b.dataset.wk));
+    period = m >= monOf(today()) ? "week" : "w:" + m; try { localStorage.setItem("mk-period", "week"); } catch (_) {}
+    renderFinance();
+  });
   $("fin-sale").addEventListener("click", () => saleForm(""));
   $("fin-exp").addEventListener("click", () => expenseForm(null));
   $("fin-xfer").addEventListener("click", () => xferForm(""));

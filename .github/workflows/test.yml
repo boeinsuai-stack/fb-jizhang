@@ -45,6 +45,8 @@ jobs:
         run: python tests/test_fast_start.py
       - name: 口味排行、客户名字候选（旧结构 / 新结构）
         run: python tests/test_rank.py
+      - name: 财务每周（旧结构 / 新结构）
+        run: python tests/test_weeks.py
       - name: 成本账：卖出早于进货时先欠着、下一批补上
         run: python tests/test_fifo_gap.py
       - name: 复制口味带售价、价钱从低到高
