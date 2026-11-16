@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-16 线上 fb-app-v24）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-16 线上 fb-app-v24，分支 feat-rank 是 v25）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -165,6 +165,16 @@
 - 「有新版 · 点一下更新」：App 本身从存的打开，所以点了以后等新的 Service Worker 生效（最多 8 秒）再刷新
 - 测试 `tests/test_fast_start.py` 12/12（编的数据，GitHub 上也跑；旧代码 5/12）：假 Firebase 让订单/流水晚 1.5 秒到；真 SDK 用 `--host-resolver-rules` 把 Google 指到「连得上不回应」的端口（**不要用 Playwright 拦请求**：一拦就带 cache:no-store，Service Worker 的「先用存的」测不出来）
   `tests/mockfb.js` 加了 `__MOCK_SLOW = {集合: 毫秒}`
+
+## 口味排行 + 客户名字候选（feat-rank，2026-11-16）
+- **口味排行**（库存页「补货建议」下面的折叠块 `#rk-sec`）：`flavourRank(days, ser, by)` 只看 `S.orders`：已卖出的单（预定不算）、日期在最近 N 天；每个口味「被几单买过」（一单里同口味只算一单）和「一共几根」。
+  默认按单数排（Bowen：不能只看根数；真实数据里一个批发客人两单 110 根，按根数排前几名全是他），可改按根数；7/14/30 天、按系列；一单 ≥5 根且占这个口味一半以上 → 写「其中一单 N 根（客人）」；右边写现在能卖的根数 / 没货。
+  选的天数、系列、排序记在 localStorage `mk-rank`。纯计算，不改数据
+- **客户名字候选**：`wireCustSug`/`custSuggest`：下单表、记跟进的客户框打字时，输入框**上面**列出以前的客人（`customerBook()`，名字包含就算、不分大小写，最多 4 个，写买过几次），点一下填上并触发「回头客」。
+  以前是 datalist：iPhone 上常常不显示（合伙人框早就因为这个改成按钮了）。放上面是因为 iPhone 键盘弹出时输入框贴着键盘，放下面会被挡；候选冒出来时用 visualViewport 把输入框留在键盘上面
+- 顺手：预定后的提示、「只是预定」那行字缩短；shim 没有本地数据库又没网时 20 秒后把空结果交出去（以前会一直「正在读取」）
+- 查过没问题、所以没动的：①「常用」格子按库存多少排：用 11-03 以来 150 次点选回放，改成按卖得多少排并不更好（平均第 9.7 格 vs 10.4 格）②点口味、切页面的反应时间（电脑慢 4 倍模拟：点口味 52 ms、切页 ~110 ms）③320/375/390 宽度没有横向溢出 ④真实数据独立重算 1720 项一致、守恒成立 ⑤两个人改同一条记录：266 条里只有 1 条
+- 测试 `tests/test_rank.py` 38/38（编的数据，旧/新结构，GitHub 上也跑）
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超

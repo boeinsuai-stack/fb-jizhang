@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v24"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v25"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -591,6 +591,15 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 .rs-need small { font-family: var(--font-body); font-size: .72rem; font-weight: 400; color: var(--muted); margin-left: 2px; }
 .restock .empty { padding: 10px 0; }
 .rs-slow { padding: 10px 12px; border-radius: 8px; background: var(--bg); }
+/* 口味排行：左边名次 + 名字，右边「几单 · 几根」和现在的库存 */
+.rk-basis { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.rk-row { grid-template-columns: 1.6em minmax(0, 1fr) auto; }
+.rk-no { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rk-row:nth-child(-n+3) .rk-no { color: var(--accent); }
+.rk-num { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: .92rem; }
+.rk-num b { font-family: var(--font-display); font-size: 1.25rem; }
+.rk-num .dim { color: var(--muted); }
+.cust-sug { margin-bottom: 2px; } .cust-sug .chip small { color: var(--muted); font-size: .76rem; margin-left: 6px; }
 /* customer page */
 .cu-top { grid-template-columns: minmax(0, 1fr) auto; }
 .cu-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
@@ -736,6 +745,14 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <div class="rs-head"><p class="hint" id="rs-basis"></p><button class="btn small" id="rs-copy" type="button">复制补货单</button></div>
       <div class="rs-list" id="rs-list"></div>
       <p class="hint rs-slow" id="rs-slow" hidden></p>
+    </details>
+    <details class="restock" id="rk-sec" hidden>
+      <summary><span class="rs-sum" id="rk-sum">口味排行</span><span class="sb-chev">展开</span></summary>
+      <div class="chips" id="rk-days" role="group" aria-label="看多少天"></div>
+      <div class="chips" id="rk-ser" role="group" aria-label="系列"></div>
+      <p class="hint rk-basis" id="rk-basis"></p>
+      <div class="rs-list" id="rk-list"></div>
+      <div id="rk-more-wrap" hidden><button class="linkbtn" id="rk-more" type="button"></button></div>
     </details>
     <div class="chips seg" id="inv-tabs" role="group" aria-label="切换下方内容">
       <button class="chip" type="button" data-it="log" aria-pressed="true">出入库流水</button>
@@ -1361,8 +1378,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
   /* the one customer field shown up front: a name, optional */
   function custNameHtml(o) {
     o = o || {};
-    return '<div class="field"><label for="f-cust">客户（可不填）</label><input id="f-cust" list="dl-cust" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Marketplace 上的称呼" value="' + esc(o.customer || "") + '"></div>' +
-      '<p class="hint" id="f-cust-hint" hidden></p>' + dlHtml("dl-cust", uniqVals((x) => x.customer));
+    return '<div class="field"><label for="f-cust">客户（可不填）</label><input id="f-cust" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" placeholder="Marketplace 上的称呼" value="' + esc(o.customer || "") + '"></div>' +
+      '<p class="hint" id="f-cust-hint" hidden></p>';
   }
   /* the rest lives in the folded "更多" section */
   function custMoreHtml(o) {
@@ -1375,6 +1392,28 @@ details.restock > summary::-webkit-details-marker { display: none; }
       dlHtml("dl-sub", uniqVals((x) => x.suburb)) + dlHtml("dl-src", [...new Set(SOURCES.concat(uniqVals((x) => x.source)))]);
   }
   /* typing a name we've sold to before shows their history and fills in their suburb */
+  /* 客户名字：打几个字，下面直接列出以前的客人（名字里有这几个字就算，不分大小写），点一下填上。
+     以前用浏览器自带的下拉候选（datalist）：iPhone 上只在键盘上面挤出两三个、常常不显示，老客人找不到就当成新客人又打一遍（2026-11-16 Bowen 找不到 Valentine） */
+  function custSuggest(q, limit) {
+    const k = normName(q); if (!k) return [];
+    return customerBook().filter((c) => normName(c.name).includes(k) && normName(c.name) !== k)
+      .sort((a, b) => (normName(b.name).startsWith(k) - normName(a.name).startsWith(k)) || (b.last || "").localeCompare(a.last || "") || a.name.localeCompare(b.name)).slice(0, limit || 4);
+  }
+  function wireCustSug(onPick) {
+    const inp = $("f-cust"); if (!inp || $("f-cust-sug")) return;
+    const box = document.createElement("div"); box.className = "chips cust-sug"; box.id = "f-cust-sug"; box.hidden = true;
+    inp.insertAdjacentElement("beforebegin", box); // 放在输入框上面：iPhone 键盘弹出来时输入框正好贴着键盘，放下面会被键盘挡住
+    const paint = () => {
+      const list = custSuggest(inp.value);
+      box.hidden = !list.length;
+      box.innerHTML = list.map((c) => '<button type="button" class="chip" data-cust-pick="' + esc(c.name) + '">' + esc(c.name) + "<small>" + (c.paid.length ? c.paid.length + " 次" : c.resv.length ? "有预定" : "问过") + "</small></button>").join("");
+      /* 候选冒出来会把输入框往下顶：键盘开着时别让输入框被顶到键盘后面 */
+      const vv = window.visualViewport, card = inp.closest(".sheet-card");
+      if (vv && card && list.length) { const over = inp.getBoundingClientRect().bottom + 10 - (vv.offsetTop + vv.height); if (over > 0) card.scrollTop += over; }
+    };
+    inp.addEventListener("input", paint);
+    box.addEventListener("click", (e) => { const c = e.target.closest("[data-cust-pick]"); if (!c) return; inp.value = c.dataset.custPick; box.hidden = true; box.innerHTML = ""; if (onPick) onPick(); });
+  }
   function wireCust(exceptId) {
     const upd = (fill) => {
       const past = custOrders($("f-cust").value, exceptId), h = $("f-cust-hint");
@@ -1389,6 +1428,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     /* 打字时就显示「回头客」那行：以前要等输入框失焦（也就是点「保存」那一下）才冒出来，表单变高、按钮下移，第一下保存会点空 */
     $("f-cust").addEventListener("input", () => upd(false));
     $("f-cust").addEventListener("change", () => upd(true)); upd(false);
+    wireCustSug(() => upd(true));
   }
   function readCust(o) {
     const v = (id) => ($(id).value || "").trim(), prev = (o && o.follow_up) || {};
@@ -1414,7 +1454,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     let n = 0;
     const splitter = pickSplitter(edit ? edit.pick_split || null : null);
     const html =
-      (edit ? '<input type="checkbox" id="f-resv" checked hidden>' : '<label class="check"><input type="checkbox" id="f-resv"' + (reserve ? " checked" : "") + '><span>只是预定（还没付款，之后在「客户」页顶部「结算」）</span></label>') +
+      (edit ? '<input type="checkbox" id="f-resv" checked hidden>' : '<label class="check"><input type="checkbox" id="f-resv"' + (reserve ? " checked" : "") + '><span>只是预定（还没付款，之后再结算）</span></label>') +
       '<div class="lines-head"><span>香型</span><span>数量</span><span>单价 $</span><span></span></div>' +
       '<div id="f-lines"></div>' +
       '<div><button type="button" class="btn ghost small" id="f-addline">+ 再加一种香型</button></div>' +
@@ -1496,7 +1536,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const P = readPay(!resv, orderTotal({ lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
       await db.collection("orders").doc(oid).set(Object.assign({ status: resv ? "reserved" : "paid", date, at, lines, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, { payment: P.payment }, dropNulls({ pay_cash: P.pay_cash, pay_other: P.pay_other }), dropNulls(readCust(null)),
         lump != null ? { lump_total: lump } : {}, pfrom ? { pick_from: pfrom } : {}, pk.pick_split ? { pick_split: pk.pick_split } : {}));
-      if (resv) { if (onDone) onDone(); return "已记预定 " + lines.reduce((a, l) => a + l.qty, 0) + " 根。客人付款后到「客户」页顶部的预定里点「结算」。"; }
+      if (resv) { if (onDone) onDone(); return "已记预定 " + lines.reduce((a, l) => a + l.qty, 0) + " 根，在「客户」页结算。"; }
       const msg = "已记一笔卖出" + await commitSale(oid, lines, date, at, pfrom, pk.pick_split);
       if (onDone) onDone();
       return msg;
@@ -1888,6 +1928,54 @@ details.restock > summary::-webkit-details-marker { display: none; }
       slow: rows.filter((r) => r.s === 0 && r.on >= 3).sort((a, b) => b.on - a.on),
     };
   }
+  /* ---------- 口味排行（2026-11-16 Bowen）：一段时间里哪个口味卖得最好。两个标准：被几单买过（多少客人要）、一共卖了几根（出了多少货）。
+     只算已经卖出的单（预定结算后才算）；一单里同一个口味只算一单。一单就占了一半以上根数的（批发）标出来，不然按根数排会被一个大单带偏 ---------- */
+  const RK_KEY = "mk-rank";
+  let rk = (() => { try { return Object.assign({ days: 14, ser: "", by: "n", all: false }, JSON.parse(localStorage.getItem(RK_KEY) || "{}"), { all: false }); } catch (_) { return { days: 14, ser: "", by: "n", all: false }; } })();
+  function flavourRank(days, ser, by) {
+    const td = today(), since = ymd(new Date(Date.now() - (days - 1) * 864e5)), R = {};
+    let orders = 0;
+    for (const o of S.orders) {
+      if (isReserved(o) || !(o.lines || []).length || (o.date || "") < since || (o.date || "") > td) continue;
+      const per = {};
+      for (const l of o.lines) { const i = itemBy(l.sku); if (!i || isGeneric(i) || (ser && seriesOf(i) !== ser)) continue; per[l.sku] = (per[l.sku] || 0) + (Number(l.qty) || 0); }
+      if (Object.keys(per).length) orders++;
+      for (const [sku, q] of Object.entries(per)) {
+        const r = (R[sku] = R[sku] || { i: itemBy(sku), n: 0, u: 0, big: 0, who: "" });
+        r.n++; r.u += q; if (q > r.big) { r.big = q; r.who = (o.customer || "").trim(); }
+      }
+    }
+    const rows = Object.values(R).sort((a, b) => (by === "u" ? b.u - a.u || b.n - a.n : b.n - a.n || b.u - a.u) || bySku(a.i, b.i));
+    return { since, rows, orders, units: rows.reduce((a, r) => a + r.u, 0) };
+  }
+  function renderRank() {
+    if (!S.loaded) { $("rk-sec").hidden = true; return; }
+    const sers = allSeries(); if (rk.ser && !sers.includes(rk.ser)) rk.ser = "";
+    const P = flavourRank(rk.days, rk.ser, rk.by), D = derive(), RV = reservedQty();
+    $("rk-sec").hidden = !S.orders.some((o) => !isReserved(o) && (o.lines || []).length);
+    $("rk-sum").innerHTML = "口味排行 <small>近 " + rk.days + " 天</small>";
+    const chip = (attr, v, label, on) => '<button class="chip" type="button" ' + attr + '="' + esc(v) + '" aria-pressed="' + on + '">' + esc(label) + "</button>";
+    $("rk-days").innerHTML = [7, 14, 30].map((d) => chip("data-rk-days", d, d + " 天", rk.days === d)).join("");
+    $("rk-ser").innerHTML = chip("data-rk-ser", "", "全部", !rk.ser) + sers.map((x) => chip("data-rk-ser", x, x, rk.ser === x)).join("");
+    $("rk-basis").innerHTML = "<span>" + fmtD(P.since) + "起 · " + P.orders + " 单 · " + P.units + " 根 · " + P.rows.length + " 款</span>" +
+      "<span>" + (rk.by === "u" ? "按根数排" : "按单数排") + ' · <button class="linkbtn" id="rk-by" type="button">' + (rk.by === "u" ? "改按单数" : "改按根数") + "</button></span>";
+    const TOP = 10, list = rk.all ? P.rows : P.rows.slice(0, TOP);
+    $("rk-list").innerHTML = list.length ? list.map((r, k) => {
+      const left = Math.max(0, D.st[r.i.sku] || 0) - (RV[r.i.sku] || 0), bulk = r.big >= 5 && r.big * 2 >= r.u;
+      return '<div class="rs-row rk-row"><span class="rk-no">' + (k + 1) + '</span><div class="rs-what"><span class="name">' + esc(enOf(r.i)) + '</span><span class="cn">' + esc((rk.ser ? "" : seriesOf(r.i) + " · ") + r.i.name) + "</span>" +
+        (bulk ? '<span class="dates">其中一单 ' + r.big + " 根" + (r.who ? "（" + esc(r.who) + "）" : "") + "</span>" : "") + "</div>" +
+        '<span class="rs-side"><span class="rk-num"><b' + (rk.by === "u" ? ' class="dim"' : "") + ">" + r.n + "</b> 单 · <b" + (rk.by === "u" ? "" : ' class="dim"') + ">" + r.u + "</b> 根</span>" +
+        '<span class="pill' + (left > 0 ? "" : " bad") + '">' + (left > 0 ? "剩 " + left : "没货") + "</span></span></div>";
+    }).join("") : '<div class="empty">这段时间没有卖出' + (rk.ser ? " " + esc(rk.ser) : "") + "。</div>";
+    $("rk-more-wrap").hidden = P.rows.length <= TOP;
+    $("rk-more").textContent = rk.all ? "只看前 " + TOP + " 名" : "看全部 " + P.rows.length + " 款";
+  }
+  $("rk-sec").addEventListener("click", (e) => {
+    const d = e.target.closest("[data-rk-days]"), sr = e.target.closest("[data-rk-ser]");
+    if (d) rk.days = Number(d.dataset.rkDays); else if (sr) rk.ser = sr.dataset.rkSer; else if (e.target.closest("#rk-by")) rk.by = rk.by === "u" ? "n" : "u"; else if (e.target.closest("#rk-more")) rk.all = !rk.all; else return;
+    try { localStorage.setItem(RK_KEY, JSON.stringify({ days: rk.days, ser: rk.ser, by: rk.by })); } catch (_) {}
+    renderRank();
+  });
   function renderRestock() {
     if (!S.loaded) { $("rs-sec").hidden = true; return; }
     const P = restockPlan();
@@ -1918,7 +2006,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const low = ITEMS.filter((i) => { const q = D.st[i.sku] || 0; return q > 0 && q <= 1; }).length;
     const out = ITEMS.filter((i) => (D.st[i.sku] || 0) <= 0 && i.status !== "停售").length;
     renderStockBox(D, RV);
-    renderRestock();
+    renderRestock(); renderRank();
 
     const box = $("items");
     if (!ITEMS.length) {
@@ -2383,8 +2471,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const avail = S.items.filter((i) => !isGeneric(i)).sort((a, b) => ((a.status === "停售") - (b.status === "停售")) || bySku(a, b));
     let n = 0;
     const html =
-      '<div class="field"><label for="f-cust">客户</label><input id="f-cust" list="dl-cust" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Marketplace 上的称呼" value="' + esc((f && f.customer) || preName || "") + '"></div>' +
-      '<p class="hint" id="f-cust-hint" hidden></p>' + dlHtml("dl-cust", uniqVals((x) => x.customer).concat(S.followups.map((x) => x.customer).filter(Boolean)).filter((v, k, a) => a.indexOf(v) === k)) +
+      '<div class="field"><label for="f-cust">客户</label><input id="f-cust" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" placeholder="Marketplace 上的称呼" value="' + esc((f && f.customer) || preName || "") + '"></div>' +
+      '<p class="hint" id="f-cust-hint" hidden></p>' +
       '<div class="field"><label>想要的口味（可以不选）</label></div><div id="f-lines"></div>' +
       '<div><button type="button" class="btn ghost small" id="f-addline">+ 再加一种</button></div>' +
       '<div class="field"><label for="f-funote">跟进什么</label><input id="f-funote" placeholder="比如：葡萄冰没货了，到货告诉他" value="' + esc((f && f.note) || "") + '"></div>' +

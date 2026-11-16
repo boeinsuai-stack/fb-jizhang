@@ -274,8 +274,8 @@
       let q = fs.collection(c); if (order) q = q.orderBy(order[0], order[1]);
       if (persistOK === false) { // 没有本地数据库：直接读云端（不再限 1000 条）；没网时 SDK 先给的「空」不交给页面（最多等 20 秒）
         if (lim) q = q.limit(lim * 2); paintStale();
-        let ok = false; const t = setTimeout(() => { ok = true; }, 20000);
-        un = q.onSnapshot((s) => { if (!s.metadata.fromCache) { markSeen(c); ok = true; clearTimeout(t); } if (ok || s.size) next(view(s, lim)); }, err); return;
+        let ok = false, last = null; const t = setTimeout(() => { ok = true; if (last && !stop) next(view(last, lim)); }, 20000); // 20 秒还没连上：把手上有的（空的）交出去，不然一直「正在读取」
+        un = q.onSnapshot((s) => { last = s; if (!s.metadata.fromCache) { markSeen(c); ok = true; clearTimeout(t); } if (ok || s.size) next(view(s, lim)); }, err); return;
       }
       let latest = null, open = false;
       const gate = pull(c);
