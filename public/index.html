@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v23"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v24"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -4055,6 +4055,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     return { text: blocks.map((b) => b.text).join("\n\n"), n: items.length };
   }
   async function copyPlain() {
+    if (!S.loaded) { toast("数据还没读完，稍等再复制。"); return; } // 读到一半复制出来的数字不对（2026-11-16）
     const { text, n } = plainFlavours();
     if (!n) { toast("现在没有能卖的口味。"); return; }
     try { await navigator.clipboard.writeText(text); toast("已复制 " + n + " 个能卖的口味。"); }
@@ -4619,18 +4620,26 @@ details.restock > summary::-webkit-details-marker { display: none; }
     try { userCap = await window.claude.use("user"); meId = userCap ? await userCap.id() : null; } catch (_) { meId = null; }
     db = wrapDb(rawDb);
     const onErr = (e) => { if (e && e.code !== "revoked") { $("banner").textContent = "数据暂时读取失败，请刷新页面。"; $("banner").hidden = false; } };
-    const mark = (k) => { S.loaded |= k; };
+    /* 读完了才算读完（2026-11-16）：以前口味一到 S.loaded 就是真，订单、流水还没读进来时页面已经按一半数据显示库存、客户，
+       复制口味复制出错的数字。现在每类记录都到了，S.loaded 才变成 15（页面里 S.loaded 为真、(S.loaded & 15) === 15 都 = 全部读完） */
+    let got = 0; const NEED = 511; // 1 口味 2 流水 4 订单 8 支出 16 订货 32 结账 64 往来 128 客户 256 跟进
+    const mark = (k) => { got |= k; S.loaded = (got & NEED) === NEED ? 15 : 0; };
     const all = (snap) => snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
     /* 数据结构版本：云端 meta/schema.version === 2 才用 v2（迁移确认后才写这个标记）；版本变了就刷新页面，两台手机一起换 */
-    const sch = await readSchema(), schemaV = sch && sch.version === 2 ? 2 : 1;
+    /* 数据结构版本先用这台手机记得的（马上就有）：以前每次打开都先问云端，信号差时 Firebase 要等 10 秒才放弃，这 10 秒 App 一直「正在读取」。
+       另一台手机改了版本（迁移/退回/恢复）时，下面的监听收到云端的新版本会自动刷新。这台手机没记过才问云端 */
+    let sch = null; try { sch = JSON.parse(localStorage.getItem("fb-schema") || "null"); } catch (_) {}
+    if (!sch) sch = await readSchema();
+    const schemaV = sch && sch.version === 2 ? 2 : 1;
     rawDb.doc("meta/schema").onSnapshot((sc) => {
       if (!sc || (!sc.exists && sc.metadata && sc.metadata.fromCache)) return; // 手机本地没有 ≠ 云端没有：不知道就不动（不然没网时会一直刷新）
       const d = keepSchema(sc.exists ? sc.data() || {} : {}); if ((d.version === 2 ? 2 : 1) !== schemaV) location.reload();
     }, () => {});
     if (schemaV === 2 && window.FBV2) {
       v2store = window.FBV2.createStore(rawDb, () => S.items, (P, ready) => {
+        if (!ready) return; // 还有几类没读到：先不换（一半的数据算出来的库存、客户都不对）
         S.orders = P.orders; S.moves = P.moves; S.expenses = P.expenses; S.purchases = P.purchases; S.settles = P.settles; S.transfers = P.transfers;
-        if (ready) mark(2 | 4 | 8); render();
+        mark(2 | 4 | 8 | 16 | 32 | 64); render();
       });
       window.__fbV2store = v2store; // 中转站（shim.js）用：上传现算的旧样子、写入 Claude 改动
     }
@@ -4639,11 +4648,11 @@ details.restock > summary::-webkit-details-marker { display: none; }
     if (!v2store) db.collection("movements").limit(1000).onSnapshot((s) => { S.moves = all(s); mark(2); render(); }, onErr);
     if (!v2store) db.collection("orders").limit(1000).onSnapshot((s) => { S.orders = all(s); mark(4); render(); }, onErr);
     if (!v2store) db.collection("expenses").limit(1000).onSnapshot((s) => { S.expenses = all(s); mark(8); render(); }, onErr);
-    if (!v2store) db.collection("purchases").limit(1000).onSnapshot((s) => { S.purchases = all(s); render(); }, onErr);
-    if (!v2store) db.collection("settlements").limit(1000).onSnapshot((s) => { S.settles = all(s); render(); }, onErr);
-    if (!v2store) db.collection("transfers").limit(1000).onSnapshot((s) => { S.transfers = all(s); render(); }, onErr);
-    db.collection("customers").limit(1000).onSnapshot((s) => { S.customers = all(s); render(); }, onErr);
-    db.collection("followups").limit(1000).onSnapshot((s) => { S.followups = all(s); render(); }, onErr);
+    if (!v2store) db.collection("purchases").limit(1000).onSnapshot((s) => { S.purchases = all(s); mark(16); render(); }, onErr);
+    if (!v2store) db.collection("settlements").limit(1000).onSnapshot((s) => { S.settles = all(s); mark(32); render(); }, onErr);
+    if (!v2store) db.collection("transfers").limit(1000).onSnapshot((s) => { S.transfers = all(s); mark(64); render(); }, onErr);
+    db.collection("customers").limit(1000).onSnapshot((s) => { S.customers = all(s); mark(128); render(); }, onErr);
+    db.collection("followups").limit(1000).onSnapshot((s) => { S.followups = all(s); mark(256); render(); }, onErr);
     rawDb.collection("log").orderBy("at", "desc").limit(200).onSnapshot((s) => { S.log = all(s); if (view === "inventory") { resolveNames(); renderLog(); } }, () => {});
     /* one-time: everything recorded before the audit trail existed was the owner's — stamp it and seed the log */
     (async () => {

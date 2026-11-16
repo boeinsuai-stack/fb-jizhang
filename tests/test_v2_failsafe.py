@@ -103,7 +103,9 @@ with sync_playwright() as p:
     check("没网 + 从没看到过版本：用旧结构", not pg.evaluate(is_v2))
 
     # 5. 没网时「确认迁移」：拒绝，不写 meta/schema（以前读不到旧的新结构记录就当成没有）
+    #    这台手机从没跟云端对过账、本地又是空的几类：先等一会儿云端（最多 4 秒，见 test_fast_start），读完再点
     pg.evaluate("location.hash = '#settings'"); pg.wait_for_selector("#mig-sec:not([hidden])", timeout=8000)
+    pg.wait_for_function("document.getElementById('sb-total') && document.getElementById('sb-total').textContent !== '–'", timeout=8000)
     pg.click("#mig-check"); pg.wait_for_timeout(400)
     check("没网时也能「检查迁移」（只读本地、不写）", "全部一致" in pg.inner_text("#mig-out"), pg.inner_text("#mig-out")[:40])
     pg.click("#mig-go"); pg.click("#mig-go"); pg.wait_for_timeout(800)

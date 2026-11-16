@@ -94,6 +94,7 @@
   }
   const listeners = [];
   function deliver(l) {
+    if (l.holdUntil) return;
     const online = !OFFLINE && !l.cacheOnly;
     if (l.doc) { const [c, id] = l.doc.split("/"); const r = col(online ? server : cache, c).get(id); l.cb(docSnap(id, r, c, !online)); return; }
     let rows;
@@ -117,7 +118,9 @@
     let opts = {}; if (a[0] && typeof a[0] === "object" && !a[0].next) opts = a.shift();
     const cb = a[0], err = a[1];
     const l = Object.assign({ cb, err, seen: new Map(), cacheOnly: opts.source === "cache" }, spec);
-    listeners.push(l); setTimeout(() => !l.off && deliver(l), 0);
+    // __MOCK_SLOW = { 集合: 毫秒 }：这个集合第一次给结果要等这么久（模拟手机上几类记录先后读出来）
+    const slow = ((window.__MOCK_SLOW || {})[spec.q ? spec.q.c : ""]) || 0; if (slow) l.holdUntil = Date.now() + slow;
+    listeners.push(l); setTimeout(() => { l.holdUntil = 0; if (!l.off) deliver(l); }, slow);
     return () => { l.off = true; };
   }
 

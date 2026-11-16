@@ -11,7 +11,7 @@
   - 同步状态小圆点：包住 DocumentReference.set/update/delete 和 WriteBatch.commit，用 waitForPendingWrites 判断已保存
   - **没网也能记账（2026-11-08）**：Firestore 写入的 promise 要等云端确认，没网时永远不完成 → 包装后改成「写进本地缓存就完成」
     （读一次 cache 排在写入后面当标记 + 等一拍让 onSnapshot 跑完）。云端拒收另外计数，右上角红字显示。不要去掉这层
-  - 登录：1.5 秒内 Firebase 还没确认登录，就用 localStorage `fb-last-user`（上次登录的人）先打开；确认后换人则刷新；确认是退出状态则取消
+  - 登录：0.3 秒内（2026-11-16 以前 1.5 秒）Firebase 还没确认登录，就用 localStorage `fb-last-user`（上次登录的人）先打开；确认后换人则刷新；确认是退出状态则取消
   - **增量同步（feat12，2026-11-09，替代 limit(1000)）**：业务代码拿到的 db 是 shim 的 `dbApi`，不是原始 Firestore
     - 账本集合 SYNCED（items movements orders expenses purchases settlements transfers customers followups log）：
       页面用 `onSnapshot({source:"cache"})` 读手机本地数据库的**全部**记录（不计费）；业务代码写的 `limit(1000)` 被忽略，`orderBy().limit(n)`（操作记录 200 条）照旧
@@ -24,8 +24,9 @@
 - `public/firebase-config.js`：Firebase 配置 + APP_CONFIG（只放指纹，不放邮箱）
 - `public/vendor/`：Firebase compat SDK 10.12.2（app/auth/firestore）和 xlsx 0.18.5，从 npm 包复制（去掉 sourceMappingURL）。
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
-- `public/sw.js`：安装时预存 App + vendor；页面网络优先、3 秒超时用缓存；vendor 缓存优先；字体先用缓存
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-16 线上 fb-app-v23）
+- `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
+  新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-16 线上 fb-app-v23，分支 fix-fast-start 是 v24）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -37,7 +38,7 @@
 - 设置页「数据结构升级」（店主）：检查迁移 → 确认迁移（写 v2_* + meta/schema=2，旧集合不动）→ 迁移后旧结构又有改动会提示「补进新结构」→ 退回旧结构（现算的旧样子写回旧集合 + 版本改回 1）
 - 测试（真实数据放仓库外，fixture 用 ArtifactData 或备份 json 生成）：`node tests/v2_roundtrip.js <fixture>`（往返逐字段）、`tests/golden.py` + `tests/golden_diff.py`（旧版计算结果当标准答案）、
   `tests/test_v2_diff.py <fixture> <v2种子>`（界面上旧版/新版各做一遍逐条比）、`node tests/v2_fuzz.js <fixture> 2000 <种子>`（随机写入压力测试）、`tests/test_v2_migrate.py <fixture>`（迁移/补进/退回端到端）。种子：`node tests/v2_seed.js`
-- **读不到 ≠ 没有**（2026-11-10）：数据结构版本 `readSchema()` 先问云端（没网时 SDK 用缓存），读不到用 localStorage `fb-schema`（这台手机上次看到的），都没有才当旧结构；
+- **读不到 ≠ 没有**（2026-11-10）：数据结构版本**启动时先用 localStorage `fb-schema`**（2026-11-16 起，见「打开要快」），这台手机没记过才 `readSchema()`：先问云端（没网时 SDK 用缓存），读不到用 localStorage `fb-schema`（这台手机上次看到的），都没有才当旧结构；
   meta/schema 的监听收到「本地没有」（`!exists && fromCache`）不当真（不然没网时一直刷新）。确认迁移、迁移后查旧结构改动都用 `get({source:"server"})`，读不到就停/写明「还没能检查」，联网后自动再查。
   测试 `tests/test_v2_failsafe.py`（编的小数据，GitHub 上也跑）；真 SDK 的对应行为在 test_realsdk.py 里实测过
 - 中转站 v2：`tests/test_v2_relay.py <fixture> <v2种子>`（Drive 用 page.route 内存模拟；预放没过期的 token）旧版/新版各走一遍 上传 → 写入 Claude 改动 → 撤销，8/8。注意 page.route 后注册的先生效；种子要有 meta/backfill.done
@@ -153,6 +154,17 @@
 - **每次「同步到 App」后重新生成并发布镜像**（不带 --preview）。**预览新功能**：在功能分支上 `--preview "这次改了什么"` 生成、发布到镜像，
   顶上黄条写明「还没同步到 App」；Bowen 看完说「同步到 App」→ 上线 main → 再发布一次不带预览的
 - 测试 `tests/test_mirror.py [fixture]`：同一份数据，镜像里 App 代码算出的所有数字 == 手机 App（golden.py）算的；只读；增量同步只写变了的；GitHub 上用编的数据跑
+
+## 打开要快、读到一半不显示（fix-fast-start，2026-11-16）
+- Bowen：打开先白屏、等很久（数据明明在手机里）；没读完就去库存「复制口味」，复制出来的数字不对；客户里找不到老客人 Valentine（数据里在：11-02 有他一单）
+- 实测（真 SDK + 真本地数据库 + 真 Service Worker，信号很差）以前 5 秒以上才出数字：sw.js 页面网络优先 3 秒超时 + 登录等 1.5 秒 + 启动先问云端数据结构版本（Firebase 等云端最长 10 秒）。现在 0.5–0.8 秒
+- 读到一半：以前口味一到 `S.loaded` 就是真，v2 的 onChange 没 ready 也把一半的结果交给页面 → 库存显示 0 / 少算、客户缺人、复制口味复制错。
+  现在 `mark()` 记 9 类（口味、流水、订单、支出、订货、结账、往来、客户、跟进）都到了 `S.loaded` 才 = 15；v2 没 ready 不换 S；「复制口味」没读完就拦住
+- shim `listen()`：本地应该有、却是空的（新手机 / iPhone 清过存储：本地 0 条但上次整份对账有 n>0 条，或从没对过账）→ 先不交「空」，等云端整份读完一起给（最多 20 秒，没网不等）
+- **跟云端对上没有**：这次打开后每类记录都收到过云端回应 = 对上了，记 localStorage `fb-synced:<uid>`。还没对上且上次对上在 10 分钟前 → 标题下 `#stale-bar`「正在跟云端对 / 没网 · 现在显示的是这台手机 HH:MM 存的数据」；本地数据库用不了时写明「每次都要从云端整份下载（所以慢）」。`window.__fbSyncInfo()` 排查用
+- 「有新版 · 点一下更新」：App 本身从存的打开，所以点了以后等新的 Service Worker 生效（最多 8 秒）再刷新
+- 测试 `tests/test_fast_start.py` 12/12（编的数据，GitHub 上也跑；旧代码 5/12）：假 Firebase 让订单/流水晚 1.5 秒到；真 SDK 用 `--host-resolver-rules` 把 Google 指到「连得上不回应」的端口（**不要用 Playwright 拦请求**：一拦就带 cache:no-store，Service Worker 的「先用存的」测不出来）
+  `tests/mockfb.js` 加了 `__MOCK_SLOW = {集合: 毫秒}`
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超

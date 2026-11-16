@@ -46,11 +46,12 @@
     if (msg) box.querySelector("p").textContent = msg;
   }
   // 没网或信号很差时，Firebase 确认登录最长要等 30 秒，这段时间 App 一片空白。
-  // 手机里记着上次是谁登录的：1.5 秒还没确认，就先用他打开（数据从手机缓存读，记账先存手机）。
+  // 手机里记着上次是谁登录的：0.3 秒还没确认，就先用他打开（数据从手机缓存读，记账先存手机）。确认后不是他就刷新。
+  // 以前等 1.5 秒（2026-11-16 改：Bowen 说打开要等很久；本来数据都在手机里）
   let started = null, lastU = null;
   const startWith = (u) => { if (started) return; started = u; resolveUser(u); };
   try { lastU = JSON.parse(localStorage.getItem("fb-last-user") || "null"); } catch (_) {}
-  const fastStart = lastU && lastU.uid ? setTimeout(() => startWith(lastU), 1500) : null;
+  const fastStart = lastU && lastU.uid ? setTimeout(() => startWith(lastU), 300) : null;
   auth.onAuthStateChanged((u) => {
     if (u) {
       try { localStorage.setItem("fb-last-user", JSON.stringify({ uid: u.uid, email: u.email || "", displayName: u.displayName || "" })); } catch (_) {}
@@ -216,8 +217,21 @@
   let syncUid = "";
   const pulled = {};
   const maxU = (s) => s.docs.reduce((m, d) => { if (d.metadata.hasPendingWrites) return m; const u = d.get("_u"); return u && u.toMillis ? Math.max(m, u.toMillis()) : m; }, 0);
+  /* 跟云端对上没有（2026-11-16）：这一次打开后，每类记录都收到过云端的回应 = 对上了，记下时间。
+     还没对上、上次对上又是 10 分钟以前：标题下写明「现在显示的是这台手机 X 存的数据」（以前没有任何提示，几天没开的手机显示几天前的账，看起来跟真的一样） */
+  const seen = new Set(), gates = {};
+  const syncKey = () => "fb-synced:" + syncUid;
+  const syncedAt = () => { try { return +localStorage.getItem(syncKey()) || 0; } catch (_) { return 0; } };
+  function markSeen(c) {
+    if (seen.has(c)) return; seen.add(c);
+    if (Object.keys(pulled).every((k) => seen.has(k))) { try { localStorage.setItem(syncKey(), String(Date.now())); } catch (_) {} }
+    paintStale();
+  }
   function pull(c) {
-    if (pulled[c]) return; pulled[c] = 1;
+    if (pulled[c]) return gates[c]; pulled[c] = 1;
+    /* 本地数据库应该有、却是空的（新手机、iPhone 清过存储）：先别把「空」交给页面，等云端整份读完一起给，
+       不然页面先显示 0，再一类一类慢慢冒出来，中间看到的库存、客户都不对。最多等 20 秒；没网不等 */
+    let release; gates[c] = new Promise((r) => { release = r; });
     const key = "fb-sync:" + syncUid + ":" + c;
     let st = {}; try { st = JSON.parse(localStorage.getItem(key) || "{}") || {}; } catch (_) {}
     const save = (o) => { Object.assign(st, o); try { localStorage.setItem(key, JSON.stringify(st)); } catch (_) {} };
@@ -225,6 +239,7 @@
       const since = firebase.firestore.Timestamp.fromMillis(Math.max(0, (st.since || 0) - MARGIN));
       fs.collection(c).where("_u", ">", since).onSnapshot({ includeMetadataChanges: true }, (s) => {
         if (s.metadata.fromCache) return;
+        markSeen(c);
         const m = maxU(s); if (m > (st.since || 0)) save({ since: m });
       }, (e) => console.warn("增量同步出错：" + c, e));
     };
@@ -232,15 +247,19 @@
       const t0 = Date.now();
       const un = fs.collection(c).onSnapshot({ includeMetadataChanges: true }, (s) => {
         if (s.metadata.fromCache) return; // 等云端的完整结果
-        un();
+        un(); markSeen(c); setTimeout(release, 0); // 等这一批写进本地数据库、页面的本地监听先收到
         save({ since: Math.max(maxU(s), st.since || 0) || t0 - 3600e3, full: Date.now(), n: s.size });
         delta();
-      }, (e) => { console.warn("整份对账出错：" + c, e); if (st.since) delta(); });
+      }, (e) => { console.warn("整份对账出错：" + c, e); release(); if (st.since) delta(); });
     };
     fs.collection(c).get({ source: "cache" }).then((s) => s.size, () => 0).then((have) => {
+      // 上次整份对账时云端有 n>0 条：肯定该有，最多等 20 秒；从没对过账（新手机）：不知道该不该有，最多等 4 秒
+      if (!have && (st.n || 0) > 0 && navigator.onLine !== false) setTimeout(release, 20000);
+      else if (!have && !st.since && navigator.onLine !== false) setTimeout(release, 4000); else release();
       // 本地数据库是空的（新手机、清过数据）或者一天没对账了：先整份读一次
       if (!st.since || !have || Date.now() - (st.full || 0) > DAY) full(); else delta();
     });
+    return gates[c];
   }
   // 给页面的快照：去掉已删除的、去掉 _u；有 lim 时只给前 lim 条（操作记录只显示最新 200 条）
   function view(s, lim) {
@@ -253,9 +272,15 @@
     persistReady.then(() => {
       if (stop) return;
       let q = fs.collection(c); if (order) q = q.orderBy(order[0], order[1]);
-      if (persistOK === false) { if (lim) q = q.limit(lim * 2); un = q.onSnapshot((s) => next(view(s, lim)), err); return; } // 没有本地数据库：直接读云端（不再限 1000 条）
-      un = q.onSnapshot({ source: "cache" }, (s) => next(view(s, lim)), err);
-      pull(c);
+      if (persistOK === false) { // 没有本地数据库：直接读云端（不再限 1000 条）；没网时 SDK 先给的「空」不交给页面（最多等 20 秒）
+        if (lim) q = q.limit(lim * 2); paintStale();
+        let ok = false; const t = setTimeout(() => { ok = true; }, 20000);
+        un = q.onSnapshot((s) => { if (!s.metadata.fromCache) { markSeen(c); ok = true; clearTimeout(t); } if (ok || s.size) next(view(s, lim)); }, err); return;
+      }
+      let latest = null, open = false;
+      const gate = pull(c);
+      un = q.onSnapshot({ source: "cache" }, (s) => { latest = s; if (open || s.size) { open = true; next(view(s, lim)); } }, err);
+      gate.then(() => { if (stop || open) return; open = true; if (latest) next(view(latest, lim)); });
     });
     return () => { stop = true; if (un) un(); };
   }
@@ -276,8 +301,29 @@
     doc: (p) => fs.doc(p),
     batch: () => fs.batch(),
   };
-  window.addEventListener("online", paintBadge);
-  window.addEventListener("offline", paintBadge);
+  let staleBar = null, staleT = null;
+  function paintStale() {
+    if (!document.body) return;
+    clearTimeout(staleT);
+    const host = document.querySelector("header.top"); if (!host) { staleT = setTimeout(paintStale, 500); return; }
+    const all = Object.keys(pulled), done = persistOK !== false && all.length && all.every((k) => seen.has(k)), at = syncedAt();
+    let t = "";
+    if (persistOK === false && !done) t = "这台手机的本地数据库用不了，每次打开都要从云端整份下载（所以慢）";
+    else if (!done && Date.now() - at > 10 * 60e3) {
+      t = (navigator.onLine === false ? "没网" : "正在跟云端对") + " · 现在显示的是这台手机" + (at ? " " + hhmm(at) + " 存的数据" : "里存的数据");
+    }
+    if (!t) { if (staleBar) { staleBar.remove(); staleBar = null; } return; }
+    if (!staleBar || !staleBar.isConnected) {
+      staleBar = document.createElement("div"); staleBar.id = "stale-bar"; staleBar.setAttribute("role", "status");
+      staleBar.style.cssText = "padding:8px 12px;border-radius:10px;background:#fbf1e3;color:#8a5212;font-size:.86rem;line-height:1.4";
+      host.insertAdjacentElement("afterend", staleBar);
+    }
+    staleBar.textContent = t;
+  }
+  setTimeout(paintStale, 1500); // 开头 1.5 秒内对上了就不显示
+  window.__fbSyncInfo = () => ({ persistOK, synced_at: syncedAt(), pulled: Object.keys(pulled), seen: [...seen] }); // 测试、排查用
+  window.addEventListener("online", () => { paintBadge(); paintStale(); });
+  window.addEventListener("offline", () => { paintBadge(); paintStale(); });
 
   /* ---------- mcp：备份到 Google Drive ---------- */
   // 原 App 调用 mcp.callTool("Google Drive", "create_file", {...})。这里用 Google 官方的网页授权（只申请
@@ -679,7 +725,12 @@
         bar.addEventListener("click", async () => {
           bar.disabled = true; bar.textContent = "正在更新…";
           try { await Promise.all(["./", "index.html", "shim.js", "v2.js", "orderparse.js", "firebase-config.js"].map((u) => fetch(u, { cache: "reload" }).catch(() => {}))); } catch (_) {} // 先把新文件拿下来，免得刷新后还是浏览器存的旧文件
-          try { const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) reg.update().catch(() => {}); } catch (_) {}
+          /* App 本身从手机里存的那份打开（sw.js：先用存的），所以要等新版装好（新的 Service Worker 生效）再刷新，最多等 8 秒 */
+          try {
+            const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+            if (reg) { await reg.update().catch(() => {}); const w = reg.installing || reg.waiting;
+              if (w && w.state !== "activated") await new Promise((ok) => { const t = setTimeout(ok, 8000); w.addEventListener("statechange", () => { if (w.state === "activated") { clearTimeout(t); ok(); } }); }); }
+          } catch (_) {}
           location.reload();
         });
         host.insertAdjacentElement("afterend", bar);
