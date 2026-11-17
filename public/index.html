@@ -168,6 +168,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .rv > summary::-webkit-details-marker { display: none; }
 .rv-main { display: grid; gap: 1px; min-width: 0; }
 .rv-main b { font-weight: 600; overflow-wrap: anywhere; }
+.rv-note { font-size: .82rem; color: var(--fg); background: var(--hover); border-radius: 6px; padding: 2px 6px; margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; justify-self: start; }
 .rv > summary .l-amt::after { content: ""; display: inline-block; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); margin-left: 10px; vertical-align: middle; transition: transform .15s; }
 .rv[open] > summary .l-amt::after { transform: rotate(45deg); }
 .rv > summary .l-amt { display: block; white-space: nowrap; }
@@ -1423,15 +1424,13 @@ details.restock > summary::-webkit-details-marker { display: none; }
     return '<div class="field"><label for="f-cust">客户（可不填）</label><input id="f-cust" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" placeholder="Marketplace 上的称呼" value="' + esc(o.customer || "") + '"></div>' +
       '<p class="hint" id="f-cust-hint" hidden></p>';
   }
-  /* the rest lives in the folded "更多" section */
+  /* the rest lives in the folded "更多" section。
+     2026-11-17 Bowen：「区」「从哪来的」没必要 → 拿掉（真实数据 154 单里只有 2 单填过区，来源全是自动填的「回头客」）。以前填过的照旧留在记录上，不再显示 */
   function custMoreHtml(o) {
     o = o || {}; const fu = o.follow_up || {};
-    return '<div class="grid2"><div class="field"><label for="f-sub">区（suburb）</label><input id="f-sub" list="dl-sub" autocomplete="off" placeholder="比如 Rockingham" value="' + esc(o.suburb || "") + '"></div>' +
-      '<div class="field"><label for="f-src">从哪来的</label><input id="f-src" list="dl-src" autocomplete="off" placeholder="帖子、回头客…" value="' + esc(o.source || "") + '"></div></div>' +
-      '<div class="grid2"><div class="field"><label for="f-fu">下次跟进</label><input id="f-fu" type="date" value="' + esc(fu.date || "") + '"></div>' +
+    return '<div class="grid2"><div class="field"><label for="f-fu">下次跟进</label><input id="f-fu" type="date" value="' + esc(fu.date || "") + '"></div>' +
       '<div class="field"><label for="f-funote">跟进什么</label><input id="f-funote" placeholder="比如：想要一整盒" value="' + esc(fu.note || "") + '"></div></div>' +
-      (fu.done ? '<label class="check"><input type="checkbox" id="f-fudone" checked><span>已经跟进过了</span></label>' : "") +
-      dlHtml("dl-sub", uniqVals((x) => x.suburb)) + dlHtml("dl-src", [...new Set(SOURCES.concat(uniqVals((x) => x.source)))]);
+      (fu.done ? '<label class="check"><input type="checkbox" id="f-fudone" checked><span>已经跟进过了</span></label>' : "");
   }
   /* typing a name we've sold to before shows their history and fills in their suburb */
   /* 客户名字：打几个字，下面直接列出以前的客人（名字里有这几个字就算，不分大小写），点一下填上。
@@ -1463,9 +1462,6 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const paid = past.filter((o) => !isReserved(o)), n = paid.reduce((a, o) => a + (o.lines || []).reduce((s, l) => s + (Number(l.qty) || 0), 0), 0);
       h.textContent = "回头客：之前买过 " + paid.length + " 次、" + n + " 根，共 " + money(r2(paid.reduce((a, o) => a + (orderTotal(o) || 0), 0))) + "，上次 " + fmtD(past[0].date) + "。";
       if (!fill) return;
-      const prof = S.customers.find((x) => x.id === custId($("f-cust").value)), last = past.find((o) => o.suburb), sub = (prof && prof.suburb) || (last && last.suburb);
-      if (sub && !$("f-sub").value.trim()) $("f-sub").value = sub;
-      if ($("f-src") && !$("f-src").value.trim()) $("f-src").value = "回头客";
     };
     /* 打字时就显示「回头客」那行：以前要等输入框失焦（也就是点「保存」那一下）才冒出来，表单变高、按钮下移，第一下保存会点空 */
     $("f-cust").addEventListener("input", () => upd(false));
@@ -1476,7 +1472,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const v = (id) => ($(id).value || "").trim(), prev = (o && o.follow_up) || {};
     const d = v("f-fu"), n = v("f-funote"), done = $("f-fudone") ? $("f-fudone").checked : false;
     const fu = d || n ? Object.assign({ date: d || null, note: n, done }, done && prev.done_at ? { done_at: prev.done_at } : {}, prev.contacted_at ? { contacted_at: prev.contacted_at } : {}) : null;
-    return { customer: v("f-cust") || null, suburb: v("f-sub") || null, source: v("f-src") || null, follow_up: fu };
+    const name = v("f-cust") || null; // 区、来源不再填：以前记的照旧留着；来源跟以前一样，买过的人自动记「回头客」
+    return { customer: name, suburb: (o && o.suburb) || null, source: (o && o.source) || (name && custOrders(name, o && o.id).length ? "回头客" : null), follow_up: fu };
   }
   /* ---------- 客人少给 / 多给（2026-11-17 Bowen）：结账时客人少给了（比如忘了配送费）或多给了，记在那一单上；
      下次跟这个客人记单 / 结算预定时提醒「上次少给 $30，这单要收回来」或「上次多给 $20，这单少收」，勾上就两清。
@@ -1562,9 +1559,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
     };
   }
   const belowPill = () => "";
-  /* one line for lists: "Belinda · Cooloongup · 来自 芒果帖 · 跟进 11月1日：想要一盒" */
+  /* one line for lists: "Belinda · 跟进 11月1日：想要一盒" */
   function custLine(o) {
-    const fu = o.follow_up, a = [o.customer, o.suburb, o.source ? "来自 " + o.source : ""].filter(Boolean);
+    const fu = o.follow_up, a = [o.customer].filter(Boolean);
     if (fu && !fu.done) a.push((fu.contacted_at ? "已发信息，等回复" : "跟进" + (fu.date ? " " + fmtD(fu.date) : "")) + (fu.note ? "：" + fu.note : ""));
     return a.join(" · ");
   }
@@ -1590,9 +1587,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
       mixRowHtml(edit || null) +
       custNameHtml(custPre) + balHtml(edit) +
       '<p class="total">合计<b id="f-total">–</b></p><p id="f-baltot" hidden></p>' +
-      '<details class="more" id="f-more"><summary id="f-more-sum">更多：日期、备注、客户资料</summary><div class="more-body">' +
+      '<details class="more" id="f-more"' + (edit && (edit.note || edit.follow_up) ? " open" : "") + '><summary id="f-more-sum">更多：日期、备注、下次跟进</summary><div class="more-body">' +
         '<div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + esc((edit && edit.date) || today()) + '"></div>' +
-        '<div class="field"><label for="f-note">备注</label><input id="f-note" placeholder="取货方式、其他说明" value="' + esc(edit ? edit.note || "" : "") + '"></div>' +
+        '<div class="field"><label for="f-note">备注</label><textarea id="f-note" rows="2" placeholder="什么时候、在哪见面，其他说明">' + esc(edit ? edit.note || "" : "") + "</textarea></div>" +
         custMoreHtml(custPre) +
       "</div></details>" +
       '<p class="callout" id="f-pickhint" hidden></p>' + pnameField(edit ? edit.pick_from || "" : "", true) + splitter.html;
@@ -1634,7 +1631,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }
     function updQuote() {
       const d = $("f-date").value;
-      $("f-more-sum").textContent = d && d !== today() ? "更多（日期 " + fmtD(d) + "）" : "更多：日期、备注、客户资料";
+      $("f-more-sum").textContent = d && d !== today() ? "更多（日期 " + fmtD(d) + "）" : "更多：日期、备注、下次跟进";
     }
     async function submit() {
       needDb();
@@ -1716,12 +1713,12 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const html =
       '<div class="field"><label for="f-date">卖出日期</label><input id="f-date" type="date" value="' + esc(o.date || today()) + '"></div>' +
       custNameHtml(o) + balHtml(o) +
-      '<details class="more"' + (o.suburb || o.source || o.follow_up ? " open" : "") + '><summary>客户资料：区、来源、跟进</summary><div class="more-body">' + custMoreHtml(o) + "</div></details>" +
+      '<details class="more"' + (o.follow_up ? " open" : "") + '><summary>下次跟进</summary><div class="more-body">' + custMoreHtml(o) + "</div></details>" +
       '<div class="fixed-line" style="font-size:.74rem;color:var(--muted)"><span>香型</span><span>数量</span><span>单价 $</span></div>' +
       lines.map((l, k) => '<div class="fixed-line"><span>' + esc(nm(l.sku, l.name)) + '</span><span>×' + esc(l.qty) + '</span><input id="f-price-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" placeholder="未填" aria-label="' + esc(l.name) + ' 单价" value="' + (l.unit_price == null ? "" : esc(l.unit_price)) + '"></div>').join("") +
       '<div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(o.delivery_fee || "") + '"></div>' +
       payPick(o) +
-      '<div class="field"><label for="f-note">备注</label><input id="f-note" value="' + esc(o.note || "") + '"></div>' +
+      '<div class="field"><label for="f-note">备注</label><textarea id="f-note" rows="2">' + esc(o.note || "") + "</textarea></div>" +
       (isReserved(o) && lines.length ? pnameField(o.pick_from || "", false) + (splitter = pickSplitter(o.pick_split || null)).html : "") +
       (lines.length ? lumpHtml(o.lump_total != null, o.lump_total) : "") +
       '<p class="total">合计<b id="f-total">–</b></p><p id="f-baltot" hidden></p>' +
@@ -2628,8 +2625,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="field"><label>想要的口味（可以不选）</label></div><div id="f-lines"></div>' +
       '<div><button type="button" class="btn ghost small" id="f-addline">+ 再加一种</button></div>' +
       '<div class="field"><label for="f-funote">跟进什么</label><input id="f-funote" placeholder="比如：葡萄冰没货了，到货告诉他" value="' + esc((f && f.note) || "") + '"></div>' +
-      '<div class="grid2"><div class="field"><label for="f-fu">哪天跟进（可不填）</label><input id="f-fu" type="date" value="' + esc((f && f.date) || "") + '"></div>' +
-      '<div class="field"><label for="f-sub">区（可不填）</label><input id="f-sub" list="dl-sub" autocomplete="off" value="' + esc((f && f.suburb) || "") + '"></div></div>' + dlHtml("dl-sub", uniqVals((x) => x.suburb)) +
+      '<div class="field"><label for="f-fu">哪天跟进（可不填）</label><input id="f-fu" type="date" value="' + esc((f && f.date) || "") + '"></div>' +
       '<p class="hint">口味到货后，跟进列表会显示「到货了」，提醒你去找他。</p>';
     function addLine(sku, qty) {
       const k = n++, row = document.createElement("div");
@@ -2649,7 +2645,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const note = $("f-funote").value.trim();
       if (!wants.length && !note) throw userError("选一下他想要的口味，或者写一下要跟进什么。");
       const fid = f ? f.id : rid("fu");
-      await db.collection("followups").doc(fid).set(Object.assign({ customer: name, wants, note, date: $("f-fu").value || null, suburb: $("f-sub").value.trim() || null, done: false, created_at: (f && f.created_at) || new Date().toISOString() }, f && f.contacted_at ? { contacted_at: f.contacted_at } : {}));
+      await db.collection("followups").doc(fid).set(Object.assign({ customer: name, wants, note, date: $("f-fu").value || null, suburb: (f && f.suburb) || null, done: false, created_at: (f && f.created_at) || new Date().toISOString() }, f && f.contacted_at ? { contacted_at: f.contacted_at } : {}));
       return f ? "跟进已更新。" : "已记下：" + name + (wants.length ? " 想要 " + wantsText(wants) : "") + "。在「客户」和「财务」的跟进列表里都能看到。";
     }, () => {
       const pre = (f && f.wants) || [];
@@ -4589,7 +4585,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     $("c-list").innerHTML = list.map((c) => {
       const open = openCust === c.id, f = c.fu, n = c.paid.length, cb = custBal(c.name);
       const pills = (c.p.type === "wholesale" ? '<span class="tag">批发</span>' : '<span class="tag" style="background:var(--line);color:var(--muted)">零售</span>') + (cb.amt ? '<span class="pill ' + (cb.amt > 0 ? "warn" : "ok") + '">' + (cb.amt > 0 ? "少给你 " : "多给了 ") + money(Math.abs(cb.amt)) + "</span>" : "") + (n >= 2 ? '<span class="pill">回头客 · ' + n + " 次</span>" : "") + (c.resv.length ? '<span class="pill warn">有预定</span>' : "") + (f ? '<span class="pill ' + (f.restocked ? "" : f.contacted_at ? "na" : "warn") + '">' + (f.restocked ? "到货了" : f.contacted_at ? "等回复" : "要跟进") + "</span>" : "");
-      const sub = [c.suburb || (c.enq.find((x) => x.suburb) || {}).suburb, n ? "买过 " + n + " 次、" + c.qty + " 根" : c.enq.length ? "问过 " + c.enq.length + " 次，还没成交" : "还没成交", c.last ? "上次 " + fmtD(c.last) + "（" + agoText(c.last) + "）" : ""].filter(Boolean).join(" · ");
+      const sub = [n ? "买过 " + n + " 次、" + c.qty + " 根" : c.enq.length ? "问过 " + c.enq.length + " 次，还没成交" : "还没成交", c.last ? "上次 " + fmtD(c.last) + "（" + agoText(c.last) + "）" : ""].filter(Boolean).join(" · ");
       const balNote = (o) => balOf(o).map((e) => (e.kind === "diff" ? (e.amt > 0 ? "少给 " : "多给 ") + money(Math.abs(e.amt)) : e.kind === "back" ? (e.amt < 0 ? "收回 " : "抵掉 ") + money(Math.abs(e.amt)) : "不追了 " + money(Math.abs(e.amt))) + (e.why && e.kind === "diff" ? "：" + e.why : "")).join("；");
       const hist = c.orders.map((o) => { const t = orderTotal(o); return "<li><span>" + fmtD(o.date) + (isReserved(o) ? " · 预定" : "") + " · " + esc(linesText(o)) + (o.note ? "（" + esc(o.note) + "）" : "") + (balOf(o).length ? ' <b class="bal-note">' + esc(balNote(o)) + "</b>" : "") + "</span><b>" + (t == null ? "未填价" : money(t)) + "</b></li>"; }).join("");
       return '<div class="row"><div class="row-top cu-top">' +
@@ -4613,7 +4609,6 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const p = c.p, v = (k, fb) => esc(p[k] != null ? p[k] : fb || "");
     openSheet("客户资料 · " + c.name,
       '<div class="field"><label>客户类型</label><div class="chips" role="radiogroup" aria-label="客户类型"><label class="chip"><input type="radio" name="f-ctype" value="retail"' + (p.type === "wholesale" ? "" : " checked") + '> 零售</label><label class="chip"><input type="radio" name="f-ctype" value="wholesale"' + (p.type === "wholesale" ? " checked" : "") + "> 批发（记单时自动按盒报价）</label></div></div>" +
-      '<div class="field"><label for="f-csub">区（suburb）</label><input id="f-csub" value="' + v("suburb", c.suburb) + '" placeholder="比如 Rockingham"></div>' +
       '<div class="field"><label for="f-ccontact">联系方式</label><input id="f-ccontact" value="' + v("contact") + '" placeholder="Facebook 名字、电话、地址…"></div>' +
       '<div class="field"><label for="f-cnote">关于这个人</label><textarea id="f-cnote" rows="3" placeholder="比如：买得多、喜欢芒果味、只收现金">' + v("note") + "</textarea></div>" +
       '<p class="hint">这些是客户本身的信息，每次记单都会用到。某一单的情况写在那一单的备注里。</p>',
@@ -4621,7 +4616,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
         needDb();
         const val = (k) => $(k).value.trim();
         const ty = (document.querySelector('input[name="f-ctype"]:checked') || {}).value || "retail";
-        await db.collection("customers").doc(c.id).set({ name: c.name, key: normName(c.name), type: ty, suburb: val("f-csub") || null, contact: val("f-ccontact") || null, note: val("f-cnote") || null, created_at: p.created_at || new Date().toISOString() });
+        await db.collection("customers").doc(c.id).set({ name: c.name, key: normName(c.name), type: ty, suburb: p.suburb || null, contact: val("f-ccontact") || null, note: val("f-cnote") || null, created_at: p.created_at || new Date().toISOString() });
         return "已保存 " + c.name + " 的资料。";
       });
   }
@@ -4724,7 +4719,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     $("fu-list").innerHTML = FU.map((x) => {
       const due = !!x.date && x.date <= td, times = x.customer ? custOrders(x.customer).filter((o) => !isReserved(o)).length : 0;
       return '<div class="lrow fu' + ((due && !x.contacted_at) || x.restocked ? " due" : "") + '"><div><span class="l-date">' + (x.restocked ? "到货了 · " : "") + fuWhen(x) + "</span>" +
-        '<span class="l-desc"><b>' + esc(x.customer || "（没写名字）") + "</b>" + (x.suburb ? " · " + esc(x.suburb) : "") + "</span>" +
+        '<span class="l-desc"><b>' + esc(x.customer || "（没写名字）") + "</b></span>" +
         (x.wants.length ? '<span class="l-sub">想要：' + wantsHtml(x.wants) + "</span>" : "") +
         (x.note ? '<span class="l-sub">' + esc(x.note) + "</span>" : "") +
         '<span class="l-sub">' + esc(x.origin) + (times > 1 ? " · 一共买过 " + times + " 次" : "") + "</span></div>" +
@@ -4739,10 +4734,12 @@ details.restock > summary::-webkit-details-marker { display: none; }
     $("resv-n").textContent = resv.length + " 单 · " + rvN + " 根";
     $("cu-badge").hidden = !resv.length; $("cu-badge").textContent = resv.length > 99 ? "99+" : String(resv.length);
     $("resv").innerHTML = resv.map((o) => { const t = orderTotal(o), n = (o.lines || []).reduce((a, l) => a + (Number(l.qty) || 0), 0);
-      const who = o.customer ? o.customer + (o.suburb ? " · " + o.suburb : "") : (o.note || "").split(/[（(，,·]/)[0].trim().slice(0, 18);
+      const who = o.customer || (o.note || "").split(/[（(，,·]/)[0].trim().slice(0, 18);
+      /* 备注（见面时间、地点……）直接写在没点开的卡片上（2026-11-17 Bowen：写了备注，概览上看不到）；以前只在点开后显示 */
+      const rvNote = o.note && o.note.trim() !== who ? '<span class="rv-note">' + esc(o.note) + "</span>" : "";
       const pk = RS[o.id] ? Object.values(RS[o.id]).reduce((a, x) => a + x, 0) : 0;
       return '<details class="rv"><summary><span class="rv-main"><span class="l-date"><span class="tag-resv">预定</span>' + fmtD(o.date) + "</span>" +
-        "<b>" + esc(who || "（没写客人名字）") + "</b>" + '<span class="l-sub">' + esc(serTxt(serQty([o]))) + "</span>" +
+        "<b>" + esc(who || "（没写客人名字）") + "</b>" + '<span class="l-sub">' + esc(serTxt(serQty([o]))) + "</span>" + rvNote +
         ((() => { const cb = o.customer ? custBal(o.customer, o.id) : { amt: 0 }; const d = balOf(o).find((e) => e.kind === "diff");
           return (cb.amt ? '<span class="pill ' + (cb.amt > 0 ? "warn" : "ok") + '">' + (cb.amt > 0 ? "上次少给 " : "上次多给 ") + money(Math.abs(cb.amt)) + "</span>" : "") +
             (d ? '<span class="pill ' + (d.amt > 0 ? "warn" : "ok") + '">' + (d.amt > 0 ? "这单少给 " : "这单多给 ") + money(Math.abs(d.amt)) + (d.why ? "：" + esc(d.why) : "") + "</span>" : ""); })()) +
@@ -4750,7 +4747,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
         (PKO[o.id] ? PKO[o.id].map((g) => '<span class="pick-tag done">已从' + esc(gWho(g)) + "拿货 · " + (g.sid ? "已结账" : "还没结账") + "</span>").join("") : "") + "</span>" +
         '<span class="l-amt">' + (t == null ? '<span class="pill warn">未定价</span>' : money(t)) + "</span></summary>" +
         '<div class="rv-body"><div class="l-desc">' + (o.payment ? payBadgeO(o) : "") + linesBySrc(o, RA.groups.filter((g) => g.oid === o.id).map((g) => ({ label: "找" + gWho(g) + "拿", qty: skuQty(g.moves) }))
-          .concat((PKO[o.id] || []).map((g) => ({ label: "找" + gWho(g) + "拿", cls: "done", qty: skuQty(g.moves) })))) + "</div>" + (custLine(o) ? '<span class="l-sub">' + esc(custLine(o)) + "</span>" : "") + (o.note ? '<span class="l-sub">' + esc(o.note) + "</span>" : "") +
+          .concat((PKO[o.id] || []).map((g) => ({ label: "找" + gWho(g) + "拿", cls: "done", qty: skuQty(g.moves) })))) + "</div>" + (o.follow_up && !o.follow_up.done ? '<span class="l-sub">' + esc(custLine(o)) + "</span>" : "") +
         '<div class="l-actions"><button class="btn small primary" type="button" data-settle="' + esc(o.id) + '">结算</button><button class="btn small" type="button" data-edit-order="' + esc(o.id) + '">编辑</button><button class="btn small ghost danger" type="button" data-void-order="' + esc(o.id) + '">取消预定</button></div></div></details>'; }).join("");
 
   }

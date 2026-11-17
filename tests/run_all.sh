@@ -20,6 +20,7 @@ run python3 tests/test_rank.py
 run python3 tests/test_weeks.py
 run python3 tests/test_cust_bal.py
 run python3 tests/test_pay_mix.py
+run python3 tests/test_resv_note.py
 run python3 tests/test_fifo_gap.py
 run python3 tests/test_copy_flavours.py
 run node tests/orderparse_test.js
