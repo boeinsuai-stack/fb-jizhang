@@ -130,7 +130,7 @@ with sync_playwright() as p:
         go(pg, "customers"); pg.fill("#cq", "cara"); pg.wait_for_timeout(250)
         check("客户页 Cara 那一行标「少给你 $15」", "少给你 $15" in pg.inner_text("#c-list"))
         pg.click("#c-list [data-cu]"); pg.wait_for_timeout(250)
-        check("点开写明「上次少给你 $15：…抹零」和这单的记录", "上次少给你 $15" in pg.inner_text("#c-list") and "抹零" in pg.inner_text("#c-list") and "少给 $15" in pg.inner_text("#c-list .cu-hist"))
+        check("点开写明「上次少给你 $15：…抹零」和这单的记录", "上次少给你 $15" in pg.inner_text("#c-list") and "抹零" in pg.inner_text("#c-list") and "少给 $15" in pg.inner_text("#c-list .cu-hist2"))
         pg.click("[data-cu-waive]"); pg.wait_for_timeout(200)
         check("「不追了」点第一下只是问一下（不弹浏览器确认框）", bal(pg, "Cara") == 15 and "再点一下" in pg.inner_text("[data-cu-waive]"))
         pg.click("[data-cu-waive]"); pg.wait_for_timeout(500)
