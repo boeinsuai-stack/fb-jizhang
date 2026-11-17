@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-17 线上 fb-app-v27，分支 feat-pay-po → feat-resv-note 是 v28，一起上线）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-17 线上 fb-app-v27，分支 feat-pay-po → feat-resv-note → feat-fast-open 是 v28，一起上线）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -218,6 +218,18 @@
 - 「客人信息里各种区、各种地方没必要」：记单 / 编辑 / 结算的折叠只剩「下次跟进」（以前「客户资料：区、来源、跟进」），记跟进、客户资料也拿掉「区」。
   查真实数据：154 单里只有 2 单填过区；「从哪来的」33 单全是自动填的「回头客」。以前填过的区 / 来源**照旧留在记录上**（`readCust(o)` 从原记录带过去，客户资料、跟进同样），只是不再显示；来源照旧自动：这个名字以前有单 → 「回头客」
 - 测试 `tests/test_resv_note.py` 40/40（编的数据，旧/新结构，GitHub 上也跑）
+
+## 打开先用上次存的、复制口味放标题右边（feat-fast-open，2026-11-18）
+- Bowen：打开最常做的就是复制口味，可每次白屏 3–4 秒，按钮还要往下找。
+- 实测（`/home/claude/audit/bench/startup.py`：真 SDK + 真本地数据库 + 真 Service Worker + 真实数据量 900 多条，CPU 降速）：以前降速 4 倍出数字 2.0–2.2 秒、8 倍 4.2 秒（信号差时偶尔 9 秒）——
+  时间主要花在 Firebase 启动本地数据库、读出全部记录；页面本身算一遍只要 0.3 秒（8 倍降速）
+- **快照**：数据读完、之后每次变了（2 秒防抖，切到后台时马上）把页面用的 9 类（S.items/orders/moves/expenses/purchases/settles/transfers/customers/followups，旧样子，新结构下是现算好的）存进 localStorage `fb-snap:<uid>`（uid 取 `fb-last-user`；真实数据约 330 KB）。
+  下次打开在 data 那段之前同步读出来，`S.loaded = 15`、`snapOn = true`，马上 render → 能看、能复制口味。Firebase 读到的先放 `R`，9 类都到了 `Object.assign(S, R)` 一次换掉（`mark()`），不会一半新一半旧。
+  `snapOn` 时 `needDb()` 拦住保存（「正在读手机里的数据，一两秒后再点保存」）、`migCheck`、补操作记录也等。快照的数据结构版本跟 `fb-schema` 对不上就不用。存不下就删掉，照旧等 Firebase
+  - 结果（同一台电脑）：降速 4 倍 1.0–1.1 秒、8 倍 1.7–2.0 秒出数字；不降速 0.3 秒。新手机 / 清过数据第一次打开照旧
+- xlsx（近 1 MB）不再每次打开都加载：`needXLSX()` 点备份 / 导出时才加；sw.js 照旧预存。Firebase、shim 等脚本从 `<head>` 挪到 `<body>` 最后（build_mirror.py 跟着改成页头页尾都找）
+- 「复制口味」：从库存一览那一栏（快速下单格子下面）挪到标题右边 `header.top #inv-copy`，只在库存页显示
+- 测试 `tests/test_snapshot.py` 22/22（编的数据，旧/新结构，GitHub 上也跑：第二次打开时假 Firebase 每类慢 2.5 秒，先显示上次的 7，读完一次换成 10）
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超

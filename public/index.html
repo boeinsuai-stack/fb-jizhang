@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v28"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v28"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -52,6 +52,8 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-body); f
 main { display: grid; gap: 24px; }
 
 .top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
+/* 复制口味：Bowen 打开 App 最常做的一件事，放在标题右边，一打开就点得到（以前在快速下单格子下面，要往下找） */
+.hd-copy { align-self: center; padding: 10px 16px; font-size: .95rem; }
 .eyebrow { margin: 0 0 4px; font-size: .75rem; letter-spacing: .08em; color: var(--muted); }
 h1 { font-family: var(--font-display); font-weight: 700; font-size: 2.4rem; line-height: 1; margin: 0; letter-spacing: .01em; }
 /* 底部导航：手机单手就能换页，滑到哪都在 */
@@ -727,6 +729,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <p class="eyebrow">BOWEN · 香氛棒</p>
       <h1 id="view-title">库存</h1>
     </div>
+    <button class="btn primary hd-copy" id="inv-copy" type="button">复制口味</button>
     <nav class="switch" aria-label="切换系统">
       <a id="nav-inv" href="#inventory" aria-current="page"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.6 12 3.4l8.5 4.2v8.8L12 20.6l-8.5-4.2z"/><path d="M3.5 7.6 12 11.8l8.5-4.2M12 11.8v8.8"/></svg></span>库存</a>
       <a id="nav-po" href="#purchases"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h10.5v9H3zM13.5 9.5h3.8l3.2 3.3v2.7h-7"/><circle cx="7" cy="17.6" r="1.8"/><circle cx="17" cy="17.6" r="1.8"/></svg></span>订货</a>
@@ -754,7 +757,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <div class="tiles" id="qo-tiles"><div class="empty">正在读取…</div></div>
     </section>
     <section class="stockbox" aria-label="库存一览">
-      <div class="sb-bar"><button class="sb-head" id="sb-toggle" type="button" aria-expanded="true" aria-controls="sb-cols"><span class="sb-title">能卖 <b id="sb-total">–</b> 根</span><span class="sb-sers" id="sb-sers"></span><span class="sb-chev" id="sb-chev">收起</span></button><button class="btn small" id="inv-copy" type="button">复制口味</button></div>
+      <div class="sb-bar"><button class="sb-head" id="sb-toggle" type="button" aria-expanded="true" aria-controls="sb-cols"><span class="sb-title">能卖 <b id="sb-total">–</b> 根</span><span class="sb-sers" id="sb-sers"></span><span class="sb-chev" id="sb-chev">收起</span></button></div>
       <div class="sb-cols" id="sb-cols"></div>
     </section>
     <div class="actions">
@@ -1010,8 +1013,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
   <button class="btn primary" id="cb-go" type="button">下单</button>
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
+<!-- 脚本放在页面最后（2026-11-18）：以前在 <head> 里，Firebase 解析完之前整页是白的；现在先画出页面框架，再加载 -->
+<script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script>
 
-<script src="vendor/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -1244,7 +1248,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     try { const msg = await sheetSubmit(); closeSheet(); if (msg) toast(msg); }
     catch (x) { err.textContent = (x && x.userMsg) || errText(x); err.hidden = false; btn.disabled = false; }
   });
-  function needDb() { if (!db) throw userError("现在连不上数据，请检查网络后重新打开。"); }
+  function needDb() { if (!db) throw userError("现在连不上数据，请检查网络后重新打开。"); if (snapOn) throw userError("正在读手机里的数据，一两秒后再点保存。"); }
 
   /* ---------- forms ---------- */
   /* type-to-search flavour picker; the chosen code lives in a hidden input f-sku-<k> */
@@ -4413,13 +4417,16 @@ details.restock > summary::-webkit-details-marker { display: none; }
       return n || ((await userCap.isOwner()) ? "Bowen" : "共享成员");
     } catch (_) { return ""; }
   }
+  /* xlsx（将近 1 MB）以前每次打开都先加载：手机上光解析就要大半秒。现在点备份 / 导出时才加载（文件照旧预存在手机里，没网也能用） */
+  let xlsxP = null;
+  const needXLSX = () => window.XLSX ? Promise.resolve(true) : (xlsxP = xlsxP || new Promise((ok) => { const sc = document.createElement("script"); sc.src = "vendor/xlsx/0.18.5/xlsx.full.min.js"; sc.onload = () => ok(!!window.XLSX); sc.onerror = () => { xlsxP = null; ok(false); }; document.head.appendChild(sc); }));
   const stamp = () => { const d = new Date(); return ymd(d) + " " + pad(d.getHours()) + "-" + pad(d.getMinutes()); };
   $("bk-btn").addEventListener("click", async () => {
     if (!db || !mcp) return;
     const btn = $("bk-btn"); btn.disabled = true; btn.textContent = "备份中…"; showBk("");
     const prev = S.sync || {};
     try {
-      if (!window.XLSX) throw userError("备份组件没加载出来，请刷新页面再试。");
+      if (!(await needXLSX())) throw userError("备份组件没加载出来，请刷新页面再试。");
       const who = await whoAmI();
       const title = "Marketplace 备份 " + stamp() + (who ? " · " + who : "");
       const r = await mcp.callTool("Google Drive", "create_file", {
@@ -4528,7 +4535,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   }
   $("xl-btn").addEventListener("click", async () => {
     showBk("");
-    if (!window.XLSX) { showBk("导出组件没加载出来，请刷新页面再试。"); return; }
+    if (!(await needXLSX())) { showBk("导出组件没加载出来，请刷新页面再试。"); return; }
     if (!downloads) { showBk("现在不能导出文件，请刷新后再试。"); return; }
     try {
       const data = buildWorkbook();
@@ -4761,7 +4768,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     view = VIEWS[h] ? h : "inventory";
     try { localStorage.setItem("mk-view", view); } catch (_) {}
     for (const [k, [vid, nid]] of Object.entries(VIEWS)) { $(vid).hidden = k !== view; if (k === view) $(nid).setAttribute("aria-current", "page"); else $(nid).removeAttribute("aria-current"); }
-    $("view-title").textContent = VIEWS[view][2];
+    $("view-title").textContent = VIEWS[view][2]; $("inv-copy").hidden = view !== "inventory";
     render();
   }
   window.addEventListener("hashchange", route);
@@ -4795,7 +4802,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     } else $("mig-status").textContent = "现在用的是旧结构。先点「检查迁移」：把全部记录转成新结构再算回来，逐条比对，不改任何数据。";
   }
   function migCheck() {
-    if ((S.loaded & 15) !== 15) { toast("数据还没读完，稍等再点。"); return; }
+    if ((S.loaded & 15) !== 15 || snapOn) { toast("数据还没读完，稍等再点。"); return; }
     const old = { items: {}, customers: {}, followups: {} };
     for (const [c, k] of Object.entries(MIG_V1)) { old[c] = {}; for (const x of S[k]) old[c][x.id] = migClean(x); }
     for (const i of S.items) old.items[i.sku] = migClean(i);
@@ -4888,6 +4895,33 @@ details.restock > summary::-webkit-details-marker { display: none; }
   $("mig-late").addEventListener("click", () => migLateApply().catch((e) => toast("补进失败：" + errText(e))));
   $("mig-back").addEventListener("click", (e) => arm(e.currentTarget, "确定退回？", migBack));
 
+  /* ---------- 打开先用上次存的（2026-11-18 Bowen：打开要白屏 3–4 秒才能复制口味）----------
+     电脑上把 CPU 调慢 8 倍（≈ 普通手机）、用真实数据量实测：数据早就在手机的本地数据库里，可是 Firebase 启动本地数据库 + 读出 900 多条记录 + 算出来要 4 秒左右。
+     现在每次数据变了就把页面要用的那份（口味、订单、流水……算好的样子）存一份到 localStorage；下次打开不等 Firebase，直接用这份马上显示、能复制口味。
+     Firebase 读完以后整份换成真的（一次换完，不会一半新一半旧）。换之前不让保存（needDb），免得按旧数据记账 */
+  const SNAPF = ["items", "orders", "moves", "expenses", "purchases", "settles", "transfers", "customers", "followups"];
+  const snapKey = (() => { try { const u = JSON.parse(localStorage.getItem("fb-last-user") || "null"); return u && u.uid ? "fb-snap:" + u.uid : ""; } catch (_) { return ""; } })();
+  const snapSchema = () => { try { return (JSON.parse(localStorage.getItem("fb-schema") || "null") || {}).version === 2 ? 2 : 1; } catch (_) { return 1; } };
+  let snapOn = false, snapT = null; const R = {};
+  function saveSnap() {
+    clearTimeout(snapT); snapT = null;
+    if (!snapKey || snapOn || (S.loaded & 15) !== 15) return;
+    const x = { v: 1, at: Date.now(), schema: snapSchema(), S: {} }; for (const k of SNAPF) x.S[k] = S[k] || [];
+    try { localStorage.setItem(snapKey, JSON.stringify(x)); } catch (_) { try { localStorage.removeItem(snapKey); } catch (__) {} } // 存不下（手机空间满）：不存，下次照旧等 Firebase
+  }
+  const saveSnapSoon = () => { if (!snapT) snapT = setTimeout(saveSnap, 2000); };
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && snapT) saveSnap(); });
+  (() => {
+    if (!snapKey) return;
+    try {
+      const x = JSON.parse(localStorage.getItem(snapKey) || "null");
+      if (!x || x.v !== 1 || x.schema !== snapSchema() || !x.S || !Array.isArray(x.S.items)) return;
+      for (const k of SNAPF) S[k] = Array.isArray(x.S[k]) ? x.S[k] : [];
+      S.loaded = 15; snapOn = true; window.__fbSnapAt = x.at; render();
+    } catch (_) {}
+  })();
+  window.__fbSnapOn = () => snapOn; // 测试用
+
   /* ---------- data ---------- */
   (async () => {
     rawDb = window.claude && window.claude.use ? await window.claude.use("db") : null;
@@ -4904,7 +4938,13 @@ details.restock > summary::-webkit-details-marker { display: none; }
     /* 读完了才算读完（2026-11-16）：以前口味一到 S.loaded 就是真，订单、流水还没读进来时页面已经按一半数据显示库存、客户，
        复制口味复制出错的数字。现在每类记录都到了，S.loaded 才变成 15（页面里 S.loaded 为真、(S.loaded & 15) === 15 都 = 全部读完） */
     let got = 0; const NEED = 511; // 1 口味 2 流水 4 订单 8 支出 16 订货 32 结账 64 往来 128 客户 256 跟进
-    const mark = (k) => { got |= k; S.loaded = (got & NEED) === NEED ? 15 : 0; };
+    const mark = (k) => {
+      got |= k;
+      if ((got & NEED) === NEED) { if (snapOn) { Object.assign(S, R); snapOn = false; } S.loaded = 15; saveSnapSoon(); }
+      else if (!snapOn) S.loaded = 0;
+    };
+    const T = () => (snapOn ? R : S); // 先显示上次存的数据时，读到的先放一边，全部到了一次换掉
+    const rr = () => { if (!snapOn) render(); };
     const all = (snap) => snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
     /* 数据结构版本：云端 meta/schema.version === 2 才用 v2（迁移确认后才写这个标记）；版本变了就刷新页面，两台手机一起换 */
     /* 数据结构版本先用这台手机记得的（马上就有）：以前每次打开都先问云端，信号差时 Firebase 要等 10 秒才放弃，这 10 秒 App 一直「正在读取」。
@@ -4917,23 +4957,23 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const d = keepSchema(sc.exists ? sc.data() || {} : {}); if ((d.version === 2 ? 2 : 1) !== schemaV) location.reload();
     }, () => {});
     if (schemaV === 2 && window.FBV2) {
-      v2store = window.FBV2.createStore(rawDb, () => S.items, (P, ready) => {
+      v2store = window.FBV2.createStore(rawDb, () => (snapOn && R.items ? R.items : S.items), (P, ready) => {
         if (!ready) return; // 还有几类没读到：先不换（一半的数据算出来的库存、客户都不对）
-        S.orders = P.orders; S.moves = P.moves; S.expenses = P.expenses; S.purchases = P.purchases; S.settles = P.settles; S.transfers = P.transfers;
-        mark(2 | 4 | 8 | 16 | 32 | 64); render();
+        const t = T(); t.orders = P.orders; t.moves = P.moves; t.expenses = P.expenses; t.purchases = P.purchases; t.settles = P.settles; t.transfers = P.transfers;
+        mark(2 | 4 | 8 | 16 | 32 | 64); rr();
       });
       window.__fbV2store = v2store; // 中转站（shim.js）用：上传现算的旧样子、写入 Claude 改动
     }
     migInit();
-    db.collection("items").limit(1000).onSnapshot((s) => { S.items = all(s).map((i) => Object.assign({ sku: i.id }, i)); mark(1); if (v2store) v2store.refresh(); render(); }, onErr);
-    if (!v2store) db.collection("movements").limit(1000).onSnapshot((s) => { S.moves = all(s); mark(2); render(); }, onErr);
-    if (!v2store) db.collection("orders").limit(1000).onSnapshot((s) => { S.orders = all(s); mark(4); render(); }, onErr);
-    if (!v2store) db.collection("expenses").limit(1000).onSnapshot((s) => { S.expenses = all(s); mark(8); render(); }, onErr);
-    if (!v2store) db.collection("purchases").limit(1000).onSnapshot((s) => { S.purchases = all(s); mark(16); render(); }, onErr);
-    if (!v2store) db.collection("settlements").limit(1000).onSnapshot((s) => { S.settles = all(s); mark(32); render(); }, onErr);
-    if (!v2store) db.collection("transfers").limit(1000).onSnapshot((s) => { S.transfers = all(s); mark(64); render(); }, onErr);
-    db.collection("customers").limit(1000).onSnapshot((s) => { S.customers = all(s); mark(128); render(); }, onErr);
-    db.collection("followups").limit(1000).onSnapshot((s) => { S.followups = all(s); mark(256); render(); }, onErr);
+    db.collection("items").limit(1000).onSnapshot((s) => { T().items = all(s).map((i) => Object.assign({ sku: i.id }, i)); mark(1); if (v2store) v2store.refresh(); rr(); }, onErr);
+    if (!v2store) db.collection("movements").limit(1000).onSnapshot((s) => { T().moves = all(s); mark(2); rr(); }, onErr);
+    if (!v2store) db.collection("orders").limit(1000).onSnapshot((s) => { T().orders = all(s); mark(4); rr(); }, onErr);
+    if (!v2store) db.collection("expenses").limit(1000).onSnapshot((s) => { T().expenses = all(s); mark(8); rr(); }, onErr);
+    if (!v2store) db.collection("purchases").limit(1000).onSnapshot((s) => { T().purchases = all(s); mark(16); rr(); }, onErr);
+    if (!v2store) db.collection("settlements").limit(1000).onSnapshot((s) => { T().settles = all(s); mark(32); rr(); }, onErr);
+    if (!v2store) db.collection("transfers").limit(1000).onSnapshot((s) => { T().transfers = all(s); mark(64); rr(); }, onErr);
+    db.collection("customers").limit(1000).onSnapshot((s) => { T().customers = all(s); mark(128); rr(); }, onErr);
+    db.collection("followups").limit(1000).onSnapshot((s) => { T().followups = all(s); mark(256); rr(); }, onErr);
     rawDb.collection("log").orderBy("at", "desc").limit(200).onSnapshot((s) => { S.log = all(s); if (view === "inventory") { resolveNames(); renderLog(); } }, () => {});
     /* one-time: everything recorded before the audit trail existed was the owner's — stamp it and seed the log */
     (async () => {
@@ -4941,7 +4981,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
         if (!userCap || !meId || v2store || !(await userCap.isOwner())) return;
         const flag = await rawDb.doc("meta/backfill").get();
         if (flag && flag.exists && (flag.data() || {}).done) return;
-        await new Promise((ok) => { const t = setInterval(() => { if ((S.loaded & 15) === 15) { clearInterval(t); ok(); } }, 300); });
+        await new Promise((ok) => { const t = setInterval(() => { if ((S.loaded & 15) === 15 && !snapOn) { clearInterval(t); ok(); } }, 300); });
         const jobs = [];
         for (const [c, arr] of [["orders", S.orders], ["movements", S.moves], ["expenses", S.expenses], ["purchases", S.purchases], ["settlements", S.settles], ["items", S.items]])
           for (const x of arr) if (!x.created_by) jobs.push(() => rawDb.doc(c + "/" + x.id).update({ created_by: meId }));

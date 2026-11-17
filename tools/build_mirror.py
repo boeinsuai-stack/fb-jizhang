@@ -31,7 +31,9 @@ styles = "".join(re.findall(r"<style>.*?</style>", head, flags=re.S)[1:])  # 第
 assert "<script" not in styles
 # 页头的脚本：App 自己的（v2.js、orderparse.js…）原样内嵌；Firebase、Google 登录、firebase-config、shim 不要
 SKIP = ("vendor/firebasejs/", "accounts.google.com", "firebase-config.js", "shim.js")
-srcs = re.findall(r'<script src="([^"]+)"', head)
+# 2026-11-18 起这些脚本放在 <body> 最后（先画出页面再加载）：页头、页尾都找，页尾的标签去掉
+srcs = re.findall(r'<script src="([^"]+)"', head) + re.findall(r'<script src="([^"]+)"></script>', body)
+body = re.sub(r'<script src="[^"]+"></script>', "", body)
 own = [x for x in srcs if not any(k in x for k in SKIP)]
 assert "v2.js" in own and not any(x.startswith("http") for x in own), srcs
 own_js = "".join("<script>\n" + (ROOT / "public" / x).read_text(encoding="utf8") + "\n</script>" for x in own)
