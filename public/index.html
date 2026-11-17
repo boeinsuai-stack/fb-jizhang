@@ -451,9 +451,8 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 .owe > div { display: grid; gap: 6px; min-width: 0; }
 .owe > div > div { display: grid; gap: 1px; }
 .owe .pt-blk + .pt-blk { border-top: 1px dashed var(--warn); padding-top: 8px; }
-#f-owe { display: flex; flex-wrap: wrap; gap: 0 18px; padding: 2px 14px; } /* 一行写完（2026-11-17：以前两行，挡住下面每天的明细） */
-#f-owe .owe-line { flex: 0 1 auto; width: auto; justify-content: flex-start; padding: 8px 0; }
-#f-owe .owe-line b { font-size: 1.1rem; }
+#f-owe { display: block; padding: 4px 14px; } /* 一个人一行（2026-11-17 试过挤成一行，Bowen 说不好点，改回来） */
+#f-owe .owe-line + .owe-line { border-top: 1px dashed var(--warn); }
 .pt-list { display: grid; }
 .owe-line { all: unset; box-sizing: border-box; flex: 1; min-width: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; width: 100%; padding: 10px 0; cursor: pointer; }
 .owe-line:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
@@ -613,6 +612,16 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 .rk-num b { font-family: var(--font-display); font-size: 1.25rem; }
 .rk-num .dim { color: var(--muted); }
 .cust-sug { margin-bottom: 2px; } .cust-sug .chip small { color: var(--muted); font-size: .76rem; margin-left: 6px; }
+/* 客人少给 / 多给（2026-11-17）：记在那一单上，下次跟这个客人记单时提醒 */
+.bal-old { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--warn); border-radius: 10px; background: var(--warn-soft); }
+.bal-old.due { border-color: var(--accent); background: var(--accent-soft); }
+.bal-old p { margin: 0; } .bal-old b { font-variant-numeric: tabular-nums; } .bal-old small { color: var(--muted); }
+.bal-old .check { background: var(--surface); }
+.pill.ok { background: var(--accent-soft); color: var(--accent); }
+.bal-note { font-weight: 600; color: var(--warn); }
+#f-diff { display: grid; gap: 8px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; }
+#f-baltot { margin: -6px 0 0; font-weight: 700; color: var(--warn); }
+#f-baltot.due { color: var(--accent); }
 /* customer page */
 .cu-top { grid-template-columns: minmax(0, 1fr) auto; }
 .cu-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
@@ -1456,6 +1465,80 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const fu = d || n ? Object.assign({ date: d || null, note: n, done }, done && prev.done_at ? { done_at: prev.done_at } : {}, prev.contacted_at ? { contacted_at: prev.contacted_at } : {}) : null;
     return { customer: v("f-cust") || null, suburb: v("f-sub") || null, source: v("f-src") || null, follow_up: fu };
   }
+  /* ---------- 客人少给 / 多给（2026-11-17 Bowen）：结账时客人少给了（比如忘了配送费）或多给了，记在那一单上；
+     下次跟这个客人记单 / 结算预定时提醒「上次少给 $30，这单要收回来」或「上次多给 $20，这单少收」，勾上就两清。
+     订单字段 bal = [{ amt, why, kind, date }]：amt > 0 = 这单之后客人还欠你；amt < 0 = 你欠客人。kind：diff 这单少给/多给，back 这单收回/抵掉上次的，waive 不追了。
+     一个客人欠多少 = 他所有单的 bal 加起来（按名字，不分大小写）。钱的数字（收入、净赚）照订单合计算，不受影响 ---------- */
+  const balOf = (o) => (Array.isArray(o && o.bal) ? o.bal : []);
+  function custBal(name, exceptId) {
+    const k = normName(name); if (!k) return { amt: 0, why: [] };
+    const os = S.orders.filter((o) => o.id !== exceptId && normName(o.customer) === k && balOf(o).length).sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.at || "").localeCompare(b.at || ""));
+    let amt = 0, why = [];
+    for (const o of os) for (const e of balOf(o)) { amt = r2(amt + (Number(e.amt) || 0)); if (Math.abs(amt) < 0.005) why = []; else if (e.kind === "diff") why.push({ date: o.date, why: e.why, amt: e.amt, oid: o.id }); }
+    return { amt: Math.abs(amt) < 0.005 ? 0 : amt, why, last: os.length ? os[os.length - 1] : null };
+  }
+  const balWhy = (b) => b.why.map((x) => fmtD(x.date) + (x.why ? " · " + x.why : "")).join("；");
+  const BAL_WHY = ["配送费没给", "没有零钱", "抹零"];
+  /* 表单上的一块：上面是提醒（这个客人上次少给/多给），下面是「收的钱不对？」记这单少收/多收。take = 能不能这单就收回（预定还没付钱，只提醒） */
+  function balHtml(o) {
+    const d = balOf(o).find((e) => e.kind === "diff");
+    return '<div id="f-balold" hidden></div>' +
+      '<div><button type="button" class="linkbtn" id="f-diff-open"' + (d ? " hidden" : "") + '>客人少给 / 多给了钱？</button></div>' +
+      '<div id="f-diff"' + (d ? "" : " hidden") + '><div class="chips" role="radiogroup" aria-label="少给还是多给">' +
+        '<label class="chip"><input type="radio" name="f-diffk" value="1"' + (d && d.amt > 0 ? " checked" : "") + "> 客人少给了</label>" +
+        '<label class="chip"><input type="radio" name="f-diffk" value="-1"' + (d && d.amt < 0 ? " checked" : "") + "> 客人多给了</label></div>" +
+        '<div class="grid2"><div class="field"><label for="f-diffamt">差多少 $</label><input id="f-diffamt" type="number" min="0" step="0.01" inputmode="decimal" value="' + (d ? Math.abs(d.amt) : "") + '"></div>' +
+        '<div class="field"><label for="f-diffwhy">为什么</label><input id="f-diffwhy" placeholder="比如：配送费没给" value="' + esc(d ? d.why || "" : "") + '"></div></div>' +
+        '<div class="chips">' + BAL_WHY.map((w) => '<button type="button" class="chip" data-diffwhy="' + esc(w) + '">' + esc(w) + "</button>").join("") + '<button type="button" class="linkbtn" id="f-diff-clear">不记了</button></div>' +
+        '<p class="hint">记在这一单上。下次跟这个客人记单时会提醒你收回来 / 少收。</p></div>';
+  }
+  function wireBal(o, getName, take) {
+    const id = o ? o.id : null, had = balOf(o).find((e) => e.kind === "back");
+    let cur = { amt: 0, why: [] }, total = null;
+    const paint = () => {
+      cur = custBal(getName(), id);
+      const box = $("f-balold"), nm0 = (getName() || "").trim();
+      box.hidden = !cur.amt;
+      if (cur.amt) {
+        const owe = cur.amt > 0, a = money(Math.abs(cur.amt)), was = $("f-baltake") ? $("f-baltake").checked : !!had;
+        box.className = "bal-old" + (owe ? "" : " due");
+        box.innerHTML = "<p><b>" + esc(nm0) + (owe ? " 上次少给你 " : " 上次多给了你 ") + a + "</b><br><small>" + esc(balWhy(cur)) + "</small></p>" +
+          (take() ? '<label class="check"><input type="checkbox" id="f-baltake"' + (was ? " checked" : "") + "><span>" + (owe ? "这单一起收回来（多收 " + a + "）" : "这单少收 " + a + " 抵掉") + "</span></label>" : "<p><small>预定还没付钱：结算的时候会再提醒你。</small></p>");
+      }
+      if ($("f-diff").hidden) $("f-diff-open").hidden = !take(); // 预定还没付钱：不用记少给多给
+      tot();
+    };
+    const tot = () => {
+      const el = $("f-baltot"); if (!el) return;
+      const on = $("f-baltake") && $("f-baltake").checked && cur.amt;
+      el.hidden = !on || total == null; if (el.hidden) return;
+      el.className = cur.amt > 0 ? "" : "due";
+      el.textContent = "这次实际收 " + money(r2(total + cur.amt)) + "（合计 " + money(total) + (cur.amt > 0 ? " + 上次少给的 " : " − 上次多给的 ") + money(Math.abs(cur.amt)) + "）";
+    };
+    $("f-diff-open").addEventListener("click", () => { $("f-diff").hidden = false; $("f-diff-open").hidden = true; });
+    $("f-diff-clear").addEventListener("click", () => { $("f-diff").hidden = true; $("f-diff-open").hidden = false; $("f-diffamt").value = ""; $("f-diffwhy").value = ""; document.querySelectorAll('input[name="f-diffk"]').forEach((r) => { r.checked = false; }); });
+    $("f-diff").addEventListener("click", (e) => { const c = e.target.closest("[data-diffwhy]"); if (c) $("f-diffwhy").value = c.dataset.diffwhy; });
+    $("f-balold").addEventListener("change", tot);
+    const inp = $("f-cust"); if (inp) { inp.addEventListener("input", paint); inp.addEventListener("change", paint); }
+    paint();
+    return {
+      paint, setTotal: (t) => { total = t; tot(); },
+      /* 存的时候：这单的 bal（没有就是 null）。要记少收/多收但没写客户名字 → 不让存（下次没法提醒） */
+      read(isPaid) {
+        const out = [], dk = (document.querySelector('input[name="f-diffk"]:checked') || {}).value, da = numOrNull($("f-diffamt").value), dw = $("f-diffwhy").value.trim();
+        const date = ($("f-date") && $("f-date").value) || today();
+        if (!$("f-diff").hidden && (dk || da)) {
+          if (!dk) throw userError("选一下客人是少给了还是多给了。");
+          if (da == null || da <= 0) throw userError("填一下差了多少钱。");
+          if (!(getName() || "").trim()) throw userError("要记客人少给/多给，先写客户名字（下次才能提醒你）。");
+          out.push({ amt: r2(Number(dk) * da), why: dw || null, kind: "diff", date });
+        }
+        if (isPaid && cur.amt && $("f-baltake") && $("f-baltake").checked) out.push({ amt: r2(-cur.amt), why: (cur.amt > 0 ? "收回上次少给的" : "抵掉上次多给的") + (cur.why.length ? "：" + cur.why.map((x) => x.why).filter(Boolean).join("、") : ""), kind: "back", date });
+        for (const e of balOf(o)) if (e.kind === "waive") out.push(e);
+        return out.length ? out : null;
+      },
+    };
+  }
   const belowPill = () => "";
   /* one line for lists: "Belinda · Cooloongup · 来自 芒果帖 · 跟进 11月1日：想要一盒" */
   function custLine(o) {
@@ -1483,8 +1566,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="field"><span class="lbl">付款方式</span><div class="chips" id="f-paychips" role="radiogroup" aria-label="付款方式">' + PAY.concat([MIX]).map((x) => '<label class="chip"><input type="radio" name="f-payr" value="' + esc(x) + '"' + (edit && edit.payment === x ? " checked" : "") + "> " + esc(x) + "</label>").join("") + "</div></div>" +
       '<div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="' + esc(edit && edit.delivery_fee ? edit.delivery_fee : "") + '"></div>' +
       mixRowHtml(edit || null) +
-      custNameHtml(custPre) +
-      '<p class="total">合计<b id="f-total">–</b></p>' +
+      custNameHtml(custPre) + balHtml(edit) +
+      '<p class="total">合计<b id="f-total">–</b></p><p id="f-baltot" hidden></p>' +
       '<details class="more" id="f-more"><summary id="f-more-sum">更多：日期、备注、客户资料</summary><div class="more-body">' +
         '<div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + esc((edit && edit.date) || today()) + '"></div>' +
         '<div class="field"><label for="f-note">备注</label><input id="f-note" placeholder="取货方式、其他说明" value="' + esc(edit ? edit.note || "" : "") + '"></div>' +
@@ -1516,6 +1599,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       });
       $("f-total").textContent = totalText(ls, Number($("f-fee").value) || 0);
       mixSync(formTotalNum(ls, Number($("f-fee").value) || 0));
+      if (bal) bal.setTotal(formTotalNum(ls, Number($("f-fee").value) || 0));
       updQuote();
       const want = {};
       $("f-lines").querySelectorAll(".line").forEach((row) => { const k = row.dataset.line, sku = $("f-sku-" + k).value; if (sku) want[sku] = (want[sku] || 0) + (Number($("f-qty-" + k).value) || 0); });
@@ -1551,11 +1635,11 @@ details.restock > summary::-webkit-details-marker { display: none; }
       if (lump != null) spreadLump(lines, lump).forEach((u, k) => { lines[k].unit_price = u; });
       const fee = numOrNull($("f-fee").value);
       if (edit) return saveResvEdit(lines, lump, fee, date);
-      const oid = rid("o"), at = new Date().toISOString(), resv = $("f-resv").checked;
+      const oid = rid("o"), at = new Date().toISOString(), resv = $("f-resv").checked, B = bal.read(!resv);
       const pk = $("f-pfrom-wrap").hidden ? { pick_from: null, pick_split: null } : splitter.read(), pfrom = pk.pick_from;
       const P = readPay(!resv, orderTotal({ lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
       await db.collection("orders").doc(oid).set(Object.assign({ status: resv ? "reserved" : "paid", date, at, lines, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, { payment: P.payment }, dropNulls({ pay_cash: P.pay_cash, pay_other: P.pay_other }), dropNulls(readCust(null)),
-        lump != null ? { lump_total: lump } : {}, pfrom ? { pick_from: pfrom } : {}, pk.pick_split ? { pick_split: pk.pick_split } : {}));
+        lump != null ? { lump_total: lump } : {}, pfrom ? { pick_from: pfrom } : {}, pk.pick_split ? { pick_split: pk.pick_split } : {}, B ? { bal: B } : {}));
       if (resv) { if (onDone) onDone(); return "已记预定 " + lines.reduce((a, l) => a + l.qty, 0) + " 根，在「客户」页结算。"; }
       const msg = "已记一笔卖出" + await commitSale(oid, lines, date, at, pfrom, pk.pick_split);
       if (onDone) onDone();
@@ -1565,7 +1649,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const id = edit.id;
       const pk = $("f-pfrom-wrap").hidden ? { pick_from: edit.pick_from || null, pick_split: null } : splitter.read();
       const P = readPay(false, orderTotal({ lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
-      await db.doc("orders/" + id).update(Object.assign({ date, lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, P, readCust(edit), { pick_from: pk.pick_from || null, pick_split: pk.pick_split || null }));
+      await db.doc("orders/" + id).update(Object.assign({ date, lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, P, readCust(edit), { pick_from: pk.pick_from || null, pick_split: pk.pick_split || null }, { bal: bal.read(false) }));
       /* 已经从合伙人那拿到的货：这个口味换掉了或数量减少了，就留作库存（跟取消预定一样） */
       const want = {}, got = {};
       for (const l of lines) want[l.sku] = (want[l.sku] || 0) + l.qty;
@@ -1581,8 +1665,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
       if (onDone) onDone();
       return "预定已更新" + (freeN ? "；拿到的 " + freeN + " 根留在库存" + owedTail(rel) + "。" : "。");
     }
+    let bal = null;
     openSheet(edit ? "编辑预定" : reserve ? "记一笔预定" : "记一笔卖出", html, submit, () => {
       splitter.bind();
+      bal = wireBal(edit, () => $("f-cust").value, () => !$("f-resv").checked); // 预定还没付钱：只提醒，不能当场收回
       if (preset.length) preset.forEach((x) => { addLine(x.sku, x.qty); if (x.price != null) $("f-price-" + (n - 1)).value = x.price; }); else addLine("");
       $("f-addline").addEventListener("click", () => { addLine(""); recalc(); });
       $("f-lines").addEventListener("click", (e) => {
@@ -1592,7 +1678,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       wirePicker(avail, D, (k) => { setDefaultPrice(k); recalc(); });
       wireCust(edit ? edit.id : null);
       sheetOn("input", recalc); sheetOn("change", recalc);
-      $("f-resv").addEventListener("change", () => { $("sheet-title").textContent = $("f-resv").checked ? "记一笔预定" : "记一笔卖出"; recalc(); });
+      $("f-resv").addEventListener("change", () => { $("sheet-title").textContent = $("f-resv").checked ? "记一笔预定" : "记一笔卖出"; bal.paint(); recalc(); });
       /* 再点一下已选的付款方式 = 取消（预定可以先不选） */
       let payWas = curPay();
       $("f-paychips").addEventListener("click", (e) => { const r = e.target.closest('input[name="f-payr"]'); if (!r) return; if (r.value === payWas) { r.checked = false; payWas = ""; recalc(); } else payWas = r.value; });
@@ -1607,7 +1693,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const lines = o.lines || [];
     const html =
       '<div class="field"><label for="f-date">卖出日期</label><input id="f-date" type="date" value="' + esc(o.date || today()) + '"></div>' +
-      custNameHtml(o) +
+      custNameHtml(o) + balHtml(o) +
       '<details class="more"' + (o.suburb || o.source || o.follow_up ? " open" : "") + '><summary>客户资料：区、来源、跟进</summary><div class="more-body">' + custMoreHtml(o) + "</div></details>" +
       '<div class="fixed-line" style="font-size:.74rem;color:var(--muted)"><span>香型</span><span>数量</span><span>单价 $</span></div>' +
       lines.map((l, k) => '<div class="fixed-line"><span>' + esc(nm(l.sku, l.name)) + '</span><span>×' + esc(l.qty) + '</span><input id="f-price-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" placeholder="未填" aria-label="' + esc(l.name) + ' 单价" value="' + (l.unit_price == null ? "" : esc(l.unit_price)) + '"></div>').join("") +
@@ -1617,9 +1703,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="field"><label for="f-note">备注</label><input id="f-note" value="' + esc(o.note || "") + '"></div>' +
       (isReserved(o) && lines.length ? pnameField(o.pick_from || "", false) + (splitter = pickSplitter(o.pick_split || null)).html : "") +
       (lines.length ? lumpHtml(o.lump_total != null, o.lump_total) : "") +
-      '<p class="total">合计<b id="f-total">–</b></p>' +
+      '<p class="total">合计<b id="f-total">–</b></p><p id="f-baltot" hidden></p>' +
       '<p class="hint">数量改不了：要改数量，请撤销这单再重新记。</p>';
     const readLines = () => lines.map((l, k) => ({ qty: Number(l.qty) || 0, price: numOrNull($("f-price-" + k).value) }));
+    let bal = null;
     openSheet(isReserved(o) ? "编辑预定" : "编辑订单", html, async () => {
       const pk = $("f-pfrom") && splitter ? splitter.read() : null;
       needDb();
@@ -1629,7 +1716,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const fee = numOrNull($("f-fee").value);
       const date = $("f-date").value || o.date;
       const P = readPay(!isReserved(o), orderTotal({ lines: newLines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
-      await db.doc("orders/" + id).update(Object.assign({ date, lines: newLines, lump_total: lump, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, P, readCust(o), pk ? { pick_from: pk.pick_from || null, pick_split: pk.pick_split || null } : {}));
+      await db.doc("orders/" + id).update(Object.assign({ date, lines: newLines, lump_total: lump, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, P, readCust(o), pk ? { pick_from: pk.pick_from || null, pick_split: pk.pick_split || null } : {}, { bal: bal.read(!isReserved(o)) }));
       if (date !== o.date) {
         await Promise.all(S.moves.filter((m) => m.order_id === id).map((m) => db.doc("movements/" + m.id).update({ date })));
         const px = S.expenses.find((x) => x.batch_id === id + "-pick");
@@ -1637,7 +1724,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
       }
       return "订单已更新" + (date !== o.date ? "，出入库和拿货支出的日期也一起改了。" : "。");
     }, () => {
-      const upd = () => { lumpSync(); const fee = Number($("f-fee").value) || 0; $("f-total").textContent = lines.length ? totalText(readLines(), fee) : money(fee); mixSync(lines.length ? formTotalNum(readLines(), fee) : fee); };
+      bal = wireBal(o, () => $("f-cust").value, () => !isReserved(o));
+      const upd = () => { lumpSync(); const fee = Number($("f-fee").value) || 0; $("f-total").textContent = lines.length ? totalText(readLines(), fee) : money(fee); mixSync(lines.length ? formTotalNum(readLines(), fee) : fee); bal.setTotal(lines.length ? formTotalNum(readLines(), fee) : fee); };
       wireCust(id);
       if ($("f-pfrom") && splitter) { splitter.bind(); splitter.setShort(Object.entries(resvAlloc().RS[id] || {})); }
       sheetOn("input", upd); sheetOn("change", upd); upd();
@@ -2628,7 +2716,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   });
   $("resv").addEventListener("click", (e) => {
     const t = e.target.closest("button"); if (!t) return;
-    if (t.dataset.settle) { const o = S.orders.find((x) => x.id === t.dataset.settle); if (!resvReady(o)) settleForm(t.dataset.settle); else if (!o.payment) payPickSettle(t.dataset.settle); else arm(t, "再点一次确认", () => quickSettle(t.dataset.settle)); }
+    if (t.dataset.settle) { const o = S.orders.find((x) => x.id === t.dataset.settle); if (!resvReady(o)) settleForm(t.dataset.settle); else if (!o.payment || (o.customer && custBal(o.customer, o.id).amt)) payPickSettle(t.dataset.settle); else arm(t, "再点一次确认", () => quickSettle(t.dataset.settle)); }
     else if (t.dataset.editOrder) orderEditForm(t.dataset.editOrder);
     else if (t.dataset.voidOrder) arm(t, "确认取消？", () => voidOrder(t.dataset.voidOrder));
   });
@@ -3018,24 +3106,28 @@ details.restock > summary::-webkit-details-marker { display: none; }
     await db.doc("orders/" + o.id).update(Object.assign({ status: "paid", date, at, lines, payment: pay }, split || {}));
     const msg = await commitSale(o.id, lines, date, at);
     const t = orderTotal(Object.assign({}, o, { lines }));
-    return "已结算" + (t != null ? " " + money(t) : "") + "（" + (pay === MIX && split ? "现金 " + money(split.pay_cash) + " + " + split.pay_other : pay) + "），算作卖出" + msg;
+    return "已结算" + (t != null ? " " + money(t) : "") + "（" + (pay === MIX && split && split.pay_cash != null ? "现金 " + money(split.pay_cash) + " + " + split.pay_other : pay) + "），算作卖出" + msg;
   }
   async function quickSettle(id) {
     const o = S.orders.find((x) => x.id === id); if (!o) return;
     if (!resvReady(o)) { settleForm(id); return; }
+    if (o.customer && custBal(o.customer, o.id).amt) { payPickSettle(id); return; } // 这个客人上次少给/多给了：先提醒，不直接结
     try { toast(await settleNow(o, o.payment)); } catch (e) { toast(e.userMsg || errText(e)); }
   }
   function payPickSettle(id) {
     const o = S.orders.find((x) => x.id === id); if (!o) return;
     const t = orderTotal(Object.assign({}, o, { lines: o.lines.map((l, k) => Object.assign({}, l, { unit_price: resvPrices(o)[k] })) }));
     const html = '<p class="hint">' + esc((o.note ? o.note + " · " : "") + linesText(o)) + "</p>" +
-      '<div class="chips" role="radiogroup" aria-label="付款方式">' + PAY.concat([MIX]).map((x) => '<label class="chip"><input type="radio" name="f-payr" value="' + esc(x) + '"> ' + esc(x) + "</label>").join("") + "</div>" +
-      mixRowHtml(null) +
-      '<p class="total">合计<b>' + (t == null ? "–" : money(t)) + "</b></p>";
+      '<div class="chips" role="radiogroup" aria-label="付款方式">' + PAY.concat([MIX]).map((x) => '<label class="chip"><input type="radio" name="f-payr" value="' + esc(x) + '"' + (o.payment === x ? " checked" : "") + "> " + esc(x) + "</label>").join("") + "</div>" +
+      mixRowHtml(o.payment === MIX ? o : null) +
+      (String(o.customer || "").trim() ? "" : custNameHtml(o)) + balHtml(o) +
+      '<p class="total">合计<b>' + (t == null ? "–" : money(t)) + '</b></p><p id="f-baltot" hidden></p>';
+    const custNow = () => String(o.customer || "").trim() || ($("f-cust") ? $("f-cust").value.trim() : "");
+    let bal = null;
     openSheet("结算 · 客人怎么付的？", html, async () => {
-      const P = readPay(true, t);
-      return settleNow(o, P.payment, P.payment === MIX ? { pay_cash: P.pay_cash, pay_other: P.pay_other } : { pay_cash: null, pay_other: null });
-    }, () => { $("sheet-save").textContent = "结算"; const u = () => mixSync(t); sheetOn("change", u); sheetOn("input", u); });
+      const P = readPay(true, t), B = bal.read(true);
+      return settleNow(o, P.payment, Object.assign(P.payment === MIX ? { pay_cash: P.pay_cash, pay_other: P.pay_other } : { pay_cash: null, pay_other: null }, { bal: B }, !String(o.customer || "").trim() && custNow() ? { customer: custNow() } : {}));
+    }, () => { $("sheet-save").textContent = "结算"; bal = wireBal(o, custNow, () => true); bal.setTotal(t); const u = () => mixSync(t); sheetOn("change", u); sheetOn("input", u); });
   }
   function settleForm(id) {
     const o = S.orders.find((x) => x.id === id); if (!o) return;
@@ -3049,8 +3141,11 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="field"><label for="f-pay">付款方式</label><select id="f-pay">' + payOptions(o.payment) + "</select></div></div>" +
       mixRowHtml(o) +
       lumpHtml(o.lump_total != null, o.lump_total) +
-      '<p class="total">合计<b id="f-total">–</b></p>';
+      (String(o.customer || "").trim() ? "" : custNameHtml(o)) + balHtml(o) +
+      '<p class="total">合计<b id="f-total">–</b></p><p id="f-baltot" hidden></p>';
     const read = () => lines.map((l, k) => numOrNull($("f-price-" + k).value));
+    const custNow = () => String(o.customer || "").trim() || ($("f-cust") ? $("f-cust").value.trim() : "");
+    let bal = null;
     openSheet("结算预定", html, async () => {
       needDb();
       const lump = readLump();
@@ -3058,12 +3153,13 @@ details.restock > summary::-webkit-details-marker { display: none; }
       if (prices.some((p) => p != null && p < 0)) throw userError("单价不能是负数。");
       const newLines = lines.map((l, k) => ({ sku: l.sku, name: l.name, qty: l.qty, unit_price: prices[k] }));
       const date = $("f-date").value || today(), at = new Date().toISOString(), fee = numOrNull($("f-fee").value);
-      const P = readPay(true, orderTotal({ lines: newLines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
-      await db.doc("orders/" + id).update(Object.assign({ status: "paid", date, at, lines: newLines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }, P));
+      const P = readPay(true, orderTotal({ lines: newLines, lump_total: lump, delivery_fee: fee == null ? 0 : fee })), B = bal.read(true);
+      await db.doc("orders/" + id).update(Object.assign({ status: "paid", date, at, lines: newLines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }, P, { bal: B }, !String(o.customer || "").trim() && custNow() ? { customer: custNow() } : {}));
       const msg = await commitSale(id, newLines, date, at);
       return "已结算，算作卖出" + msg;
     }, () => {
-      const upd = () => { lumpSync(); const ps = read(), ls = lines.map((l, k) => ({ qty: Number(l.qty) || 0, price: ps[k] })), fee = Number($("f-fee").value) || 0; $("f-total").textContent = totalText(ls, fee); mixSync(formTotalNum(ls, fee)); };
+      bal = wireBal(o, custNow, () => true);
+      const upd = () => { lumpSync(); const ps = read(), ls = lines.map((l, k) => ({ qty: Number(l.qty) || 0, price: ps[k] })), fee = Number($("f-fee").value) || 0; $("f-total").textContent = totalText(ls, fee); mixSync(formTotalNum(ls, fee)); bal.setTotal(formTotalNum(ls, fee)); };
       sheetOn("input", upd); sheetOn("change", upd); upd();
     });
   }
@@ -4455,10 +4551,11 @@ details.restock > summary::-webkit-details-marker { display: none; }
     list.sort(custSort === "spent" ? (a, b) => b.spent - a.spent || lastAct(b).localeCompare(lastAct(a)) : (a, b) => lastAct(b).localeCompare(lastAct(a)) || b.spent - a.spent);
     if (!list.length) { $("c-list").innerHTML = '<div class="empty">' + (custSort === "ws" && !ql ? "还没有批发客户。点开一个客户，在「编辑资料」里选「批发」。" : custSort === "fu" && !ql ? "现在没有要跟进的客户。" : all.length ? "没有符合的客户。" : "还没有客户。记单时在「客户」一栏写上名字，这里就会出现。") + "</div>"; return; }
     $("c-list").innerHTML = list.map((c) => {
-      const open = openCust === c.id, f = c.fu, n = c.paid.length;
-      const pills = (c.p.type === "wholesale" ? '<span class="tag">批发</span>' : '<span class="tag" style="background:var(--line);color:var(--muted)">零售</span>') + (n >= 2 ? '<span class="pill">回头客 · ' + n + " 次</span>" : "") + (c.resv.length ? '<span class="pill warn">有预定</span>' : "") + (f ? '<span class="pill ' + (f.restocked ? "" : f.contacted_at ? "na" : "warn") + '">' + (f.restocked ? "到货了" : f.contacted_at ? "等回复" : "要跟进") + "</span>" : "");
+      const open = openCust === c.id, f = c.fu, n = c.paid.length, cb = custBal(c.name);
+      const pills = (c.p.type === "wholesale" ? '<span class="tag">批发</span>' : '<span class="tag" style="background:var(--line);color:var(--muted)">零售</span>') + (cb.amt ? '<span class="pill ' + (cb.amt > 0 ? "warn" : "ok") + '">' + (cb.amt > 0 ? "少给你 " : "多给了 ") + money(Math.abs(cb.amt)) + "</span>" : "") + (n >= 2 ? '<span class="pill">回头客 · ' + n + " 次</span>" : "") + (c.resv.length ? '<span class="pill warn">有预定</span>' : "") + (f ? '<span class="pill ' + (f.restocked ? "" : f.contacted_at ? "na" : "warn") + '">' + (f.restocked ? "到货了" : f.contacted_at ? "等回复" : "要跟进") + "</span>" : "");
       const sub = [c.suburb || (c.enq.find((x) => x.suburb) || {}).suburb, n ? "买过 " + n + " 次、" + c.qty + " 根" : c.enq.length ? "问过 " + c.enq.length + " 次，还没成交" : "还没成交", c.last ? "上次 " + fmtD(c.last) + "（" + agoText(c.last) + "）" : ""].filter(Boolean).join(" · ");
-      const hist = c.orders.map((o) => { const t = orderTotal(o); return "<li><span>" + fmtD(o.date) + (isReserved(o) ? " · 预定" : "") + " · " + esc(linesText(o)) + (o.note ? "（" + esc(o.note) + "）" : "") + "</span><b>" + (t == null ? "未填价" : money(t)) + "</b></li>"; }).join("");
+      const balNote = (o) => balOf(o).map((e) => (e.kind === "diff" ? (e.amt > 0 ? "少给 " : "多给 ") + money(Math.abs(e.amt)) : e.kind === "back" ? (e.amt < 0 ? "收回 " : "抵掉 ") + money(Math.abs(e.amt)) : "不追了 " + money(Math.abs(e.amt))) + (e.why && e.kind === "diff" ? "：" + e.why : "")).join("；");
+      const hist = c.orders.map((o) => { const t = orderTotal(o); return "<li><span>" + fmtD(o.date) + (isReserved(o) ? " · 预定" : "") + " · " + esc(linesText(o)) + (o.note ? "（" + esc(o.note) + "）" : "") + (balOf(o).length ? ' <b class="bal-note">' + esc(balNote(o)) + "</b>" : "") + "</span><b>" + (t == null ? "未填价" : money(t)) + "</b></li>"; }).join("");
       return '<div class="row"><div class="row-top cu-top">' +
         '<button class="row-main" type="button" data-cu="' + esc(c.id) + '" aria-expanded="' + open + '"><span class="cu-name"><span class="name">' + esc(c.name) + "</span>" + pills + "</span>" +
           '<span class="dates">' + esc(sub) + "</span>" + (c.p.note ? '<span class="notes">' + esc(c.p.note) + "</span>" : "") + "</button>" +
@@ -4466,6 +4563,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
         '<div class="detail"' + (open ? "" : " hidden") + ">" +
           '<div class="meta">' + (c.source ? "<span>来源 <b>" + esc(c.source) + "</b></span>" : "") + (c.p.contact ? "<span>联系 <b>" + esc(c.p.contact) + "</b></span>" : "") +
             (c.flavours.length ? '<span class="cu-flav">常买：' + c.flavours.map((x) => esc(x[0]) + " ×" + x[1]).join("、") + "</span>" : "") + (n ? "<span>平均每次 <b>" + money(r2(c.spent / n)) + "</b></span>" : "") + "</div>" +
+          (cb.amt ? '<div class="bal-old' + (cb.amt > 0 ? "" : " due") + '"><p><b>' + (cb.amt > 0 ? "上次少给你 " : "上次多给了你 ") + money(Math.abs(cb.amt)) + "</b>：" + esc(balWhy(cb)) + '</p><p><small>下次跟 ' + esc(c.name) + " 记单时会提醒你" + (cb.amt > 0 ? "收回来" : "少收") + '。</small> <button class="linkbtn" type="button" data-cu-waive="' + esc(c.id) + '">不追了</button></p></div>' : "") +
           (f ? '<div class="cu-fu' + (f.contacted_at && !f.restocked ? " wait" : "") + '"><span>' + (f.restocked ? "到货了 · " : "") + fuWhen(f) + (f.note ? "：" + esc(f.note) : "") + "</span>" +
             (f.wants.length ? "<span>想要：" + wantsHtml(f.wants) + "</span>" : "") +
             '<span class="row-actions">' + fuButtons(f) + "</span></div>" : "") +
@@ -4497,6 +4595,13 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const c = () => customerBook().find((x) => x.id === (b.dataset.cuSale || b.dataset.cuResv));
     if (b.dataset.cu) { openCust = openCust === b.dataset.cu ? null : b.dataset.cu; renderCustomers(); const again = document.querySelector('[data-cu="' + CSS.escape(b.dataset.cu) + '"]'); if (again) again.focus(); }
     else if (b.dataset.cuEdit) customerForm(b.dataset.cuEdit);
+    else if (b.dataset.cuWaive) {
+      /* 不追了：在他最后一单上记一笔 waive 把差额清掉（钱的数字不变） */
+      const x = customerBook().find((y) => y.id === b.dataset.cuWaive), cb = x && custBal(x.name);
+      if (!cb || !cb.amt || !cb.last) return;
+      if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "确定不追了？再点一下"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = "不追了"; } }, 4000); return; } // 不用浏览器的确认框（iPhone 上会卡住页面）
+      (async () => { try { needDb(); await db.doc("orders/" + cb.last.id).update({ bal: balOf(cb.last).concat([{ amt: r2(-cb.amt), why: "不追了", kind: "waive", date: today() }]) }); toast("好，" + x.name + " 的不再提醒。"); } catch (e) { toast(e.userMsg || errText(e)); } })();
+    }
     else if (b.dataset.cuFu) { const x = customerBook().find((y) => y.id === b.dataset.cuFu); if (x) followUpForm(null, x.name); }
     else if (b.dataset.editOrder) orderEditForm(b.dataset.editOrder);
     else if (b.dataset.cuSale || b.dataset.cuResv) { const x = c(); if (x) saleForm([], !!b.dataset.cuResv, null, { customer: x.name, suburb: x.suburb, source: x.paid.length ? "回头客" : x.source }); }
@@ -4602,6 +4707,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const pk = RS[o.id] ? Object.values(RS[o.id]).reduce((a, x) => a + x, 0) : 0;
       return '<details class="rv"><summary><span class="rv-main"><span class="l-date"><span class="tag-resv">预定</span>' + fmtD(o.date) + "</span>" +
         "<b>" + esc(who || "（没写客人名字）") + "</b>" + '<span class="l-sub">' + esc(serTxt(serQty([o]))) + "</span>" +
+        ((() => { const cb = o.customer ? custBal(o.customer, o.id) : { amt: 0 }; return cb.amt ? '<span class="pill ' + (cb.amt > 0 ? "warn" : "ok") + '">' + (cb.amt > 0 ? "上次少给 " : "上次多给 ") + money(Math.abs(cb.amt)) + "</span>" : ""; })()) +
         (pk ? '<span class="pick-tag">要找' + Object.entries(RW[o.id] || {}).map(([w, n]) => esc(w) + "拿 " + n + " 根").join("、") + "</span>" : "") +
         (PKO[o.id] ? PKO[o.id].map((g) => '<span class="pick-tag done">已从' + esc(gWho(g)) + "拿货 · " + (g.sid ? "已结账" : "还没结账") + "</span>").join("") : "") + "</span>" +
         '<span class="l-amt">' + (t == null ? '<span class="pill warn">未定价</span>' : money(t)) + "</span></summary>" +

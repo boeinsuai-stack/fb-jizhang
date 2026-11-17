@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-16 线上 fb-app-v25，分支 feat-weeks 是 v26）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-16 线上 fb-app-v25，分支 feat-weeks / feat-cust-bal 是 v26，一起上线）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -182,11 +182,24 @@
 - 现在**不加新的一行**：选「本周」时，净赚那一块（`#f-hero`）右上角 ‹ ›（`#f-wkarr`，本周时 › 灰着）；在这一块上左右滑也能换（往左滑 = 下一周，跟翻页一样；横向 >50px 且比竖向大 1.5 倍才算）
   - `stepWeek(dir)`：换 period、重算、`haptic()`、这一块轻轻滑进来（prefers-reduced-motion 时不动）
   - `haptic()`：安卓 `navigator.vibrate(8)`；iPhone 没有 vibrate，点一个隐藏的 `<input type=checkbox switch>`（iOS 18 Safari 会轻震；没在真机上验过）
-  - 欠合伙人的那一块（`#f-owe`）改成一行写完（以前两行，Bowen 说挡住了每天的明细）
+  - 欠合伙人的那一块（`#f-owe`）试过挤成一行，Bowen 说不好点 → 一个人一行（跟以前一样）
   - 数字就是 `finBook(inPeriod)`，跟别的时间范围一个算法
 - localStorage `mk-period` 只记 week/month/…，选了以前某一周下次打开回到本周
 - 测试 `tests/test_weeks.py` 26/26（编的数据，旧/新结构，GitHub 上也跑；has_touch + 合成 TouchEvent 模拟滑动，stub navigator.vibrate 数震了几下——stub 的 evaluate 字符串末尾要加 `; 0`，不然 Playwright 会把那个函数执行一次）
 - 同时给 Bowen 看过三个苹果风格预览（iOS 原生 / 玻璃 / Bento），他说都不如现在清楚，不用。他要「清晰且好看」：在现在这版上改，保留框线、粗数字和对比度
+
+## 客人少给 / 多给（feat-cust-bal，2026-11-17）
+- Bowen：客人结账时少给了（比如忘了配送费）或多给了，要记下来；下次跟这个客人有单时提醒收回来 / 少收
+- 订单字段 `bal = [{ amt, why, kind, date }]`：amt > 0 = 这单之后客人还欠你，< 0 = 你欠客人；kind：`diff` 这单少给/多给、`back` 这单收回/抵掉上次的、`waive` 不追了。
+  一个客人欠多少 = `custBal(name)` = 他所有单（名字不分大小写）的 amt 加起来。**收入、净赚照订单合计算，不受影响**（应收/应付的思路：少给的那 $30 算在那单收入里，下次收回来不算新收入）
+- 界面（`balHtml` + `wireBal(o, getName, canTake)`，放在客户名字下面）：
+  - 「客人少给 / 多给了钱？」展开：少给/多给 + 差多少 + 为什么（配送费没给 / 没有零钱 / 抹零）；没写客户名字不让存
+  - 这个客人有没两清的：提醒框「X 上次少给你 $30 / 上次多给了你 $20」+ 日期和原因 +「这单一起收回来 / 这单少收抵掉」，勾上后合计下面写「这次实际收 $90（合计 $60 + 上次少给的 $30）」
+  - 记一笔卖出、编辑已卖出的单（事后补记）、结算预定（选付款那页 `payPickSettle` 和要填价的 `settleForm`）都有；预定还没付钱：只提醒，不能当场抵，也不显示记少给多给
+  - 预定已经选好付款方式时点「结算」本来是直接结；这个客人有没两清的 → 改成先弹出选付款那页（不然提醒看不到）
+  - 客户页：那一行标「少给你 $X / 多给了 $X」；点开有原因 +「不追了」（点两下，不用浏览器确认框）= 在他最后一单上记 waive；历史里每单写「少给 $30：配送费没给 / 收回 $30」；预定卡片标「上次少给 $30」
+- 新结构：订单上的额外字段原样存进 v2_orders，测试里迁移再算回来一字不差
+- 测试 `tests/test_cust_bal.py` 45/45（编的数据，旧/新结构，GitHub 上也跑）
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超
