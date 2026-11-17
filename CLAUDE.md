@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-17 线上 fb-app-v27，分支 feat-pay-po → feat-resv-note → feat-fast-open 是 v28，一起上线）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-17 线上 fb-app-v27，分支 feat-pay-po → feat-resv-note → feat-fast-open → feat-followup 是 v28，一起上线）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -230,6 +230,20 @@
 - xlsx（近 1 MB）不再每次打开都加载：`needXLSX()` 点备份 / 导出时才加；sw.js 照旧预存。Firebase、shim 等脚本从 `<head>` 挪到 `<body>` 最后（build_mirror.py 跟着改成页头页尾都找）
 - 「复制口味」：从库存一览那一栏（快速下单格子下面）挪到标题右边 `header.top #inv-copy`，只在库存页显示
 - 测试 `tests/test_snapshot.py` 22/22（编的数据，旧/新结构，GitHub 上也跑：第二次打开时假 Firebase 每类慢 2.5 秒，先显示上次的 7，读完一次换成 10）
+
+## 跟进重做、按节奏自动提醒、客户买过什么竖着排（feat-followup，2026-11-18）
+- Bowen：①跟进只能「已发信息 / 不用跟了」一次，客人说下次再说就没法往后排 ②有的客人不知道几号跟进 ③「这个客人很热情、每几天来一次」——时间到了 App 要自己提醒 ④客户点开买过什么格式很乱，要跟合伙人对账单一样按系列竖着排 ⑤客户页除了预定，别的都没用
+- **往后排** `laterForm(kind, id)`（kind：o 订单上的跟进 / f 单独的跟进 / a 自动提醒）：「这次怎么说的」+ 下次哪天（`whenHtml/readWhen`：不定 / 明天 / 3 天后 / 一周后 / 两周后 / 选日期；自动提醒的多一个「按他的节奏」、没有「不定」）。
+  联系记录 `touches: [{date, what}]`（最多 20 笔，在跟进 / follow_up / 客户资料上），列表写「上次联系 11月16日：他说下周」；往后排会清掉 contacted_at（「已发信息」也记一笔）。记跟进的日期默认「不定」，记了 7 天还没定会写出来
+- **按节奏自动提醒**（`rhythmOf / autoFUs / autoRow`，跟进列表 `#fu-list` 下面，标题改「要联系的客户」）：节奏 = 客户资料 `every`（天；0 = 不用提醒）；没设就按他的记录：买过 3 天以上，相邻间隔中位数（最少 3 天）。
+  只买过 2 次不算（真实数据里两天连着买的人会被算成「3 天一次」）。上次 + 节奏 − 1 天起出现；有预定 / 有跟进的不出现；按记录算的、超过 30 天也超过 3 个周期没来的不出现（你设的照样提醒）。
+  往后排存在客户资料 `next`；他之后又买了（上次买 ≥ 最后一次联系）就不管 next。行上写：该来了 · 比平时晚了 N 天 / 节奏和上次哪天 / 常买前 3 种 + 现在有几根 / 你在资料里写的「关于这个人」。按钮：他要了·记预定 / 联系过了·往后排 / 不用提醒他 / 改节奏
+  - 拿真实记录回测（11-18）：照每个人自己的中位数猜下一次，10 次里 6 次差 2 天以内，照所有人的平均（8 天）4 次
+- 客户资料加「大概多久买一次」：按他的记录（大概 N 天）/ 每 3 天 / 每周 / 每两周 / 每月 / 不用提醒 / 自己填；保存时带上 next、touches（节奏改了清掉 next）
+- **custPatch(c, patch)**：改客户资料几个字段要整份写回——`wrapRef` 的 set 不认 `{merge:true}`（只给几个字段会把备注、类型冲掉，测试抓到的）
+- 客户点开：买过什么 = `.cu-hist2`：日期 + 金额一行，下面每个系列「Bar Pro 3 根」，再下面每个口味「Grape Ice ×2」（缩进）；顶上「一共 Bar Pro 6 根 · Ali 3 根」+ 节奏、下次大概哪天。不再显示来源
+- 客户页：4 个统计框缩成一行「N 个客户 · 回头客 N（%）· 平均每人 $」，放在「全部客户」标题下
+- 测试 `tests/test_followup.py` 44/44（编的数据，旧/新结构，GitHub 上也跑）
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超
