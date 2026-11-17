@@ -48,7 +48,7 @@ with sync_playwright() as p:
           localStorage.setItem('fb-last-user', JSON.stringify({ uid: 'u-test', email: '', displayName: '测试' }));""" +
           (f"localStorage.setItem('fb-schema', JSON.stringify({{ version: 2 }}));" if mode == "新结构" else "") +
           f"window.__SEED = n === 1 ? {json.dumps(s1, ensure_ascii=False)} : {json.dumps(s2, ensure_ascii=False)};"
-          f"window.__MOCK_SLOW = n === 1 ? {{}} : {json.dumps({c: 2500 for c in cols})}; }})();")
+          f"window.__MOCK_SLOW = n === 1 ? {{}} : n === 2 ? {json.dumps({c: 2500 for c in cols})} : {json.dumps({c: 5000 for c in cols})}; }})();")  # 第三次起慢 5 秒：机器忙的时候也来得及查
         pg = ctx.new_page(); pg.on("pageerror", lambda e: (print("   页面报错：", e), results.append(False)))
         pg.route("**/*", lambda r: r.abort() if "127.0.0.1" not in r.request.url else r.fallback())
         pg.route("**/firebase-app-compat.js", lambda r: r.fulfill(body=MOCK, content_type="text/javascript"))
@@ -91,7 +91,7 @@ with sync_playwright() as p:
             check("这时保存：拦住，写明一两秒后再点", "一两秒后再点保存" in err, err)
             pg.click("#sheet-close"); pg.wait_for_timeout(200)
         else: check("这时保存：拦住（进货弹窗没打开）", False)
-        pg.wait_for_function("!window.__fbSnapOn()", timeout=6000)
+        pg.wait_for_function("!window.__fbSnapOn()", timeout=9000)
         check(f"Firebase 读完后换成真的（{int((time.time() - t0) * 1000)} ms）", pg.evaluate(TOT) == "10")
 
         # 存的那份对不上（数据结构换了）就不用
