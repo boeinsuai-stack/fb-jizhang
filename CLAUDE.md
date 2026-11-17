@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-17 线上 fb-app-v27）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-17 线上 fb-app-v27，分支 feat-pay-po 是 v28）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -99,7 +99,7 @@
 ## 体检第二批（fix-batch2-20261115）
 - **弹出页聚焦**：记一笔 / 预定 / 编辑预定、跟合伙人结账 `openSheet(..., { focus: false })`；`openSheet` 自动聚焦跳过口味搜索框 `.pick-q`
   （feat15 跳过勾选框以后光标落到口味框 → 一打开就弹口味下拉）。test_sheet
-- **下单表付款方式**：一排小标签（radio `name="f-payr"`，`curPay()` 本来就两种都认），再点一下已选的 = 取消；别的弹窗还是 `<select id="f-pay">`
+- **下单表付款方式**：一排小标签（radio `name="f-payr"`，`curPay()` 本来就两种都认），再点一下已选的 = 取消；（2026-11-17 起别的弹窗也都是小标签，见「付款方式统一」）
 - **结账少勾**：`#f-part` 写明「没勾的里有同系列的货……分开结合计会多付/少付 $X」（= 勾的 + 没勾的各自互抵 − 全部一起互抵）。test_offset
 - **合伙人页**：余额 0 但 `pendingPicks(w)` 不空的人也列出来
 - **有新版提示**（shim.js 最后）：打开 8 秒后 / 切回前台（5 分钟节流）/ 每半小时 fetch `sw.js`（no-store）取 CACHE，跟 `<meta name="app-version">` 不一样 → 标题下 `#update-bar`「有新版 · 点一下更新」→ 先 `cache:"reload"` 拿新文件再刷新。test_update
@@ -202,6 +202,15 @@
   - 客户页：那一行标「少给你 $X / 多给了 $X」；点开有原因 +「不追了」（点两下，不用浏览器确认框）= 在他最后一单上记 waive；历史里每单写「少给 $30：配送费没给 / 收回 $30」；预定卡片标「上次少给 $30」
 - 新结构：订单上的额外字段原样存进 v2_orders，测试里迁移再算回来一字不差
 - 测试 `tests/test_cust_bal.py` 65/65（编的数据，旧/新结构，GitHub 上也跑）
+
+## 付款方式统一 + 订货单「一起改」放下面（feat-pay-po，2026-11-17）
+- Bowen：「结款的时候为什么没有一部分现金、一部分转账」——订货结款还是下拉框、只有 4 种。查下来还有 6 处同样（代送费、改已卖出的单、结算要填价的预定、合伙人拿货·卖出、记往来当场付、合伙人拿货/我拿货当场付）
+- 现在**所有**收钱/付钱的弹窗用同一个：`payPick(o)`（一排小标签 + 现金+转账 + `mixRowHtml`，`id="f-paychips"`）+ `wirePay(getTotal)`（再点取消、现金框跟着显示「现金 $X + PayID $Y」）；存的时候一律 `readPay(required, total)` → `payment / pay_cash / pay_other`。
+  不再有 `<select id="f-pay">`、`needPay`、`payOptions`（test_pay_mix 会查）。下单、选付款结算预定、跟合伙人结账那三处是早先自己写的小标签，行为一样，没动
+- 订货单存 `payment/pay_cash/pay_other`，列表写「已付 11月17日 · 现金 $100 + PayID $200」（`payWords(x, total)`）；新结构订货单的额外字段原样存得住（测试迁移再算回来一样）
+- 订货单：以前「整系列每根 $」在每个系列框头上、「选中的每种都订 N 根」在最下面，Bowen 说应该放一起 → 系列框头只剩系列名 + 根数；所有口味下面一块「选中的一起改」（`#f-bulk`）：
+  每种都订 N 根（选了 2 种以上）+ 每个有 2 种以上口味的系列一个「Bar Pro 每根 $」（`#f-serp`，系列没变不重画，免得打字时丢焦点）
+- 测试 `tests/test_pay_mix.py` 49/49（编的数据，旧/新结构，GitHub 上也跑）；test_po_quick 改用 `#f-bulk input[data-sr]`
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超

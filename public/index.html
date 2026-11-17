@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v27"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v28"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -283,6 +283,8 @@ label.chip:has(input:checked) { background: var(--accent-soft); color: var(--acc
 .po-flav .lines-head { display: none; }
 .po-date { margin: -6px 0 0; text-align: right; font-size: .8rem; color: var(--muted); } .po-date input { margin-left: 6px; }
 .po-all { display: flex; align-items: center; gap: 6px; font-size: .86rem; } .po-all input { width: 72px; }
+.po-bulk { display: grid; gap: 8px; border: 1px dashed var(--line); border-radius: 10px; padding: 8px 10px; margin-top: 8px; }
+.po-serp { display: flex; flex-wrap: wrap; gap: 8px 16px; } .po-serp .po-gc { font-size: .86rem; color: inherit; gap: 6px; } .po-serp .po-gc input { width: 84px; padding: 6px 8px; font-size: .9rem; }
 .pser { border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px 12px; margin: 0; display: grid; gap: 10px; min-width: 0; }
 .pser legend { padding: 0 6px; font-weight: 600; font-size: .9rem; }
 .stepper { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 8px; align-items: center; }
@@ -1027,14 +1029,25 @@ details.restock > summary::-webkit-details-marker { display: none; }
   const PAY_CLS = { "现金": "pay-cash", "PayID": "pay-payid", "银行转账": "pay-bank", "其他": "pay-other" };
   const payBadge = (pay, amt) => '<span class="pay ' + (pay ? PAY_CLS[pay] || "pay-other" : "pay-none") + '">' + esc(pay || "没选付款方式") + (amt != null ? " " + money(amt) : "") + "</span>";
   const paySum = (pairs) => { const t = {}; for (const [pay, amt] of pairs) if (amt) t[pay || ""] = r2((t[pay || ""] || 0) + amt); const keys = PAY.filter((k) => t[k]).concat(Object.keys(t).filter((k) => k && !PAY.includes(k))).concat(t[""] ? [""] : []); return keys.map((k) => payBadge(k || null, t[k])).join(""); };
-  const needPay = () => { const v = $("f-pay").value; if (!v) throw userError("选一下付款方式。"); return v; };
   /* split payment: part cash, the rest by transfer. Stored as payment "现金+转账", pay_cash = the cash part, pay_other = how the rest came */
   const MIX = "现金+转账", TRANSFER = ["PayID", "银行转账", "其他"];
-  const payOptions = (cur) => '<option value="">未选择</option>' + PAY.concat([MIX]).map((p) => "<option" + (cur === p ? " selected" : "") + ">" + p + "</option>").join("");
   const mixRowHtml = (o) => '<div class="grid2" id="f-mixwrap"' + (o && o.payment === MIX ? "" : " hidden") + '><div class="field"><label for="f-paycash">其中现金 $</label><input id="f-paycash" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(o && o.pay_cash != null ? o.pay_cash : "") + '"></div>' +
     '<div class="field"><label for="f-payother">其余转账用</label><select id="f-payother">' + TRANSFER.map((p) => "<option" + (((o && o.pay_other) || "PayID") === p ? " selected" : "") + ">" + p + "</option>").join("") + "</select></div></div>" +
     '<p class="hint" id="f-mixhint" hidden></p>';
   const curPay = () => ($("f-pay") ? $("f-pay").value : ((document.querySelector('input[name="f-payr"]:checked') || {}).value || ""));
+  /* 付款方式：所有收钱 / 付钱的地方都用这一个（2026-11-17 Bowen：订货结款没有「现金+转账」）——一排小标签 + 现金+转账分开填；再点一下已选的 = 取消 */
+  const payPick = (o, label) => '<div class="field"><span class="lbl">' + (label || "付款方式") + '</span><div class="chips" id="f-paychips" role="radiogroup" aria-label="付款方式">' +
+    PAY.concat([MIX]).map((x) => '<label class="chip"><input type="radio" name="f-payr" value="' + esc(x) + '"' + (o && o.payment === x ? " checked" : "") + "> " + esc(x) + "</label>").join("") + "</div></div>" +
+    mixRowHtml(o && o.payment === MIX ? o : null);
+  function wirePay(getTotal) {
+    const box = $("f-paychips"); if (!box) return;
+    let was = curPay();
+    const sync = () => mixSync(getTotal ? getTotal() : null);
+    box.addEventListener("click", (e) => { const r = e.target.closest('input[name="f-payr"]'); if (!r) return; if (r.value === was) { r.checked = false; was = ""; } else was = r.value; sync(); });
+    sheetOn("input", sync); sheetOn("change", sync); sync();
+  }
+  /* 一笔钱的付款方式写成字：现金+转账 =「现金 $50 + PayID $100」 */
+  const payWords = (x, total) => { if (!x || !x.payment) return ""; if (x.payment !== MIX) return x.payment; const c = Number(x.pay_cash) || 0; return "现金 " + money(c) + " + " + (x.pay_other || "PayID") + (total == null ? "" : " " + money(r2(total - c))); };
   function mixSync(total) {
     if (!$("f-mixwrap")) return;
     const on = curPay() === MIX, c = numOrNull($("f-paycash").value), h = $("f-mixhint");
@@ -1706,9 +1719,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<details class="more"' + (o.suburb || o.source || o.follow_up ? " open" : "") + '><summary>客户资料：区、来源、跟进</summary><div class="more-body">' + custMoreHtml(o) + "</div></details>" +
       '<div class="fixed-line" style="font-size:.74rem;color:var(--muted)"><span>香型</span><span>数量</span><span>单价 $</span></div>' +
       lines.map((l, k) => '<div class="fixed-line"><span>' + esc(nm(l.sku, l.name)) + '</span><span>×' + esc(l.qty) + '</span><input id="f-price-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" placeholder="未填" aria-label="' + esc(l.name) + ' 单价" value="' + (l.unit_price == null ? "" : esc(l.unit_price)) + '"></div>').join("") +
-      '<div class="grid2"><div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(o.delivery_fee || "") + '"></div>' +
-      '<div class="field"><label for="f-pay">付款方式</label><select id="f-pay">' + payOptions(o.payment) + "</select></div></div>" +
-      mixRowHtml(o) +
+      '<div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(o.delivery_fee || "") + '"></div>' +
+      payPick(o) +
       '<div class="field"><label for="f-note">备注</label><input id="f-note" value="' + esc(o.note || "") + '"></div>' +
       (isReserved(o) && lines.length ? pnameField(o.pick_from || "", false) + (splitter = pickSplitter(o.pick_split || null)).html : "") +
       (lines.length ? lumpHtml(o.lump_total != null, o.lump_total) : "") +
@@ -1737,7 +1749,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const upd = () => { lumpSync(); const fee = Number($("f-fee").value) || 0; $("f-total").textContent = lines.length ? totalText(readLines(), fee) : money(fee); mixSync(lines.length ? formTotalNum(readLines(), fee) : fee); bal.setTotal(lines.length ? formTotalNum(readLines(), fee) : fee); };
       wireCust(id);
       if ($("f-pfrom") && splitter) { splitter.bind(); splitter.setShort(Object.entries(resvAlloc().RS[id] || {})); }
-      sheetOn("input", upd); sheetOn("change", upd); upd();
+      sheetOn("input", upd); sheetOn("change", upd); upd(); wirePay(() => (lines.length ? formTotalNum(readLines(), Number($("f-fee").value) || 0) : Number($("f-fee").value) || 0));
     });
   }
 
@@ -2712,16 +2724,16 @@ details.restock > summary::-webkit-details-marker { display: none; }
     openSheet("记代送费（只收配送费）",
       '<div class="grid2"><div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
       '<div class="field"><label for="f-fee">收到的配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal"></div></div>' +
-      '<div class="field"><label for="f-pay">付款方式</label><select id="f-pay"><option value="">未选择</option>' + PAY.map((x) => "<option>" + x + "</option>").join("") + "</select></div>" +
+      payPick(null) +
       '<div class="field"><label for="f-note">备注</label><input id="f-note" placeholder="例如 帮合伙人送一单"></div>' +
       '<p class="hint">帮别人送货、货不是你卖的，只有配送费算你的收入，没有成本。</p>',
       async () => {
         needDb();
         const fee = numOrNull($("f-fee").value); if (fee == null || fee <= 0) throw userError("填一下收到的配送费。");
         const date = $("f-date").value || today();
-        await db.collection("orders").doc(rid("o")).set({ status: "paid", kind: "delivery", date, at: new Date().toISOString(), lines: [], delivery_fee: fee, payment: needPay(), note: $("f-note").value.trim() || "代送" });
+        await db.collection("orders").doc(rid("o")).set(Object.assign({ status: "paid", kind: "delivery", date, at: new Date().toISOString(), lines: [], delivery_fee: fee }, readPay(true, fee), { note: $("f-note").value.trim() || "代送" }));
         return "已记代送费 " + money(fee) + "。";
-      });
+      }, () => wirePay(() => numOrNull($("f-fee").value)));
   });
   $("resv").addEventListener("click", (e) => {
     const t = e.target.closest("button"); if (!t) return;
@@ -2776,14 +2788,15 @@ details.restock > summary::-webkit-details-marker { display: none; }
   function poPayForm(pid) {
     const po = S.purchases.find((p) => p.id === pid); if (!po) return;
     const html = '<p class="hint">' + esc(poWho(po)) + " · " + esc(fmtD(po.date)) + " 订的 " + esc(poLinesTxt(po)) + " · <b>" + money(poOweAmt(po)) + "</b></p>" +
-      '<div class="grid2"><div class="field"><label for="f-date">付款日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
-      '<div class="field"><label for="f-pay">付款方式</label><select id="f-pay"><option value="">未选择</option>' + PAY.map((x) => "<option>" + x + "</option>").join("") + "</select></div></div>" +
+      payPick(null) +
+      '<div class="field"><label for="f-date">付款日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
       '<p class="hint">结款只是标记这张订货单已经付清，不会再记一次成本（订货时已经记过）。金额不对的话先「编辑」订货单改单价。</p>';
     openSheet("订货结款", html, async () => {
       needDb();
-      await db.doc("purchases/" + pid).update({ paid: true, paid_date: $("f-date").value || today(), payment: $("f-pay").value || null });
-      return "已结款：付给" + poWho(po) + " " + money(poOweAmt(po)) + "。";
-    }, () => { $("sheet-save").textContent = "确认已付"; });
+      const P = readPay(false, poOweAmt(po));
+      await db.doc("purchases/" + pid).update(Object.assign({ paid: true, paid_date: $("f-date").value || today() }, P));
+      return "已结款：付给" + poWho(po) + " " + money(poOweAmt(po)) + (P.payment ? "（" + payWords(P, poOweAmt(po)) + "）" : "") + "。";
+    }, () => { $("sheet-save").textContent = "确认已付"; wirePay(() => poOweAmt(po)); });
   }
 
   function poForm(pid) {
@@ -2809,7 +2822,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
         '<div class="tiles po-tiles" id="f-ptiles"></div>' +
         '<div class="lines-head"><span>香型</span><span>订多少根</span><span>单根成本 $</span><span></span></div>' +
         '<div id="f-lines"></div>' +
-        '<label class="po-all" id="f-allbox" hidden>选中的每种都订 <input id="f-allq" type="number" min="1" step="1" inputmode="numeric" aria-label="每种都订多少根"> 根</label>' +
+        '<div class="po-bulk" id="f-bulk" hidden><span class="flabel">选中的一起改</span>' +
+          '<label class="po-all" id="f-allbox" hidden>每种都订 <input id="f-allq" type="number" min="1" step="1" inputmode="numeric" aria-label="每种都订多少根"> 根</label>' +
+          '<div class="po-serp" id="f-serp"></div></div>' +
       "</div>" +
       '<details class="fold"' + (SERS.some((sr) => serLine(sr)) ? " open" : "") + '><summary>只知道系列，口味到货再分</summary>' +
       SERS.map((sr, k) => { const l = serLine(sr), unit = l ? l.unit_cost : defaultPickCost(sr);
@@ -2825,12 +2840,13 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<p class="total">共 <b id="f-units">0</b> 根 · 付款 <b id="f-total">–</b></p>' +
       '<p class="po-date">订货日期：<span id="f-date-txt"></span> <button type="button" class="linkbtn" id="f-date-edit">改</button><input id="f-date" type="date" value="' + esc(po ? po.date : today()) + '" hidden aria-label="订货日期"></p>';
     const serVal = {};
-    /* 选好的口味按系列分组：每组一个框，框头 = 系列小标签 + 这组几根 + 整系列每根成本 */
+    /* 选好的口味按系列分组：每组一个框，框头 = 系列小标签 + 这组几根。
+       一起改根数、一起改每根成本放在所有口味下面同一块（2026-11-17 Bowen：价格一起改在上面、根数一起改在下面，不顺手） */
     function grpOf(sr) {
       let g = Array.from($("f-lines").querySelectorAll(".po-grp")).find((x) => x.dataset.sr === sr);
       if (g) return g;
       g = document.createElement("div"); g.className = "po-grp"; g.dataset.sr = sr;
-      g.innerHTML = '<div class="po-gh"><span class="lg-k k-ser">' + esc(sr) + '</span><small class="po-gn"></small><label class="po-gc">整系列每根 $<input type="number" min="0" step="0.01" inputmode="decimal" data-sr="' + esc(sr) + '" value="' + esc(serVal[sr] != null ? serVal[sr] : "") + '" placeholder="同一个价" aria-label="' + esc(sr) + ' 整系列每根成本"></label></div><div class="po-grows"></div>';
+      g.innerHTML = '<div class="po-gh"><span class="lg-k k-ser">' + esc(sr) + '</span><small class="po-gn"></small></div><div class="po-grows"></div>';
       const after = Array.from($("f-lines").querySelectorAll(".po-grp")).find((x) => SERS.indexOf(x.dataset.sr) > SERS.indexOf(sr));
       $("f-lines").insertBefore(g, after || null);
       return g;
@@ -2871,9 +2887,20 @@ details.restock > summary::-webkit-details-marker { display: none; }
           (q ? '<span class="t-n" aria-hidden="true">' + q + '</span><button type="button" class="t-minus" data-psub="' + esc(i.sku) + '" aria-label="' + esc(enOf(i)) + ' 减一根">−</button>' : "") + "</div>"; }).join("")
         : '<div class="empty">' + (ql ? "没有匹配的口味。" : "这个系列还没有口味。") + "</div>";
     }
+    function bulkSync() {
+      const rows = $("f-lines").querySelectorAll(".line"), cnt = {};
+      rows.forEach((r) => { const sr = r.closest(".po-grp").dataset.sr; cnt[sr] = (cnt[sr] || 0) + 1; });
+      const srs = SERS.filter((sr) => cnt[sr] >= 2), box = $("f-serp"), sig = srs.join("|");
+      if (box.dataset.sig !== sig) {
+        box.dataset.sig = sig;
+        box.innerHTML = srs.map((sr) => '<label class="po-gc">' + esc(sr) + ' 每根 $<input type="number" min="0" step="0.01" inputmode="decimal" data-sr="' + esc(sr) + '" value="' + esc(serVal[sr] != null ? serVal[sr] : "") + '" placeholder="同一个价" aria-label="' + esc(sr) + ' 每根成本一起改"></label>').join("");
+      }
+      $("f-allbox").hidden = rows.length < 2;
+      $("f-bulk").hidden = rows.length < 2 && !srs.length;
+    }
     function flavSync() {
       const rows = $("f-lines").querySelectorAll(".line");
-      $("f-allbox").hidden = rows.length < 2;
+      bulkSync();
       $("f-lines").querySelectorAll(".po-grp").forEach((g) => { const rs = g.querySelectorAll(".line"); if (!rs.length) { g.remove(); return; }
         g.querySelector(".po-gn").textContent = Array.from(rs).reduce((a, r) => a + (Number($("f-qty-" + r.dataset.line).value) || 0), 0) + " 根"; });
       renderTiles(); recalc();
@@ -2950,10 +2977,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
       for (const l of flavLines) addLine(l.sku, l.qty, l.unit_cost);
       if (flavLines.length) pTab = seriesOf(itemBy(flavLines[0].sku)) || pTab;
       $("f-lines").addEventListener("click", (e) => { const k = e.target.dataset && e.target.dataset.rm; if (k == null) return; e.target.closest(".line").remove(); flavSync(); });
-      $("f-lines").addEventListener("input", (e) => {
-        const sr = e.target.dataset && e.target.dataset.sr;
-        if (sr) { serVal[sr] = e.target.value; e.target.closest(".po-grp").querySelectorAll(".line").forEach((r) => { $("f-ucost-" + r.dataset.line).value = e.target.value; }); recalc(); }
-        else if (/^f-qty-/.test(e.target.id)) flavSync(); });
+      $("f-lines").addEventListener("input", (e) => { if (/^f-qty-/.test(e.target.id)) flavSync(); });
+      $("f-serp").addEventListener("input", (e) => {
+        const sr = e.target.dataset && e.target.dataset.sr; if (!sr) return;
+        serVal[sr] = e.target.value; grpOf(sr).querySelectorAll(".line").forEach((r) => { $("f-ucost-" + r.dataset.line).value = e.target.value; }); recalc(); });
       $("f-ptiles").addEventListener("click", (e) => { const a = e.target.closest("[data-padd]"), m = e.target.closest("[data-psub]");
         if (a) addSku(a.dataset.padd, 1); else if (m) addSku(m.dataset.psub, -1); });
       $("f-ptabs").addEventListener("click", (e) => { const c = e.target.closest("[data-pt]"); if (!c) return; pTab = c.dataset.pt; pQ = ""; $("f-pq").value = ""; renderTiles(); });
@@ -3073,7 +3100,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const rlist = Object.entries(rcpts).sort((a, b) => (a[1].date || "").localeCompare(b[1].date || ""));
       return '<article class="po">' +
         '<div class="po-head"><div><span class="l-date">订货 ' + fmtD(po.date) + (po.supplier ? " · " + esc(po.supplier) : "") + '</span><b class="po-title">' + esc(po.note || poLinesTxt(po)) + "</b>" +
-          '<span class="l-sub">' + (poUnpaid(po) ? "还没付" + (po.supplier ? "，记在你欠 " + esc(po.supplier) + " 的账里" : "") : "已付" + (po.paid_date ? " " + fmtD(po.paid_date) : "") + (po.settlement_id ? " · 跟" + esc(poWho(po)) + "结账时一起付" : po.payment ? " · " + esc(po.payment) : "")) + "</span></div>" +
+          '<span class="l-sub">' + (poUnpaid(po) ? "还没付" + (po.supplier ? "，记在你欠 " + esc(po.supplier) + " 的账里" : "") : "已付" + (po.paid_date ? " " + fmtD(po.paid_date) : "") + (po.payment ? " · " + esc(payWords(po, poOweAmt(po))) : "") + (po.settlement_id ? " · 跟" + esc(poWho(po)) + "结账时一起付" : po.payment ? " · " + esc(po.payment) : "")) + "</span></div>" +
         '<div class="po-amt"><span>' + money(poPaid(po)) + '</span><span class="pill ' + (poUnpaid(po) ? "bad" : "") + '">' + (poUnpaid(po) ? "未付" : "已付") + '</span><span class="pill ' + lab[1] + '">' + lab[0] + "</span></div></div>" +
         '<div class="tblwrap"><table class="po-tbl"><thead><tr><th>订的</th><th>订</th><th>已到</th><th>未到</th><th>$/根</th></tr></thead><tbody>' +
         (po.lines || []).map((l) => { const g = recv[lineKey(l)] || 0, lf = Math.max(0, l.qty - g);
@@ -3146,9 +3173,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="field"><label for="f-date">结算日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
       '<div class="fixed-line rcv-head"><span>香型</span><span>数量</span><span>单价 $</span></div>' +
       lines.map((l, k) => '<div class="fixed-line"><span>' + esc(nm(l.sku, l.name)) + "</span><span>×" + esc(l.qty) + '</span><input id="f-price-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" placeholder="单价" aria-label="' + esc(nm(l.sku, l.name)) + ' 单价" value="' + esc(l.unit_price ?? numOrNull((itemBy(l.sku) || {}).price_aud) ?? "") + '"></div>').join("") +
-      '<div class="grid2"><div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(o.delivery_fee || "") + '"></div>' +
-      '<div class="field"><label for="f-pay">付款方式</label><select id="f-pay">' + payOptions(o.payment) + "</select></div></div>" +
-      mixRowHtml(o) +
+      '<div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(o.delivery_fee || "") + '"></div>' +
+      payPick(o) +
       lumpHtml(o.lump_total != null, o.lump_total) +
       (String(o.customer || "").trim() ? "" : custNameHtml(o)) + balHtml(o) +
       '<p class="total">合计<b id="f-total">–</b></p><p id="f-baltot" hidden></p>';
@@ -3168,8 +3194,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
       return "已结算，算作卖出" + msg;
     }, () => {
       bal = wireBal(o, custNow, () => true);
+      const tot = () => { const ps = read(); return formTotalNum(lines.map((l, k) => ({ qty: Number(l.qty) || 0, price: ps[k] })), Number($("f-fee").value) || 0); };
       const upd = () => { lumpSync(); const ps = read(), ls = lines.map((l, k) => ({ qty: Number(l.qty) || 0, price: ps[k] })), fee = Number($("f-fee").value) || 0; $("f-total").textContent = totalText(ls, fee); mixSync(formTotalNum(ls, fee)); bal.setTotal(formTotalNum(ls, fee)); };
-      sheetOn("input", upd); sheetOn("change", upd); upd();
+      sheetOn("input", upd); sheetOn("change", upd); upd(); wirePay(tot);
     });
   }
 
@@ -3512,7 +3539,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       (assets ? fld("f-photos", "口味照片（可选，可以多张）", '<input id="f-photos" type="file" accept="image/*" multiple><div class="thumbs" id="f-thumbs"></div>')
         : STANDALONE ? '<p class="hint">独立版不能存照片，口味可以写在备注里。</p>' : "") +
       '<div class="grid2">' + fld("f-fee", "配送费 $（买家付的）", '<input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0">') +
-      fld("f-pay", "付款方式", '<select id="f-pay"><option value="">未选择</option>' + PAY.map((p) => "<option>" + p + "</option>").join("") + "</select>") + "</div>" +
+      "</div>" + payPick(null) +
       fld("f-note", "备注", '<input id="f-note" placeholder="买家、口味等">') +
       '<p class="total">拿货 <b id="f-units">0</b> 根 · 拿货成本 <b id="f-cost">–</b> · 收入 <b id="f-total">–</b></p>' +
       '<p class="hint">一次记两件事：向合伙人拿货（拿货成本等着结账）和卖出（收入）。库存数量不变。</p>';
@@ -3536,7 +3563,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const photos = files.length ? await uploadPhotos(files) : [];
       const lines = [];
       for (const r of use) { const it = await ensureGeneric(r.sr, r.c); lines.push({ sku: it.sku, name: it.name, qty: r.q, unit_price: r.p, sr: r.sr, c: r.c }); }
-      await db.collection("orders").doc(oid).set({ status: "paid", kind: "partner", date, at, lines: lines.map((l) => ({ sku: l.sku, name: l.name, qty: l.qty, unit_price: l.unit_price })), delivery_fee: fee == null ? 0 : fee, payment: $("f-pay").value || null, note: $("f-note").value.trim(), photos });
+      await db.collection("orders").doc(oid).set(Object.assign({ status: "paid", kind: "partner", date, at, lines: lines.map((l) => ({ sku: l.sku, name: l.name, qty: l.qty, unit_price: l.unit_price })), delivery_fee: fee == null ? 0 : fee }, readPay(false, lines.every((l) => l.unit_price != null) ? r2(lines.reduce((a, l) => a + l.unit_price * l.qty, 0) + (fee || 0)) : null), { note: $("f-note").value.trim(), photos }));
       const bid = oid + "-pick", known = lines.every((l) => l.c != null), eid = known ? bid + "-cost" : null;
       const total = r2(lines.reduce((a, l) => a + (l.c || 0) * l.qty, 0));
       await Promise.all(lines.flatMap((l) => [
@@ -3549,7 +3576,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       sheetOn("click", (e) => { const b = e.target.closest("[data-step]"); if (!b) return; const i = $(b.dataset.for); i.value = Math.max(0, (Number(i.value) || 0) + Number(b.dataset.step)); recalc(); });
       sheetOn("input", recalc);
       wireFilePick((fs) => { files = fs; });
-      recalc();
+      recalc(); wirePay(() => { const rs = read().filter((r) => Number.isInteger(r.q) && r.q > 0); return rs.length && rs.every((r) => r.p != null) ? r2(rs.reduce((a, r) => a + r.p * r.q, 0) + (Number($("f-fee").value) || 0)) : null; });
     });
   }
 
@@ -3650,7 +3677,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<fieldset class="xside" id="f-xout"><legend>我给 <i class="xw">合伙人</i> 的货</legend><div id="f-lines-o"></div><button type="button" class="btn ghost small" id="f-add-o">+ 再加一种</button></fieldset>' +
       '<fieldset class="xside" id="f-xin" hidden><legend><i class="xw">合伙人</i> 给我的货</legend><div id="f-lines-i"></div><button type="button" class="btn ghost small" id="f-add-i">+ 再加一种</button></fieldset>' +
       '<div id="f-xpaidbox"><label class="check"><input type="checkbox" id="f-xpaid"> <span><i class="xw">合伙人</i> 当场就把钱付了</span></label>' +
-        '<div class="field" id="f-xpaywrap" hidden><label for="f-pay">付款方式</label><select id="f-pay"><option value="">未选择</option>' + PAY.map((x) => "<option>" + x + "</option>").join("") + "</select></div></div>" +
+        '<div id="f-xpaywrap" hidden>' + payPick(null) + "</div></div>" +
       '<div class="grid2"><div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
       '<div class="field"><label for="f-note">备注</label><input id="f-note" placeholder="例如 他下周有货到再还"></div></div>' +
       '<p class="callout xsum" id="f-xsum">–</p>' +
@@ -3693,11 +3720,11 @@ details.restock > summary::-webkit-details-marker { display: none; }
       if ((k !== "give" && !o.length) || (k !== "take" && !i.length)) throw userError(k === "swap" ? "两边的口味都要选。" : "至少选一种口味。");
       for (const l of o.concat(i)) { if (!Number.isInteger(l.qty) || l.qty < 1) throw userError("数量要是 1 或以上的整数。"); if (l.unit == null || l.unit < 0) throw userError("填一下 " + nm(l.sku) + " 的单价。"); }
       for (const l of o) haveCheck(D, l);
-      const paidNow = k === "take" && $("f-xpaid").checked; if (paidNow && !$("f-pay").value) throw userError("选一下他是怎么付的。");
+      const paidNow = k === "take" && $("f-xpaid").checked; if (paidNow && !curPay()) throw userError("选一下他是怎么付的。");
       const tid = rid("t"), date = $("f-date").value || today(), at = new Date().toISOString(), net = r2(xLineVal(o) - xLineVal(i)), eff = xferEff({ out: o, in: i });
       const doc = { date, at, partner: w, out: o, in: i, note: $("f-note").value.trim() };
       if (k === "swap" && !eff) doc.closed = true; // 两边钱相等，或同系列一根抵一根全抵掉
-      if (paidNow) { const sid = rid("s"); await db.collection("settlements").doc(sid).set({ date, at, order_ids: [], transfer_ids: [tid], qty: {}, amount: -net, paid: -net, partner: w, payment: $("f-pay").value, note: "当场付清" }); doc.partner_settlement_id = sid; }
+      if (paidNow) { const sid = rid("s"); await db.collection("settlements").doc(sid).set(Object.assign({ date, at, order_ids: [], transfer_ids: [tid], qty: {}, amount: -net, paid: -net, partner: w }, readPay(true, Math.abs(net)), { note: "当场付清" })); doc.partner_settlement_id = sid; }
       await db.collection("transfers").doc(tid).set(doc);
       await Promise.all(o.map((l) => db.collection("movements").doc(tid + "-out-" + l.sku).set({ type: "adjust", sku: l.sku, name: l.name, qty: -l.qty, date, at, transfer_id: tid, note: "合伙人往来：给 " + w }))
         .concat(i.map((l) => db.collection("movements").doc(tid + "-in-" + l.sku).set({ type: "in", sku: l.sku, name: l.name, qty: l.qty, cost: r2(l.qty * l.unit), date, at, transfer_id: tid, note: "合伙人往来：" + w + " 给的" }))));
@@ -3711,7 +3738,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
         $(box).addEventListener("click", (e) => { const k = e.target.dataset && e.target.dataset.rm; if (k == null) return; e.target.closest(".xline").remove(); recalc(); });
         wirePicker(list, D, (k) => { defUnit(k); recalc(); }, box);
       }
-      sheetOn("input", recalc); sheetOn("change", recalc); recalc();
+      sheetOn("input", recalc); sheetOn("change", recalc); recalc(); wirePay(() => xLineVal(read("o")));
       $("sheet-save").textContent = "记下来";
       if (!who0) $("f-xwho").focus();
     });
@@ -4188,7 +4215,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       ptSerpBox(lines) +
       '<p class="hint">一般整个系列同一个价，在「整系列每根」填一次就行；个别口味不一样再单独改。</p>' +
       '<label class="check"><input type="checkbox" id="f-xpaid"> <span>我当场付了钱</span></label>' +
-      '<div class="field" id="f-xpaywrap" hidden><label for="f-pay">付款方式</label><select id="f-pay"><option value="">未选择</option>' + PAY.map((x) => "<option>" + x + "</option>").join("") + "</select></div>" +
+      '<div id="f-xpaywrap" hidden>' + payPick(null) + "</div>" +
       '<p class="callout xsum" id="f-xsum">–</p>' +
       '<details class="more"><summary>更多：日期、备注</summary><div class="more-body"><div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
       '<div class="field"><label for="f-note">备注</label><input id="f-note" placeholder="例如 下周一起结"></div></div></details>';
@@ -4206,10 +4233,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const w = $("f-xwho").value.trim(); if (!w) throw userError("填一下跟谁拿的。");
       const i = read();
       for (const l of i) if (l.unit == null || l.unit < 0) throw userError("填一下 " + nm(l.sku) + " 每根多少钱。");
-      const paidNow = $("f-xpaid").checked; if (paidNow && !$("f-pay").value) throw userError("选一下你是怎么付的。");
+      const paidNow = $("f-xpaid").checked; if (paidNow && !curPay()) throw userError("选一下你是怎么付的。");
       const tid = rid("t"), date = $("f-date").value || today(), at = new Date().toISOString(), v = r2(xLineVal(i));
       const doc = { date, at, partner: w, out: [], in: i, note: $("f-note").value.trim() };
-      if (paidNow) { const sid = rid("s"); await db.collection("settlements").doc(sid).set({ date, at, order_ids: [], transfer_ids: [tid], qty: {}, amount: v, paid: v, partner: w, payment: $("f-pay").value, note: "当场付清" }); doc.partner_settlement_id = sid; }
+      if (paidNow) { const sid = rid("s"); await db.collection("settlements").doc(sid).set(Object.assign({ date, at, order_ids: [], transfer_ids: [tid], qty: {}, amount: v, paid: v, partner: w }, readPay(true, Math.abs(v)), { note: "当场付清" })); doc.partner_settlement_id = sid; }
       await db.collection("transfers").doc(tid).set(doc);
       await Promise.all(i.map((l) => db.collection("movements").doc(tid + "-in-" + l.sku).set({ type: "in", sku: l.sku, name: l.name, qty: l.qty, cost: r2(l.qty * l.unit), date, at, transfer_id: tid, note: "合伙人往来：" + w + " 给的" })));
       await wakeItems(i.map((l) => l.sku));
@@ -4218,7 +4245,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }, () => {
       $("sheet-save").textContent = "记下来";
       wirePtSerp(lines);
-      sheetOn("input", recalc); sheetOn("change", recalc);
+      sheetOn("input", recalc); sheetOn("change", recalc); wirePay(() => xLineVal(read()));
       if ($("f-pchips")) $("f-pchips").addEventListener("click", (e) => { const b = e.target.closest("[data-pn]"); if (b) { $("f-xwho").value = b.dataset.pn; recalc(); } });
       recalc();
     });
@@ -4232,7 +4259,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       ptSerpBox(lines) +
       '<p class="hint">默认按进价，说好别的价就在「整系列每根」填一次；个别口味不一样再单独改。</p>' +
       '<label class="check"><input type="checkbox" id="f-xpaid"> <span>他当场付了钱</span></label>' +
-      '<div class="field" id="f-xpaywrap" hidden><label for="f-pay">付款方式</label><select id="f-pay"><option value="">未选择</option>' + PAY.map((x) => "<option>" + x + "</option>").join("") + "</select></div>" +
+      '<div id="f-xpaywrap" hidden>' + payPick(null) + "</div>" +
       '<p class="callout xsum" id="f-xsum">–</p>' +
       '<details class="more"><summary>更多：日期、备注</summary><div class="more-body"><div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
       '<div class="field"><label for="f-note">备注</label><input id="f-note" placeholder="例如 他下周有货到再还"></div></div></details>';
@@ -4254,10 +4281,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
         if (l.unit == null || l.unit < 0) throw userError("填一下 " + nm(l.sku) + " 每根多少钱。");
         haveCheck(D, l);
       }
-      const paidNow = $("f-xpaid").checked; if (paidNow && !$("f-pay").value) throw userError("选一下他是怎么付的。");
+      const paidNow = $("f-xpaid").checked; if (paidNow && !curPay()) throw userError("选一下他是怎么付的。");
       const tid = rid("t"), date = $("f-date").value || today(), at = new Date().toISOString(), net = r2(xLineVal(o));
       const doc = { date, at, partner: w, out: o, in: [], note: $("f-note").value.trim() };
-      if (paidNow) { const sid = rid("s"); await db.collection("settlements").doc(sid).set({ date, at, order_ids: [], transfer_ids: [tid], qty: {}, amount: -net, paid: -net, partner: w, payment: $("f-pay").value, note: "当场付清" }); doc.partner_settlement_id = sid; }
+      if (paidNow) { const sid = rid("s"); await db.collection("settlements").doc(sid).set(Object.assign({ date, at, order_ids: [], transfer_ids: [tid], qty: {}, amount: -net, paid: -net, partner: w }, readPay(true, Math.abs(net)), { note: "当场付清" })); doc.partner_settlement_id = sid; }
       await db.collection("transfers").doc(tid).set(doc);
       await Promise.all(o.map((l) => db.collection("movements").doc(tid + "-out-" + l.sku).set({ type: "adjust", sku: l.sku, name: l.name, qty: -l.qty, date, at, transfer_id: tid, note: "合伙人往来：给 " + w })));
       if (onDone) onDone();
@@ -4265,7 +4292,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }, () => {
       $("sheet-save").textContent = "记下来";
       wirePtSerp(lines);
-      sheetOn("input", recalc); sheetOn("change", recalc);
+      sheetOn("input", recalc); sheetOn("change", recalc); wirePay(() => xLineVal(read()));
       if ($("f-pchips")) $("f-pchips").addEventListener("click", (e) => { const b = e.target.closest("[data-pn]"); if (b) { $("f-xwho").value = b.dataset.pn; recalc(); } });
       recalc();
     });

@@ -84,7 +84,7 @@ with sync_playwright() as p:
         if SHOT and mode == "新结构": pg.screenshot(path=SHOT + "-粘贴识别.png", full_page=False)
         grp = pg.evaluate("[...document.querySelectorAll('#f-lines .po-grp')].map((g) => [g.dataset.sr, g.querySelector('.po-gn').textContent, [...g.querySelectorAll('.pl-name b')].map((b) => b.textContent)])")
         check("按系列分框：Bar Pro 框 11 根、Ali 框 6 根，行里只写口味名", grp == [["Bar Pro", "11 根", ["Banana Buzz", "Grape Ice", "Blueberry Ice"]], ["Ali", "6 根", ["Pink Lemon"]]], str(grp))
-        pg.fill('#f-lines input[data-sr="Bar Pro"]', "32")
+        pg.fill('#f-bulk input[data-sr="Bar Pro"]', "32")
         tot = pg.inner_text("#f-units")
         check("共 17 根", tot == "17", tot)
         if SHOT and mode == "新结构":
