@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v26"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v27"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="vendor/firebasejs/10.12.2/firebase-app-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-auth-compat.js"></script><script src="vendor/firebasejs/10.12.2/firebase-firestore-compat.js"></script><script src="https://accounts.google.com/gsi/client" async></script><script src="firebase-config.js"></script><script src="v2.js"></script><script src="orderparse.js"></script><script src="shim.js"></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1468,11 +1468,11 @@ details.restock > summary::-webkit-details-marker { display: none; }
   /* ---------- 客人少给 / 多给（2026-11-17 Bowen）：结账时客人少给了（比如忘了配送费）或多给了，记在那一单上；
      下次跟这个客人记单 / 结算预定时提醒「上次少给 $30，这单要收回来」或「上次多给 $20，这单少收」，勾上就两清。
      订单字段 bal = [{ amt, why, kind, date }]：amt > 0 = 这单之后客人还欠你；amt < 0 = 你欠客人。kind：diff 这单少给/多给，back 这单收回/抵掉上次的，waive 不追了。
-     一个客人欠多少 = 他所有单的 bal 加起来（按名字，不分大小写）。钱的数字（收入、净赚）照订单合计算，不受影响 ---------- */
+     一个客人欠多少 = 他所有已付款的单的 bal 加起来（按名字，不分大小写；预定上记的少给/多给等结算了才算）。钱的数字（收入、净赚）照订单合计算，不受影响 ---------- */
   const balOf = (o) => (Array.isArray(o && o.bal) ? o.bal : []);
   function custBal(name, exceptId) {
     const k = normName(name); if (!k) return { amt: 0, why: [] };
-    const os = S.orders.filter((o) => o.id !== exceptId && normName(o.customer) === k && balOf(o).length).sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.at || "").localeCompare(b.at || ""));
+    const os = S.orders.filter((o) => o.id !== exceptId && !isReserved(o) && normName(o.customer) === k && balOf(o).length).sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.at || "").localeCompare(b.at || ""));
     let amt = 0, why = [];
     for (const o of os) for (const e of balOf(o)) { amt = r2(amt + (Number(e.amt) || 0)); if (Math.abs(amt) < 0.005) why = []; else if (e.kind === "diff") why.push({ date: o.date, why: e.why, amt: e.amt, oid: o.id }); }
     return { amt: Math.abs(amt) < 0.005 ? 0 : amt, why, last: os.length ? os[os.length - 1] : null };
@@ -1490,7 +1490,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
         '<div class="grid2"><div class="field"><label for="f-diffamt">差多少 $</label><input id="f-diffamt" type="number" min="0" step="0.01" inputmode="decimal" value="' + (d ? Math.abs(d.amt) : "") + '"></div>' +
         '<div class="field"><label for="f-diffwhy">为什么</label><input id="f-diffwhy" placeholder="比如：配送费没给" value="' + esc(d ? d.why || "" : "") + '"></div></div>' +
         '<div class="chips">' + BAL_WHY.map((w) => '<button type="button" class="chip" data-diffwhy="' + esc(w) + '">' + esc(w) + "</button>").join("") + '<button type="button" class="linkbtn" id="f-diff-clear">不记了</button></div>' +
-        '<p class="hint">记在这一单上。下次跟这个客人记单时会提醒你收回来 / 少收。</p></div>';
+        '<p class="hint">记在这一单上。下次跟这个客人记单时会提醒你收回来 / 少收。' + (o && isReserved(o) ? "预定也可以先记，结算时照这个收。" : "") + "</p></div>";
   }
   function wireBal(o, getName, take) {
     const id = o ? o.id : null, had = balOf(o).find((e) => e.kind === "back");
@@ -1505,18 +1505,27 @@ details.restock > summary::-webkit-details-marker { display: none; }
         box.innerHTML = "<p><b>" + esc(nm0) + (owe ? " 上次少给你 " : " 上次多给了你 ") + a + "</b><br><small>" + esc(balWhy(cur)) + "</small></p>" +
           (take() ? '<label class="check"><input type="checkbox" id="f-baltake"' + (was ? " checked" : "") + "><span>" + (owe ? "这单一起收回来（多收 " + a + "）" : "这单少收 " + a + " 抵掉") + "</span></label>" : "<p><small>预定还没付钱：结算的时候会再提醒你。</small></p>");
       }
-      if ($("f-diff").hidden) $("f-diff-open").hidden = !take(); // 预定还没付钱：不用记少给多给
       tot();
+    };
+    /* 合计下面一行：这次实际收多少 = 合计 − 这单少给的（+ 这单多给的）+ 收回上次少给的（− 抵掉上次多给的） */
+    const diffNow = () => {
+      if ($("f-diff").hidden) return 0;
+      const k = Number((document.querySelector('input[name="f-diffk"]:checked') || {}).value) || 0, a = numOrNull($("f-diffamt").value);
+      return k && a > 0 ? r2(k * a) : 0;
     };
     const tot = () => {
       const el = $("f-baltot"); if (!el) return;
-      const on = $("f-baltake") && $("f-baltake").checked && cur.amt;
-      el.hidden = !on || total == null; if (el.hidden) return;
-      el.className = cur.amt > 0 ? "" : "due";
-      el.textContent = "这次实际收 " + money(r2(total + cur.amt)) + "（合计 " + money(total) + (cur.amt > 0 ? " + 上次少给的 " : " − 上次多给的 ") + money(Math.abs(cur.amt)) + "）";
+      const back = $("f-baltake") && $("f-baltake").checked && cur.amt ? cur.amt : 0, d = diffNow();
+      el.hidden = (!back && !d) || total == null; if (el.hidden) return;
+      const got = r2(total - d + back);
+      el.className = got >= total ? (back > 0 ? "" : "due") : "";
+      el.textContent = "这次实际收 " + money(got) + "（合计 " + money(total) +
+        (d ? (d > 0 ? " − 这单少给的 " : " + 这单多给的 ") + money(Math.abs(d)) : "") +
+        (back ? (back > 0 ? " + 上次少给的 " : " − 上次多给的 ") + money(Math.abs(back)) : "") + "）";
     };
     $("f-diff-open").addEventListener("click", () => { $("f-diff").hidden = false; $("f-diff-open").hidden = true; });
-    $("f-diff-clear").addEventListener("click", () => { $("f-diff").hidden = true; $("f-diff-open").hidden = false; $("f-diffamt").value = ""; $("f-diffwhy").value = ""; document.querySelectorAll('input[name="f-diffk"]').forEach((r) => { r.checked = false; }); });
+    $("f-diff-clear").addEventListener("click", () => { $("f-diff").hidden = true; $("f-diff-open").hidden = false; $("f-diffamt").value = ""; $("f-diffwhy").value = ""; document.querySelectorAll('input[name="f-diffk"]').forEach((r) => { r.checked = false; }); tot(); });
+    $("f-diff").addEventListener("input", tot); $("f-diff").addEventListener("change", tot);
     $("f-diff").addEventListener("click", (e) => { const c = e.target.closest("[data-diffwhy]"); if (c) $("f-diffwhy").value = c.dataset.diffwhy; });
     $("f-balold").addEventListener("change", tot);
     const inp = $("f-cust"); if (inp) { inp.addEventListener("input", paint); inp.addEventListener("change", paint); }
@@ -2716,7 +2725,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   });
   $("resv").addEventListener("click", (e) => {
     const t = e.target.closest("button"); if (!t) return;
-    if (t.dataset.settle) { const o = S.orders.find((x) => x.id === t.dataset.settle); if (!resvReady(o)) settleForm(t.dataset.settle); else if (!o.payment || (o.customer && custBal(o.customer, o.id).amt)) payPickSettle(t.dataset.settle); else arm(t, "再点一次确认", () => quickSettle(t.dataset.settle)); }
+    if (t.dataset.settle) { const o = S.orders.find((x) => x.id === t.dataset.settle); if (!resvReady(o)) settleForm(t.dataset.settle); else if (!o.payment || (o.customer && custBal(o.customer, o.id).amt) || balOf(o).some((e) => e.kind === "diff")) payPickSettle(t.dataset.settle); else arm(t, "再点一次确认", () => quickSettle(t.dataset.settle)); }
     else if (t.dataset.editOrder) orderEditForm(t.dataset.editOrder);
     else if (t.dataset.voidOrder) arm(t, "确认取消？", () => voidOrder(t.dataset.voidOrder));
   });
@@ -3111,7 +3120,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   async function quickSettle(id) {
     const o = S.orders.find((x) => x.id === id); if (!o) return;
     if (!resvReady(o)) { settleForm(id); return; }
-    if (o.customer && custBal(o.customer, o.id).amt) { payPickSettle(id); return; } // 这个客人上次少给/多给了：先提醒，不直接结
+    if ((o.customer && custBal(o.customer, o.id).amt) || balOf(o).some((e) => e.kind === "diff")) { payPickSettle(id); return; } // 这个客人上次少给/多给了、或这单记了少给多给：先弹出写明实际收多少，不直接结
     try { toast(await settleNow(o, o.payment)); } catch (e) { toast(e.userMsg || errText(e)); }
   }
   function payPickSettle(id) {
@@ -4707,7 +4716,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const pk = RS[o.id] ? Object.values(RS[o.id]).reduce((a, x) => a + x, 0) : 0;
       return '<details class="rv"><summary><span class="rv-main"><span class="l-date"><span class="tag-resv">预定</span>' + fmtD(o.date) + "</span>" +
         "<b>" + esc(who || "（没写客人名字）") + "</b>" + '<span class="l-sub">' + esc(serTxt(serQty([o]))) + "</span>" +
-        ((() => { const cb = o.customer ? custBal(o.customer, o.id) : { amt: 0 }; return cb.amt ? '<span class="pill ' + (cb.amt > 0 ? "warn" : "ok") + '">' + (cb.amt > 0 ? "上次少给 " : "上次多给 ") + money(Math.abs(cb.amt)) + "</span>" : ""; })()) +
+        ((() => { const cb = o.customer ? custBal(o.customer, o.id) : { amt: 0 }; const d = balOf(o).find((e) => e.kind === "diff");
+          return (cb.amt ? '<span class="pill ' + (cb.amt > 0 ? "warn" : "ok") + '">' + (cb.amt > 0 ? "上次少给 " : "上次多给 ") + money(Math.abs(cb.amt)) + "</span>" : "") +
+            (d ? '<span class="pill ' + (d.amt > 0 ? "warn" : "ok") + '">' + (d.amt > 0 ? "这单少给 " : "这单多给 ") + money(Math.abs(d.amt)) + (d.why ? "：" + esc(d.why) : "") + "</span>" : ""); })()) +
         (pk ? '<span class="pick-tag">要找' + Object.entries(RW[o.id] || {}).map(([w, n]) => esc(w) + "拿 " + n + " 根").join("、") + "</span>" : "") +
         (PKO[o.id] ? PKO[o.id].map((g) => '<span class="pick-tag done">已从' + esc(gWho(g)) + "拿货 · " + (g.sid ? "已结账" : "还没结账") + "</span>").join("") : "") + "</span>" +
         '<span class="l-amt">' + (t == null ? '<span class="pill warn">未定价</span>' : money(t)) + "</span></summary>" +

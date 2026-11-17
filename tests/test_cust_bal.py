@@ -2,6 +2,8 @@
 - 记一单时「客人少给 / 多给了钱？」→ 少给 $30（配送费没给）存在那一单的 bal 上；没写客户名字不让存（下次没法提醒）
 - 下次给同一个人记单（名字不分大小写）：提醒「上次少给你 $30」+「这单一起收回来」，勾上后写「这次实际收 $90（合计 $60 + 上次少给的 $30）」，存了就两清
 - 多给：结算预定时记「客人多给了 $20」；下一个预定只提醒不能当场抵；结算那单时勾「这单少收 $20 抵掉」→ 两清
+- 预定上就能记（11-17 Bowen：在预定那里点「编辑」要能看到）：卡片标「这单少给 $10」；还没结算不算进这个客人欠的；
+  结算时写「这次实际收 $50（合计 $60 − 这单少给的 $10）」，已选好付款方式也先弹出来；结算后下次提醒
 - 卖出以后才想起来：编辑那一单补记；客户页显示「少给你 $X」、「不追了」点两下清掉
 - 收入、净赚照订单合计算，不受影响；新结构下 bal 照样存得住（迁移成新结构再算回来一字不差）
 用编出来的小数据，旧结构 / 新结构各一遍，GitHub 上也跑。运行：python3 tests/test_cust_bal.py"""
@@ -109,7 +111,7 @@ with sync_playwright() as p:
         check("结算预定时记「客人多给了 $20」：Ben 欠 −20（你欠他）", order(pg, r1)["status"] == "paid" and bal(pg, "Ben") == -20, (order(pg, r1).get("bal"), bal(pg, "Ben")))
         r2 = sale(pg, "ben", resv=True, keep_open=True, fn=lambda pg: pg.click('#f-paychips label:has(input[value="现金"])')); pg.wait_for_timeout(150)
         r = txt(pg, "#f-balold")
-        check("下一个预定：提醒「上次多给了你 $20」，不能当场抵（还没付钱），也不显示记少给多给", "上次多给了你 $20" in r and "结算的时候" in r and pg.locator("#f-baltake").count() == 0 and pg.is_hidden("#f-diff-open"), r)
+        check("下一个预定：提醒「上次多给了你 $20」，不能当场抵（还没付钱）；记少给多给的入口还在", "上次多给了你 $20" in r and "结算的时候" in r and pg.locator("#f-baltake").count() == 0 and pg.is_visible("#f-diff-open"), r)
         save(pg); r2 = sorted(ids(pg) - {o["id"] for o in pg.evaluate("window.__GM.S.orders") if o.get("status") == "paid" or o["id"] == r1})[0]
         go(pg, "customers")
         check("预定卡片上标「上次多给 $20」", "上次多给 $20" in pg.evaluate(f"""() => document.querySelector('[data-settle="{r2}"]').closest('details').innerText"""))
@@ -135,6 +137,33 @@ with sync_playwright() as p:
         check("再点一下：Cara 清掉、不再提醒", bal(pg, "Cara") == 0 and "少给你" not in pg.inner_text("#c-list"), bal(pg, "Cara"))
         sale(pg, "Cara", keep_open=True); pg.wait_for_timeout(150)
         check("不追了以后再给 Cara 记单：不提醒", txt(pg, "#f-balold") == "")
+        pg.click("#sheet-close"); pg.wait_for_timeout(250)
+
+        # 4b. 预定上记：点预定的「编辑」就能记少给 / 多给
+        r4 = sale(pg, "Dan", resv=True, fn=lambda pg: pg.click('#f-paychips label:has(input[value="现金"])'))
+        go(pg, "customers"); pg.evaluate(f"""() => document.querySelector('[data-settle="{r4}"]').closest('details').querySelector('[data-edit-order]').click()"""); pg.wait_for_timeout(400)
+        check("预定点「编辑」：看得到「客人少给 / 多给了钱？」", pg.is_visible("#f-diff-open"))
+        diff(pg, "1", 10, "配送费没给"); pg.wait_for_timeout(150)
+        check("编辑预定时填了少给 $10：合计下面马上写「这次实际收 $50（合计 $60 − 这单少给的 $10）」", txt(pg, "#f-baltot") == "这次实际收 $50（合计 $60 − 这单少给的 $10）", txt(pg, "#f-baltot"))
+        save(pg)
+        o4 = order(pg, r4)
+        check("存在预定上：bal = 少给 $10，还是预定", o4["status"] == "reserved" and (o4.get("bal") or [{}])[0].get("amt") == 10, o4.get("bal"))
+        go(pg, "customers")
+        card = pg.evaluate(f"""() => document.querySelector('[data-settle="{r4}"]').closest('details').innerText""")
+        check("预定卡片标「这单少给 $10：配送费没给」", "这单少给 $10" in card and "配送费没给" in card, card[:200])
+        pg.fill("#cq", "dan"); pg.wait_for_timeout(250)
+        check("还没结算：不算进 Dan 欠你的（客户页 Dan 那一行不标「少给你」）", "上次少给" not in card and "Dan" in pg.inner_text("#c-list") and "少给你" not in pg.inner_text("#c-list"), pg.inner_text("#c-list")[:200])
+        pg.fill("#cq", ""); pg.wait_for_timeout(250)
+        pg.evaluate(f"""() => document.querySelector('[data-edit-order="{r4}"]').click()"""); pg.wait_for_timeout(400)
+        check("再打开编辑：上次填的还在（少给 $10、配送费没给）", pg.is_visible("#f-diff") and pg.input_value("#f-diffamt") == "10" and pg.input_value("#f-diffwhy") == "配送费没给")
+        pg.click("#sheet-close"); pg.wait_for_timeout(250)
+        pg.evaluate(f"""() => document.querySelector('[data-settle="{r4}"]').click()"""); pg.wait_for_timeout(600)
+        check("已选好付款方式的预定点「结算」：因为这单记了少给，先弹出来", pg.is_visible("#sheet") and order(pg, r4)["status"] == "reserved")
+        check("结算那页写「这次实际收 $50（合计 $60 − 这单少给的 $10）」", txt(pg, "#f-baltot") == "这次实际收 $50（合计 $60 − 这单少给的 $10）", txt(pg, "#f-baltot"))
+        save(pg)
+        check("结算后：这单 bal 还在，Dan 欠你 $10", order(pg, r4)["status"] == "paid" and bal(pg, "Dan") == 10, (order(pg, r4).get("bal"), bal(pg, "Dan")))
+        sale(pg, "Dan", keep_open=True); pg.wait_for_timeout(150)
+        check("下次给 Dan 记单：提醒「上次少给你 $10」", "上次少给你 $10" in txt(pg, "#f-balold"), txt(pg, "#f-balold"))
         pg.click("#sheet-close"); pg.wait_for_timeout(250)
 
         # 5. 钱的数字不变、刷新后还在
