@@ -170,6 +170,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .rv > summary::-webkit-details-marker { display: none; }
 .rv-main { display: grid; gap: 1px; min-width: 0; }
 .rv-main b { font-weight: 600; overflow-wrap: anywhere; }
+.rv-meet { font-size: .9rem; color: var(--fg); } .rv-meet.now { color: var(--accent); } .rv-meet.late { color: var(--warn); }
+.rv-nomeet { color: var(--muted); }
+.meet-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; } .meet-row input { width: auto; min-width: 9.5em; }
 .rv-who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tag-ho { font: inherit; font-size: .72rem; font-weight: 700; line-height: 1.3; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; cursor: pointer; }
 .tag-ho.ho-d { background: var(--accent); color: var(--surface); }
@@ -1200,6 +1203,36 @@ details.restock > summary::-webkit-details-marker { display: none; }
     box.addEventListener("click", (e) => { const r = e.target.closest('input[name="f-hor"]'); if (!r) return; if (r.value === was) { r.checked = false; was = null; } else was = r.value; });
     const fee = $("f-fee"); if (fee) fee.addEventListener("input", () => { if (Number(fee.value) > 0 && !readHo()) { box.querySelector('input[value="配送"]').checked = true; was = "配送"; } });
   }
+  /* 预定什么时候交货 / 见面（2026-11-18 Bowen：时间别写在备注里，单独一栏放在客户下面；预定按时间排）。
+     订单字段 meet_date（YYYY-MM-DD）、meet_time（HH:MM），都可以不填；只填了几点没选哪天 = 今天 */
+  const MEET_D = [["0", "今天"], ["1", "明天"], ["2", "后天"]];
+  function meetHtml(o, show) {
+    const td = today(), d = o && o.meet_date, k = d ? (MEET_D.find(([n]) => addDays(td, Number(n)) === d) || ["d"])[0] : "";
+    return '<div class="field" id="f-meet"' + (show ? "" : " hidden") + '><span class="lbl">什么时候交货（见面）</span><div class="chips" id="f-md" role="radiogroup" aria-label="哪天">' +
+      MEET_D.map(([n, t]) => '<label class="chip"><input type="radio" name="f-mdr" value="' + n + '"' + (k === n ? " checked" : "") + "> " + t + "</label>").join("") +
+      '<label class="chip"><input type="radio" name="f-mdr" value="d"' + (k === "d" ? " checked" : "") + "> 选日期</label></div>" +
+      '<div class="meet-row"><input id="f-mdate" type="date" value="' + esc(d || "") + '"' + (k === "d" ? "" : " hidden") + ' aria-label="哪天">' +
+      '<input id="f-mtime" type="time" value="' + esc((o && o.meet_time) || "") + '" aria-label="几点"><span class="hint">几点（可不填）</span></div></div>';
+  }
+  function readMeet() {
+    if (!$("f-meet") || $("f-meet").hidden) return { meet_date: null, meet_time: null };
+    const v = (document.querySelector('input[name="f-mdr"]:checked') || {}).value, tm = $("f-mtime").value || null;
+    let d = v == null ? null : v === "d" ? $("f-mdate").value || null : addDays(today(), Number(v));
+    if (!d && tm) d = today();
+    return { meet_date: d, meet_time: tm };
+  }
+  function wireMeet() {
+    const box = $("f-md"); if (!box) return; let was = (document.querySelector('input[name="f-mdr"]:checked') || {}).value;
+    box.addEventListener("click", (e) => { const r = e.target.closest('input[name="f-mdr"]'); if (!r) return; if (r.value === was) { r.checked = false; was = null; } else was = r.value;
+      const dd = $("f-mdate"); dd.hidden = was !== "d"; if (!dd.hidden && !dd.value) dd.value = addDays(today(), 3); });
+  }
+  const meetKey = (o) => o.meet_date ? o.meet_date + "T" + (o.meet_time || "99:99") : "";
+  function meetTxt(o) {
+    if (!o.meet_date) return "";
+    const td = today(), d = o.meet_date, g = dayGap(td, d), WDN = "日一二三四五六";
+    const day = g === 0 ? "今天" : g === 1 ? "明天" : g === 2 ? "后天" : fmtD(d) + " 周" + WDN[new Date(d + "T12:00:00").getDay()];
+    return (d < td ? "已过 · " + fmtD(d) : day) + (o.meet_time ? " " + o.meet_time : "");
+  }
   /* order lines grouped by series, e.g. "Bar Pro：葡萄冰 ×1、芒果冰 ×1；Ali：香蕉 ×2" (generic pickup lines read "Bar Pro ×2") */
   const linesText = (o) => {
     const ls = o.lines || []; if (!ls.length) return "代送（只收配送费）";
@@ -1617,7 +1650,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       hoChips(edit) +
       '<div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="' + esc(edit && edit.delivery_fee ? edit.delivery_fee : "") + '"></div>' +
       mixRowHtml(edit || null) +
-      custNameHtml(custPre) + balHtml(edit) +
+      custNameHtml(custPre) + meetHtml(edit, !!(edit || reserve)) + balHtml(edit) +
       '<p class="total">合计<b id="f-total">–</b></p><p id="f-baltot" hidden></p>' +
       '<details class="more" id="f-more"' + (edit && (edit.note || edit.follow_up) ? " open" : "") + '><summary id="f-more-sum">更多：日期、备注、下次跟进</summary><div class="more-body">' +
         '<div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + esc((edit && edit.date) || today()) + '"></div>' +
@@ -1689,7 +1722,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const oid = rid("o"), at = new Date().toISOString(), resv = $("f-resv").checked, B = bal.read(!resv);
       const pk = $("f-pfrom-wrap").hidden ? { pick_from: null, pick_split: null } : splitter.read(), pfrom = pk.pick_from;
       const P = readPay(!resv, orderTotal({ lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
-      await db.collection("orders").doc(oid).set(Object.assign({ status: resv ? "reserved" : "paid", date, at, lines, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, readHo() ? { handoff: readHo() } : {}, { payment: P.payment }, dropNulls({ pay_cash: P.pay_cash, pay_other: P.pay_other }), dropNulls(readCust(null)),
+      await db.collection("orders").doc(oid).set(Object.assign({ status: resv ? "reserved" : "paid", date, at, lines, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, readHo() ? { handoff: readHo() } : {}, resv ? dropNulls(readMeet()) : {}, { payment: P.payment }, dropNulls({ pay_cash: P.pay_cash, pay_other: P.pay_other }), dropNulls(readCust(null)),
         lump != null ? { lump_total: lump } : {}, pfrom ? { pick_from: pfrom } : {}, pk.pick_split ? { pick_split: pk.pick_split } : {}, B ? { bal: B } : {}));
       if (resv) { if (onDone) onDone(); return "已记预定 " + lines.reduce((a, l) => a + l.qty, 0) + " 根，在「客户」页结算。"; }
       const msg = "已记一笔卖出" + await commitSale(oid, lines, date, at, pfrom, pk.pick_split);
@@ -1700,7 +1733,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const id = edit.id;
       const pk = $("f-pfrom-wrap").hidden ? { pick_from: edit.pick_from || null, pick_split: null } : splitter.read();
       const P = readPay(false, orderTotal({ lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
-      await db.doc("orders/" + id).update(Object.assign({ date, lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim(), handoff: readHo() }, P, readCust(edit), { pick_from: pk.pick_from || null, pick_split: pk.pick_split || null }, { bal: bal.read(false) }));
+      await db.doc("orders/" + id).update(Object.assign({ date, lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim(), handoff: readHo() }, readMeet(), P, readCust(edit), { pick_from: pk.pick_from || null, pick_split: pk.pick_split || null }, { bal: bal.read(false) }));
       /* 已经从合伙人那拿到的货：这个口味换掉了或数量减少了，就留作库存（跟取消预定一样） */
       const want = {}, got = {};
       for (const l of lines) want[l.sku] = (want[l.sku] || 0) + l.qty;
@@ -1729,7 +1762,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
       wirePicker(avail, D, (k) => { setDefaultPrice(k); recalc(); });
       wireCust(edit ? edit.id : null);
       sheetOn("input", recalc); sheetOn("change", recalc);
-      $("f-resv").addEventListener("change", () => { $("sheet-title").textContent = $("f-resv").checked ? "记一笔预定" : "记一笔卖出"; bal.paint(); recalc(); });
+      $("f-resv").addEventListener("change", () => { $("sheet-title").textContent = $("f-resv").checked ? "记一笔预定" : "记一笔卖出"; $("f-meet").hidden = !$("f-resv").checked; bal.paint(); recalc(); });
+      wireMeet();
       /* 再点一下已选的付款方式 = 取消（预定可以先不选） */
       let payWas = curPay();
       $("f-paychips").addEventListener("click", (e) => { const r = e.target.closest('input[name="f-payr"]'); if (!r) return; if (r.value === payWas) { r.checked = false; payWas = ""; recalc(); } else payWas = r.value; });
@@ -4889,7 +4923,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
         '<div class="l-actions">' + fuButtons(x) + "</div></div>";
     }).join("") + AU.map(autoRow).join("");
 
-    const resv = S.orders.filter(isReserved).sort(moveSort);
+    /* 按交货时间排：定了时间的在前（最早的最上面，过了的在最上面标「已过」），没定时间的在后（新记的在前） */
+    const resv = S.orders.filter(isReserved).sort((a, b) => { const x = meetKey(a), y = meetKey(b); return x && y ? x.localeCompare(y) || moveSort(a, b) : x ? -1 : y ? 1 : moveSort(a, b); });
     const RA = resvAlloc(), RS = RA.RS, RW = RA.RW, PKO = {}; for (const g of pickups()) (PKO[g.oid] = PKO[g.oid] || []).push(g);
     $("resv-pick").hidden = true;
     $("resv-sec").hidden = !resv.length;
@@ -4901,7 +4936,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
       /* 备注（见面时间、地点……）直接写在没点开的卡片上（2026-11-17 Bowen：写了备注，概览上看不到）；以前只在点开后显示 */
       const rvNote = o.note && o.note.trim() !== who ? '<span class="rv-note">' + esc(o.note) + "</span>" : "";
       const pk = RS[o.id] ? Object.values(RS[o.id]).reduce((a, x) => a + x, 0) : 0;
-      return '<details class="rv"><summary><span class="rv-main"><span class="l-date"><span class="tag-resv">预定</span>' + fmtD(o.date) + "</span>" +
+      const mt = meetTxt(o);
+      return '<details class="rv"><summary><span class="rv-main"><span class="l-date"><span class="tag-resv">预定</span>' +
+        (mt ? '<b class="rv-meet' + (o.meet_date < today() ? " late" : o.meet_date === today() ? " now" : "") + '">' + esc(mt) + "</b>" : '<span class="rv-nomeet">' + fmtD(o.date) + " 记 · 没定时间</span>") + "</span>" +
         '<span class="rv-who"><b>' + esc(who || "（没写客人名字）") + "</b>" + (() => { const h = handoffOf(o);
           return '<button type="button" class="tag-ho' + (h === "配送" ? " ho-d" : h === "自取" ? " ho-p" : " ho-u") + '" data-ho="' + esc(o.id) + '" aria-label="配送还是自取：' + (h || "没写") + '，点一下换">' + (h || "配送/自取？") + "</button>"; })() + "</span>" +
         '<span class="l-sub">' + esc(serTxt(serQty([o]))) + "</span>" + rvNote +
