@@ -1542,17 +1542,18 @@ details.restock > summary::-webkit-details-marker { display: none; }
   /* ---------- 客人少给 / 多给（2026-11-17 Bowen）：结账时客人少给了（比如忘了配送费）或多给了，记在那一单上；
      下次跟这个客人记单 / 结算预定时提醒「上次少给 $30，这单要收回来」或「上次多给 $20，这单少收」，勾上就两清。
      订单字段 bal = [{ amt, why, kind, date }]：amt > 0 = 这单之后客人还欠你；amt < 0 = 你欠客人。kind：diff 这单少给/多给，back 这单收回/抵掉上次的，waive 不追了。
-     一个客人欠多少 = 他所有已付款的单的 bal 加起来（按名字，不分大小写；预定上记的少给/多给等结算了才算）。钱的数字（收入、净赚）照订单合计算，不受影响 ---------- */
+     多给的可以标「送我的，不用还」（gift: true，2026-11-18 Bowen：有的客人多给就是送我的）：只记在那一单上，不算你欠他、不提醒。
+     一个客人欠多少 = 他所有已付款的单的 bal（送你的不算）加起来（按名字，不分大小写；预定上记的少给/多给等结算了才算）。钱的数字（收入、净赚）照订单合计算，不受影响 ---------- */
   const balOf = (o) => (Array.isArray(o && o.bal) ? o.bal : []);
   function custBal(name, exceptId) {
     const k = normName(name); if (!k) return { amt: 0, why: [] };
     const os = S.orders.filter((o) => o.id !== exceptId && !isReserved(o) && normName(o.customer) === k && balOf(o).length).sort((a, b) => (a.date || "").localeCompare(b.date || "") || (a.at || "").localeCompare(b.at || ""));
     let amt = 0, why = [];
-    for (const o of os) for (const e of balOf(o)) { amt = r2(amt + (Number(e.amt) || 0)); if (Math.abs(amt) < 0.005) why = []; else if (e.kind === "diff") why.push({ date: o.date, why: e.why, amt: e.amt, oid: o.id }); }
+    for (const o of os) for (const e of balOf(o)) { if (e.gift) continue; amt = r2(amt + (Number(e.amt) || 0)); if (Math.abs(amt) < 0.005) why = []; else if (e.kind === "diff") why.push({ date: o.date, why: e.why, amt: e.amt, oid: o.id }); }
     return { amt: Math.abs(amt) < 0.005 ? 0 : amt, why, last: os.length ? os[os.length - 1] : null };
   }
   const balWhy = (b) => b.why.map((x) => fmtD(x.date) + (x.why ? " · " + x.why : "")).join("；");
-  const BAL_WHY = ["配送费没给", "没有零钱", "抹零"];
+  const BAL_WHY = ["配送费没给", "没有零钱", "抹零"], BAL_WHY_OVER = ["转多了", "没零钱找"];
   /* 表单上的一块：上面是提醒（这个客人上次少给/多给），下面是「收的钱不对？」记这单少收/多收。take = 能不能这单就收回（预定还没付钱，只提醒） */
   function balHtml(o) {
     const d = balOf(o).find((e) => e.kind === "diff");
@@ -1562,9 +1563,15 @@ details.restock > summary::-webkit-details-marker { display: none; }
         '<label class="chip"><input type="radio" name="f-diffk" value="1"' + (d && d.amt > 0 ? " checked" : "") + "> 客人少给了</label>" +
         '<label class="chip"><input type="radio" name="f-diffk" value="-1"' + (d && d.amt < 0 ? " checked" : "") + "> 客人多给了</label></div>" +
         '<div class="grid2"><div class="field"><label for="f-diffamt">差多少 $</label><input id="f-diffamt" type="number" min="0" step="0.01" inputmode="decimal" value="' + (d ? Math.abs(d.amt) : "") + '"></div>' +
-        '<div class="field"><label for="f-diffwhy">为什么</label><input id="f-diffwhy" placeholder="比如：配送费没给" value="' + esc(d ? d.why || "" : "") + '"></div></div>' +
-        '<div class="chips">' + BAL_WHY.map((w) => '<button type="button" class="chip" data-diffwhy="' + esc(w) + '">' + esc(w) + "</button>").join("") + '<button type="button" class="linkbtn" id="f-diff-clear">不记了</button></div>' +
-        '<p class="hint">记在这一单上。下次跟这个客人记单时会提醒你收回来 / 少收。' + (o && isReserved(o) ? "预定也可以先记，结算时照这个收。" : "") + "</p></div>";
+        '<div class="field"><label for="f-diffwhy">为什么</label><input id="f-diffwhy" placeholder="' + (d && d.amt < 0 ? "比如：转多了" : "比如：配送费没给") + '" value="' + esc(d ? d.why || "" : "") + '"></div></div>' +
+        /* 少给、多给的原因不一样：选了多给，下面换成多给的原因 + 这钱要不要还他 */
+        '<div class="chips" data-for="1"' + (d && d.amt < 0 ? " hidden" : "") + ">" + BAL_WHY.map((w) => '<button type="button" class="chip" data-diffwhy="' + esc(w) + '">' + esc(w) + "</button>").join("") + "</div>" +
+        '<div class="chips" data-for="-1"' + (d && d.amt < 0 ? "" : " hidden") + ">" + BAL_WHY_OVER.map((w) => '<button type="button" class="chip" data-diffwhy="' + esc(w) + '">' + esc(w) + "</button>").join("") + "</div>" +
+        '<div id="f-giftrow"' + (d && d.amt < 0 ? "" : " hidden") + '><span class="lbl">这钱要还他吗</span><div class="chips" role="radiogroup" aria-label="多给的钱要不要还">' +
+          '<label class="chip"><input type="radio" name="f-gift" value=""' + (d && d.gift ? "" : " checked") + "> 下次还他（下次少收）</label>" +
+          '<label class="chip"><input type="radio" name="f-gift" value="1"' + (d && d.gift ? " checked" : "") + "> 送我的，不用还</label></div></div>" +
+        '<div class="chips"><button type="button" class="linkbtn" id="f-diff-clear">不记了</button></div>' +
+        '<p class="hint" id="f-diffhint">' + (d && d.gift ? "送你的：只记在这一单上，不算你欠他，也不会提醒。" : "记在这一单上。下次跟这个客人记单时会提醒你收回来 / 少收。" + (o && isReserved(o) ? "预定也可以先记，结算时照这个收。" : "")) + "</p></div>";
   }
   function wireBal(o, getName, take) {
     const id = o ? o.id : null, had = balOf(o).find((e) => e.kind === "back");
@@ -1599,7 +1606,13 @@ details.restock > summary::-webkit-details-marker { display: none; }
     };
     $("f-diff-open").addEventListener("click", () => { $("f-diff").hidden = false; $("f-diff-open").hidden = true; });
     $("f-diff-clear").addEventListener("click", () => { $("f-diff").hidden = true; $("f-diff-open").hidden = false; $("f-diffamt").value = ""; $("f-diffwhy").value = ""; document.querySelectorAll('input[name="f-diffk"]').forEach((r) => { r.checked = false; }); tot(); });
-    $("f-diff").addEventListener("input", tot); $("f-diff").addEventListener("change", tot);
+    const syncK = () => {
+      const k = (document.querySelector('input[name="f-diffk"]:checked') || {}).value, over = k === "-1", gift = over && (document.querySelector('input[name="f-gift"]:checked') || {}).value === "1";
+      $("f-diff").querySelectorAll("[data-for]").forEach((g) => { g.hidden = g.dataset.for !== (over ? "-1" : "1"); });
+      $("f-giftrow").hidden = !over; $("f-diffwhy").placeholder = over ? "比如：转多了" : "比如：配送费没给";
+      $("f-diffhint").textContent = gift ? "送你的：只记在这一单上，不算你欠他，也不会提醒。" : "记在这一单上。下次跟这个客人记单时会提醒你" + (over ? "少收他这些。" : "收回来。") + (o && isReserved(o) ? "预定也可以先记，结算时照这个收。" : "");
+    };
+    $("f-diff").addEventListener("input", tot); $("f-diff").addEventListener("change", () => { syncK(); tot(); });
     $("f-diff").addEventListener("click", (e) => { const c = e.target.closest("[data-diffwhy]"); if (c) $("f-diffwhy").value = c.dataset.diffwhy; });
     $("f-balold").addEventListener("change", tot);
     const inp = $("f-cust"); if (inp) { inp.addEventListener("input", paint); inp.addEventListener("change", paint); }
@@ -1614,7 +1627,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
           if (!dk) throw userError("选一下客人是少给了还是多给了。");
           if (da == null || da <= 0) throw userError("填一下差了多少钱。");
           if (!(getName() || "").trim()) throw userError("要记客人少给/多给，先写客户名字（下次才能提醒你）。");
-          out.push({ amt: r2(Number(dk) * da), why: dw || null, kind: "diff", date });
+          const gift = dk === "-1" && (document.querySelector('input[name="f-gift"]:checked') || {}).value === "1";
+          out.push(Object.assign({ amt: r2(Number(dk) * da), why: dw || null, kind: "diff", date }, gift ? { gift: true } : {}));
         }
         if (isPaid && cur.amt && $("f-baltake") && $("f-baltake").checked) out.push({ amt: r2(-cur.amt), why: (cur.amt > 0 ? "收回上次少给的" : "抵掉上次多给的") + (cur.why.length ? "：" + cur.why.map((x) => x.why).filter(Boolean).join("、") : ""), kind: "back", date });
         for (const e of balOf(o)) if (e.kind === "waive") out.push(e);
@@ -4761,7 +4775,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const open = openCust === c.id, f = c.fu, n = c.paid.length, cb = custBal(c.name);
       const pills = (c.p.type === "wholesale" ? '<span class="tag">批发</span>' : '<span class="tag" style="background:var(--line);color:var(--muted)">零售</span>') + (cb.amt ? '<span class="pill ' + (cb.amt > 0 ? "warn" : "ok") + '">' + (cb.amt > 0 ? "少给你 " : "多给了 ") + money(Math.abs(cb.amt)) + "</span>" : "") + (n >= 2 ? '<span class="pill">回头客 · ' + n + " 次</span>" : "") + (c.resv.length ? '<span class="pill warn">有预定</span>' : "") + (f ? '<span class="pill ' + (f.restocked ? "" : f.contacted_at ? "na" : "warn") + '">' + (f.restocked ? "到货了" : f.contacted_at ? "等回复" : "要跟进") + "</span>" : "");
       const sub = [n ? "买过 " + n + " 次、" + c.qty + " 根" : c.enq.length ? "问过 " + c.enq.length + " 次，还没成交" : "还没成交", c.last ? "上次 " + fmtD(c.last) + "（" + agoText(c.last) + "）" : ""].filter(Boolean).join(" · ");
-      const balNote = (o) => balOf(o).map((e) => (e.kind === "diff" ? (e.amt > 0 ? "少给 " : "多给 ") + money(Math.abs(e.amt)) : e.kind === "back" ? (e.amt < 0 ? "收回 " : "抵掉 ") + money(Math.abs(e.amt)) : "不追了 " + money(Math.abs(e.amt))) + (e.why && e.kind === "diff" ? "：" + e.why : "")).join("；");
+      const balNote = (o) => balOf(o).map((e) => (e.kind === "diff" ? (e.amt > 0 ? "少给 " : "多给 ") + money(Math.abs(e.amt)) + (e.gift ? "（送你的）" : "") : e.kind === "back" ? (e.amt < 0 ? "收回 " : "抵掉 ") + money(Math.abs(e.amt)) : "不追了 " + money(Math.abs(e.amt))) + (e.why && e.kind === "diff" ? "：" + e.why : "")).join("；");
       /* 买过什么（2026-11-18 Bowen：格式太乱）→ 跟合伙人对账单一样：日期一行，下面每个系列几根，再下面每个口味竖着排 */
       const hist = c.orders.map((o) => { const t = orderTotal(o), g = {};
         for (const l of o.lines || []) { const it = itemBy(l.sku), sr = seriesOf(it); (g[sr] = g[sr] || []).push({ k: isGeneric(it) ? "（口味没记）" : nm(l.sku, l.name), q: Number(l.qty) || 0 }); }
@@ -4944,7 +4958,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
         '<span class="l-sub">' + esc(serTxt(serQty([o]))) + "</span>" + rvNote +
         ((() => { const cb = o.customer ? custBal(o.customer, o.id) : { amt: 0 }; const d = balOf(o).find((e) => e.kind === "diff");
           return (cb.amt ? '<span class="pill ' + (cb.amt > 0 ? "warn" : "ok") + '">' + (cb.amt > 0 ? "上次少给 " : "上次多给 ") + money(Math.abs(cb.amt)) + "</span>" : "") +
-            (d ? '<span class="pill ' + (d.amt > 0 ? "warn" : "ok") + '">' + (d.amt > 0 ? "这单少给 " : "这单多给 ") + money(Math.abs(d.amt)) + (d.why ? "：" + esc(d.why) : "") + "</span>" : ""); })()) +
+            (d ? '<span class="pill ' + (d.amt > 0 ? "warn" : "ok") + '">' + (d.amt > 0 ? "这单少给 " : "这单多给 ") + money(Math.abs(d.amt)) + (d.gift ? " · 送你的" : "") + (d.why ? "：" + esc(d.why) : "") + "</span>" : ""); })()) +
         (pk ? '<span class="pick-tag">要找' + Object.entries(RW[o.id] || {}).map(([w, n]) => esc(w) + "拿 " + n + " 根").join("、") + "</span>" : "") +
         (PKO[o.id] ? PKO[o.id].map((g) => '<span class="pick-tag done">已从' + esc(gWho(g)) + "拿货 · " + (g.sid ? "已结账" : "还没结账") + "</span>").join("") : "") + "</span>" +
         '<span class="l-amt">' + (t == null ? '<span class="pill warn">未定价</span>' : money(t)) + "</span></summary>" +

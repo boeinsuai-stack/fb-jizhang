@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-18 线上 fb-app-v28，分支 feat-handoff → feat-meet 是 v29，一起上线）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-18 线上 fb-app-v28，分支 feat-handoff → feat-meet → feat-gift 是 v29，一起上线）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -201,6 +201,8 @@
   - 预定已经选好付款方式时点「结算」本来是直接结；这个客人有没两清的 → 改成先弹出选付款那页（不然提醒看不到）
   - 客户页：那一行标「少给你 $X / 多给了 $X」；点开有原因 +「不追了」（点两下，不用浏览器确认框）= 在他最后一单上记 waive；历史里每单写「少给 $30：配送费没给 / 收回 $30」；预定卡片标「上次少给 $30」
 - 新结构：订单上的额外字段原样存进 v2_orders，测试里迁移再算回来一字不差
+- **多给的原因 + 送我的**（feat-gift，11-18 Bowen：选了多给，下面那些还是少给的；有的客人多给就是送我的）：原因小标签分两组 `data-for="1"`（配送费没给 / 没有零钱 / 抹零）和 `data-for="-1"`（转多了 / 没零钱找，`BAL_WHY_OVER`），跟着少给/多给换，提示、占位字也换（`syncK`）。
+  选多给多一行「这钱要还他吗：下次还他（默认）/ 送我的，不用还」→ diff 条目加 `gift: true`：`custBal` 跳过（不算你欠他、不提醒、客户页不标），卡片写「这单多给 $10 · 送你的」，买过什么写「多给 $10（送你的）」。收入、净赚照旧不受影响。测试 `tests/test_gift.py` 30/30
 - 测试 `tests/test_cust_bal.py` 65/65（编的数据，旧/新结构，GitHub 上也跑）
 
 ## 付款方式统一 + 订货单「一起改」放下面（feat-pay-po，2026-11-17）

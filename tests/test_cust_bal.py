@@ -63,7 +63,8 @@ def sale(pg, cust, qty=1, resv=False, fn=None, keep_open=False):
 
 def diff(pg, k, amt, why):
     pg.click("#f-diff-open"); pg.click(f'#f-diff label:has(input[value="{k}"])'); pg.fill("#f-diffamt", str(amt))
-    if why in ("配送费没给", "没有零钱", "抹零"): pg.click(f'[data-diffwhy="{why}"]')
+    c = pg.locator(f'#f-diff [data-for="{k}"] [data-diffwhy="{why}"]')  # 少给 / 多给的原因小标签不一样（11-18）
+    if c.count(): c.click()
     else: pg.fill("#f-diffwhy", why)
 
 with sync_playwright() as p:
