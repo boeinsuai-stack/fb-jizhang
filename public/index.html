@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v28"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v29"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -170,6 +170,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .rv > summary::-webkit-details-marker { display: none; }
 .rv-main { display: grid; gap: 1px; min-width: 0; }
 .rv-main b { font-weight: 600; overflow-wrap: anywhere; }
+.rv-who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tag-ho { font: inherit; font-size: .72rem; font-weight: 700; line-height: 1.3; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; cursor: pointer; }
+.tag-ho.ho-d { background: var(--accent); color: var(--surface); }
+.tag-ho.ho-p { background: var(--surface); color: var(--fg); border-color: var(--fg); }
+.tag-ho.ho-u { background: transparent; color: var(--muted); border: 1px dashed var(--muted); font-weight: 500; }
 .rv-note { font-size: .82rem; color: var(--fg); background: var(--hover); border-radius: 6px; padding: 2px 6px; margin-top: 2px; white-space: pre-wrap; overflow-wrap: anywhere; justify-self: start; }
 .rv > summary .l-amt::after { content: ""; display: inline-block; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); margin-left: 10px; vertical-align: middle; transition: transform .15s; }
 .rv[open] > summary .l-amt::after { transform: rotate(45deg); }
@@ -1183,6 +1188,18 @@ details.restock > summary::-webkit-details-marker { display: none; }
     return ord.map((sr) => '<span class="ol-ser">' + esc(sr) + "</span>" + '<ul class="ol">' + g[sr].map((x) => "<li><span>" + esc(x.gen ? "口味" + (extra || "没记") : x.t) +
       (x.tag ? '<i class="ol-pick' + (x.cls ? " " + x.cls : "") + '">' + esc(x.tag) + "</i>" : "") + "</span><b>×" + esc(x.q) + "</b></li>").join("") + "</ul>").join("");
   }
+  /* 配送还是自取（2026-11-18 Bowen：预定上每个客人旁边要有个小标签）：订单字段 handoff；没记的：有配送费 = 配送，备注里写了自取 / 送到 = 照备注；都没有 = 不知道 */
+  const HO = ["配送", "自取"];
+  const handoffOf = (o) => { if (!o) return ""; if (HO.includes(o.handoff)) return o.handoff; if (Number(o.delivery_fee) > 0) return "配送";
+    const n = o.note || ""; return /自取|自提|来拿|来取|pick ?up/i.test(n) ? "自取" : /送到|送货|配送|deliver/i.test(n) ? "配送" : ""; };
+  const hoChips = (o) => '<div class="field"><span class="lbl">配送还是自取</span><div class="chips" id="f-ho" role="radiogroup" aria-label="配送还是自取">' +
+    HO.map((x) => '<label class="chip"><input type="radio" name="f-hor" value="' + x + '"' + (handoffOf(o) === x ? " checked" : "") + "> " + x + "</label>").join("") + "</div></div>";
+  const readHo = () => (document.querySelector('input[name="f-hor"]:checked') || {}).value || null;
+  function wireHo() { // 再点一下已选的 = 取消；填了配送费、还没选的自动选「配送」
+    const box = $("f-ho"); if (!box) return; let was = readHo();
+    box.addEventListener("click", (e) => { const r = e.target.closest('input[name="f-hor"]'); if (!r) return; if (r.value === was) { r.checked = false; was = null; } else was = r.value; });
+    const fee = $("f-fee"); if (fee) fee.addEventListener("input", () => { if (Number(fee.value) > 0 && !readHo()) { box.querySelector('input[value="配送"]').checked = true; was = "配送"; } });
+  }
   /* order lines grouped by series, e.g. "Bar Pro：葡萄冰 ×1、芒果冰 ×1；Ali：香蕉 ×2" (generic pickup lines read "Bar Pro ×2") */
   const linesText = (o) => {
     const ls = o.lines || []; if (!ls.length) return "代送（只收配送费）";
@@ -1597,6 +1614,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       lumpHtml(!!edit && edit.lump_total != null, edit ? edit.lump_total : null) +
       /* 付款方式：一排小标签，点一下（以前是下拉框，iPhone 上要 点开 → 滚轮 → 完成）；再点一下已选的 = 取消 */
       '<div class="field"><span class="lbl">付款方式</span><div class="chips" id="f-paychips" role="radiogroup" aria-label="付款方式">' + PAY.concat([MIX]).map((x) => '<label class="chip"><input type="radio" name="f-payr" value="' + esc(x) + '"' + (edit && edit.payment === x ? " checked" : "") + "> " + esc(x) + "</label>").join("") + "</div></div>" +
+      hoChips(edit) +
       '<div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="' + esc(edit && edit.delivery_fee ? edit.delivery_fee : "") + '"></div>' +
       mixRowHtml(edit || null) +
       custNameHtml(custPre) + balHtml(edit) +
@@ -1671,7 +1689,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const oid = rid("o"), at = new Date().toISOString(), resv = $("f-resv").checked, B = bal.read(!resv);
       const pk = $("f-pfrom-wrap").hidden ? { pick_from: null, pick_split: null } : splitter.read(), pfrom = pk.pick_from;
       const P = readPay(!resv, orderTotal({ lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
-      await db.collection("orders").doc(oid).set(Object.assign({ status: resv ? "reserved" : "paid", date, at, lines, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, { payment: P.payment }, dropNulls({ pay_cash: P.pay_cash, pay_other: P.pay_other }), dropNulls(readCust(null)),
+      await db.collection("orders").doc(oid).set(Object.assign({ status: resv ? "reserved" : "paid", date, at, lines, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, readHo() ? { handoff: readHo() } : {}, { payment: P.payment }, dropNulls({ pay_cash: P.pay_cash, pay_other: P.pay_other }), dropNulls(readCust(null)),
         lump != null ? { lump_total: lump } : {}, pfrom ? { pick_from: pfrom } : {}, pk.pick_split ? { pick_split: pk.pick_split } : {}, B ? { bal: B } : {}));
       if (resv) { if (onDone) onDone(); return "已记预定 " + lines.reduce((a, l) => a + l.qty, 0) + " 根，在「客户」页结算。"; }
       const msg = "已记一笔卖出" + await commitSale(oid, lines, date, at, pfrom, pk.pick_split);
@@ -1682,7 +1700,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const id = edit.id;
       const pk = $("f-pfrom-wrap").hidden ? { pick_from: edit.pick_from || null, pick_split: null } : splitter.read();
       const P = readPay(false, orderTotal({ lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
-      await db.doc("orders/" + id).update(Object.assign({ date, lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, P, readCust(edit), { pick_from: pk.pick_from || null, pick_split: pk.pick_split || null }, { bal: bal.read(false) }));
+      await db.doc("orders/" + id).update(Object.assign({ date, lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim(), handoff: readHo() }, P, readCust(edit), { pick_from: pk.pick_from || null, pick_split: pk.pick_split || null }, { bal: bal.read(false) }));
       /* 已经从合伙人那拿到的货：这个口味换掉了或数量减少了，就留作库存（跟取消预定一样） */
       const want = {}, got = {};
       for (const l of lines) want[l.sku] = (want[l.sku] || 0) + l.qty;
@@ -1701,7 +1719,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     let bal = null;
     openSheet(edit ? "编辑预定" : reserve ? "记一笔预定" : "记一笔卖出", html, submit, () => {
       splitter.bind();
-      bal = wireBal(edit, () => $("f-cust").value, () => !$("f-resv").checked); // 预定还没付钱：只提醒，不能当场收回
+      bal = wireBal(edit, () => $("f-cust").value, () => !$("f-resv").checked); wireHo(); // 预定还没付钱：只提醒，不能当场收回
       if (preset.length) preset.forEach((x) => { addLine(x.sku, x.qty); if (x.price != null) $("f-price-" + (n - 1)).value = x.price; }); else addLine("");
       $("f-addline").addEventListener("click", () => { addLine(""); recalc(); });
       $("f-lines").addEventListener("click", (e) => {
@@ -2847,6 +2865,12 @@ details.restock > summary::-webkit-details-marker { display: none; }
   });
   $("resv").addEventListener("click", (e) => {
     const t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.ho) { // 卡片上的「配送 / 自取」：点一下换（没写 → 配送 → 自取 → 配送），不展开卡片
+      e.preventDefault(); const o = S.orders.find((x) => x.id === t.dataset.ho); if (!o) return;
+      const nx = handoffOf(o) === "配送" ? "自取" : "配送";
+      (async () => { try { needDb(); await db.doc("orders/" + o.id).update({ handoff: nx }); haptic(); } catch (x) { toast(x.userMsg || errText(x)); } })();
+      return;
+    }
     if (t.dataset.settle) { const o = S.orders.find((x) => x.id === t.dataset.settle); if (!resvReady(o)) settleForm(t.dataset.settle); else if (!o.payment || (o.customer && custBal(o.customer, o.id).amt) || balOf(o).some((e) => e.kind === "diff")) payPickSettle(t.dataset.settle); else arm(t, "再点一次确认", () => quickSettle(t.dataset.settle)); }
     else if (t.dataset.editOrder) orderEditForm(t.dataset.editOrder);
     else if (t.dataset.voidOrder) arm(t, "确认取消？", () => voidOrder(t.dataset.voidOrder));
@@ -4878,7 +4902,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const rvNote = o.note && o.note.trim() !== who ? '<span class="rv-note">' + esc(o.note) + "</span>" : "";
       const pk = RS[o.id] ? Object.values(RS[o.id]).reduce((a, x) => a + x, 0) : 0;
       return '<details class="rv"><summary><span class="rv-main"><span class="l-date"><span class="tag-resv">预定</span>' + fmtD(o.date) + "</span>" +
-        "<b>" + esc(who || "（没写客人名字）") + "</b>" + '<span class="l-sub">' + esc(serTxt(serQty([o]))) + "</span>" + rvNote +
+        '<span class="rv-who"><b>' + esc(who || "（没写客人名字）") + "</b>" + (() => { const h = handoffOf(o);
+          return '<button type="button" class="tag-ho' + (h === "配送" ? " ho-d" : h === "自取" ? " ho-p" : " ho-u") + '" data-ho="' + esc(o.id) + '" aria-label="配送还是自取：' + (h || "没写") + '，点一下换">' + (h || "配送/自取？") + "</button>"; })() + "</span>" +
+        '<span class="l-sub">' + esc(serTxt(serQty([o]))) + "</span>" + rvNote +
         ((() => { const cb = o.customer ? custBal(o.customer, o.id) : { amt: 0 }; const d = balOf(o).find((e) => e.kind === "diff");
           return (cb.amt ? '<span class="pill ' + (cb.amt > 0 ? "warn" : "ok") + '">' + (cb.amt > 0 ? "上次少给 " : "上次多给 ") + money(Math.abs(cb.amt)) + "</span>" : "") +
             (d ? '<span class="pill ' + (d.amt > 0 ? "warn" : "ok") + '">' + (d.amt > 0 ? "这单少给 " : "这单多给 ") + money(Math.abs(d.amt)) + (d.why ? "：" + esc(d.why) : "") + "</span>" : ""); })()) +

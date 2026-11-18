@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-18 线上 fb-app-v28）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-18 线上 fb-app-v28，分支 feat-handoff 是 v29）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -244,6 +244,12 @@
 - 客户点开：买过什么 = `.cu-hist2`：日期 + 金额一行，下面每个系列「Bar Pro 3 根」，再下面每个口味「Grape Ice ×2」（缩进）；顶上「一共 Bar Pro 6 根 · Ali 3 根」+ 节奏、下次大概哪天。不再显示来源
 - 客户页：4 个统计框缩成一行「N 个客户 · 回头客 N（%）· 平均每人 $」，放在「全部客户」标题下
 - 测试 `tests/test_followup.py` 44/44（编的数据，旧/新结构，GitHub 上也跑）
+
+## 预定卡片上「配送 / 自取」（feat-handoff，2026-11-18）
+- Bowen：预定板块每个客人边上要有配送或自取的小标签。订单字段 `handoff`（"配送" / "自取"）；`handoffOf(o)`：有记就用；没记的有配送费 = 配送、备注里「自取 / 自提 / 来拿 / 来取 / pick up」= 自取、「送到 / 送货 / 配送 / deliver」= 配送；都没有 = 不知道
+- 卡片：客人名字右边一个小按钮（配送 = 绿底白字，自取 = 白底黑框，不知道 = 虚线「配送/自取？」），点一下就换（没写 → 配送 → 自取 → 配送），`preventDefault` 不展开卡片
+- 记单 / 编辑预定：配送费上面「配送还是自取」两个小标签（`hoChips/readHo/wireHo`，再点取消）；填了配送费、还没选的自动选「配送」。不强制选
+- 测试 `tests/test_handoff.py` 24/24（编的数据，旧/新结构，GitHub 上也跑）
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超
