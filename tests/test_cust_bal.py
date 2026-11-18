@@ -81,8 +81,12 @@ with sync_playwright() as p:
         pg.goto(URL); pg.wait_for_function("window.__GM && window.__GM.S.loaded", timeout=15000); pg.wait_for_timeout(500)
         print("== " + mode)
 
-        # 1. 少给：没写名字不让存
-        sale(pg, "", fn=lambda pg: diff(pg, "1", 30, "配送费没给"), keep_open=True)
+        # 1. 少给：新记的单不放（交货时才知道，11-18 Bowen）；记完再编辑那一单记，没写名字不让存
+        before = ids(pg); sale(pg, "", keep_open=True)
+        check("新记一笔：没有「客人少给 / 多给了钱？」", pg.is_hidden("#f-diff-open") and pg.is_hidden("#f-diff"))
+        save(pg); o0 = sorted(ids(pg) - before)[0]
+        go(pg, "finance"); pg.evaluate(f"""() => document.querySelector('[data-edit-order="{o0}"]').click()"""); pg.wait_for_selector("#f-diff-open")
+        diff(pg, "1", 30, "配送费没给")
         pg.click("#sheet-save"); pg.wait_for_timeout(400)
         check("记少给但没写客户名字：不让存，写明要先写名字", pg.is_visible("#sheet") and "客户名字" in pg.inner_text("#sheet-err"), pg.inner_text("#sheet-err") if pg.is_visible("#sheet-err") else "")
         pg.locator("#f-cust").press_sequentially("Amy"); save(pg)
@@ -112,7 +116,7 @@ with sync_playwright() as p:
         check("结算预定时记「客人多给了 $20」：Ben 欠 −20（你欠他）", order(pg, r1)["status"] == "paid" and bal(pg, "Ben") == -20, (order(pg, r1).get("bal"), bal(pg, "Ben")))
         r2 = sale(pg, "ben", resv=True, keep_open=True, fn=lambda pg: pg.click('#f-paychips label:has(input[value="现金"])')); pg.wait_for_timeout(150)
         r = txt(pg, "#f-balold")
-        check("下一个预定：提醒「上次多给了你 $20」，不能当场抵（还没付钱）；记少给多给的入口还在", "上次多给了你 $20" in r and "结算的时候" in r and pg.locator("#f-baltake").count() == 0 and pg.is_visible("#f-diff-open"), r)
+        check("下一个预定：提醒「上次多给了你 $20」，不能当场抵（还没付钱）；新记的预定不放记少给多给", "上次多给了你 $20" in r and "结算的时候" in r and pg.locator("#f-baltake").count() == 0 and pg.is_hidden("#f-diff-open"), r)
         save(pg); r2 = sorted(ids(pg) - {o["id"] for o in pg.evaluate("window.__GM.S.orders") if o.get("status") == "paid" or o["id"] == r1})[0]
         go(pg, "customers")
         check("预定卡片上标「上次多给 $20」", "上次多给 $20" in pg.evaluate(f"""() => document.querySelector('[data-settle="{r2}"]').closest('details').innerText"""))

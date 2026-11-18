@@ -98,7 +98,8 @@ with sync_playwright() as p:
         # 3. 编辑以前填过区 / 来源的单：不会被清掉
         pg.evaluate("""() => document.querySelector('[data-edit-order="o-r3"]').click()"""); pg.wait_for_selector("#f-note", state="attached")
         check("没备注没跟进的预定：「更多」照旧收着", not pg.evaluate("document.getElementById('f-more').open"))
-        pg.click("#f-more-sum"); pg.fill("#f-note", "Amy 周五下班后"); save(pg)
+        check("预定的备注直接放出来，「更多」（日期、下次跟进）藏起来", pg.is_visible("#f-note") and pg.is_hidden("#f-more"))
+        pg.fill("#f-note", "Amy 周五下班后"); save(pg)
         o3 = order(pg, "o-r3")
         check("Amy 的预定存了备注，来源自动「回头客」", o3.get("note") == "Amy 周五下班后" and o3.get("source") == "回头客", {k: o3.get(k) for k in ("note", "source", "suburb")})
         go(pg, "finance"); pg.evaluate("""() => document.querySelector('[data-edit-order="o-sold"]').click()"""); pg.wait_for_selector("#f-note", state="attached")

@@ -1555,10 +1555,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
   const balWhy = (b) => b.why.map((x) => fmtD(x.date) + (x.why ? " · " + x.why : "")).join("；");
   const BAL_WHY = ["配送费没给", "没有零钱", "抹零"], BAL_WHY_OVER = ["转多了", "没零钱找"];
   /* 表单上的一块：上面是提醒（这个客人上次少给/多给），下面是「收的钱不对？」记这单少收/多收。take = 能不能这单就收回（预定还没付钱，只提醒） */
-  function balHtml(o) {
+  function balHtml(o, noDiff) { // noDiff：新记的单只放「上次少给 / 多给」的提醒，不放记这单少给多给
     const d = balOf(o).find((e) => e.kind === "diff");
     return '<div id="f-balold" hidden></div>' +
-      '<div><button type="button" class="linkbtn" id="f-diff-open"' + (d ? " hidden" : "") + '>客人少给 / 多给了钱？</button></div>' +
+      '<div' + (noDiff ? " hidden" : "") + '><button type="button" class="linkbtn" id="f-diff-open"' + (d ? " hidden" : "") + '>客人少给 / 多给了钱？</button></div>' +
       '<div id="f-diff"' + (d ? "" : " hidden") + '><div class="chips" role="radiogroup" aria-label="少给还是多给">' +
         '<label class="chip"><input type="radio" name="f-diffk" value="1"' + (d && d.amt > 0 ? " checked" : "") + "> 客人少给了</label>" +
         '<label class="chip"><input type="radio" name="f-diffk" value="-1"' + (d && d.amt < 0 ? " checked" : "") + "> 客人多给了</label></div>" +
@@ -1664,11 +1664,13 @@ details.restock > summary::-webkit-details-marker { display: none; }
       hoChips(edit) +
       '<div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="' + esc(edit && edit.delivery_fee ? edit.delivery_fee : "") + '"></div>' +
       mixRowHtml(edit || null) +
-      custNameHtml(custPre) + meetHtml(edit, !!(edit || reserve)) + balHtml(edit) +
+      /* 2026-11-18 Bowen：少给 / 多给是交货时临时发生的，记单的时候不知道 → 新记的单不放这个（编辑预定、结算、改已卖出的单才有）；
+         上次少给 / 多给的提醒照旧。备注直接放出来；预定已经有交货时间，「更多」（日期、下次跟进）只在记卖出时有 */
+      custNameHtml(custPre) + meetHtml(edit, !!(edit || reserve)) + balHtml(edit, !edit) +
       '<p class="total">合计<b id="f-total">–</b></p><p id="f-baltot" hidden></p>' +
-      '<details class="more" id="f-more"' + (edit && (edit.note || edit.follow_up) ? " open" : "") + '><summary id="f-more-sum">更多：日期、备注、下次跟进</summary><div class="more-body">' +
+      '<div class="field"><label for="f-note">备注</label><textarea id="f-note" rows="2" placeholder="在哪见面、其他说明">' + esc(edit ? edit.note || "" : "") + "</textarea></div>" +
+      '<details class="more" id="f-more"' + (edit || reserve ? " hidden" : "") + (edit && edit.follow_up ? " open" : "") + '><summary id="f-more-sum">更多：日期、下次跟进</summary><div class="more-body">' +
         '<div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + esc((edit && edit.date) || today()) + '"></div>' +
-        '<div class="field"><label for="f-note">备注</label><textarea id="f-note" rows="2" placeholder="什么时候、在哪见面，其他说明">' + esc(edit ? edit.note || "" : "") + "</textarea></div>" +
         custMoreHtml(custPre) +
       "</div></details>" +
       '<p class="callout" id="f-pickhint" hidden></p>' + pnameField(edit ? edit.pick_from || "" : "", true) + splitter.html;
@@ -1710,7 +1712,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }
     function updQuote() {
       const d = $("f-date").value;
-      $("f-more-sum").textContent = d && d !== today() ? "更多（日期 " + fmtD(d) + "）" : "更多：日期、备注、下次跟进";
+      $("f-more-sum").textContent = d && d !== today() ? "更多（日期 " + fmtD(d) + "）" : "更多：日期、下次跟进";
     }
     async function submit() {
       needDb();
@@ -1776,7 +1778,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       wirePicker(avail, D, (k) => { setDefaultPrice(k); recalc(); });
       wireCust(edit ? edit.id : null);
       sheetOn("input", recalc); sheetOn("change", recalc);
-      $("f-resv").addEventListener("change", () => { $("sheet-title").textContent = $("f-resv").checked ? "记一笔预定" : "记一笔卖出"; $("f-meet").hidden = !$("f-resv").checked; bal.paint(); recalc(); });
+      $("f-resv").addEventListener("change", () => { $("sheet-title").textContent = $("f-resv").checked ? "记一笔预定" : "记一笔卖出"; $("f-meet").hidden = !$("f-resv").checked; $("f-more").hidden = $("f-resv").checked; bal.paint(); recalc(); });
       wireMeet();
       /* 再点一下已选的付款方式 = 取消（预定可以先不选） */
       let payWas = curPay();

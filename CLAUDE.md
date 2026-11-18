@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-18 线上 fb-app-v28，分支 feat-handoff → feat-meet → feat-gift 是 v29，一起上线）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-18 线上 fb-app-v28，分支 feat-handoff → feat-meet → feat-gift → feat-simple-form 是 v29，一起上线）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -260,6 +260,11 @@
 - 预定列表排序：定了时间的按 `meetKey`（日期 + 时间，没写几点排当天最后）从早到晚，没定的在后（新记的在前）。`resvAlloc`（库存先给哪单）没改，还是按记单日期
 - 以前写在备注里的时间没自动搬过来（备注里只写了「下午四点」没写哪天），要 Bowen 点编辑选一下
 - 测试 `tests/test_meet.py` 22/22（编的数据，旧/新结构，GitHub 上也跑）
+
+## 记单表单精简（feat-simple-form，2026-11-18）
+- Bowen：少给 / 多给是交货时临时发生的，记单时不可能知道 → 新记的单（记一笔 / 记预定）不放「客人少给 / 多给了钱？」（`balHtml(o, noDiff)`），只在编辑预定、结算、改已卖出的单里有；「上次少给 / 多给」的提醒照旧
+- 「更多」里东西太多：备注直接放在合计下面（两行框，占位「在哪见面、其他说明」）；「更多：日期、下次跟进」只在记卖出时有，记预定 / 编辑预定藏起来（日期照旧存，编辑时原来的下次跟进照旧保留）
+- 测试：test_cust_bal 67、test_resv_note 42、test_meet 24
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超
