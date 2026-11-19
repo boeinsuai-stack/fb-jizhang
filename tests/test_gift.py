@@ -2,6 +2,8 @@
 - 选「客人多给了」：原因换成 转多了 / 没零钱找，提示写「下次少收他」，多出「这钱要还他吗：下次还他 / 送我的，不用还」；换回少给就换回来
 - 送我的：订单 bal 上 gift: true；卡片写「这单多给 $10 · 送你的」；结算后不算你欠他，下次记单不提醒，客户页不标「多给了」
 - 下次还他（默认）：照旧，下次记单提醒「上次多给了你 $5」
+- 少给也能选「不用收了」（11-19 Bowen：有时少给 $20 是因为上次我多收了他 $20）：gift: true，不提醒、不算他欠你
+- 财务「收款」按实际收到的写（11-19 Bowen：少给 $20，现金还写 $60，应该写 $40）；收入、净赚照旧按合计
 用编出来的小数据，旧结构 / 新结构各一遍，GitHub 上也跑。运行：python3 tests/test_gift.py"""
 import os, sys, json, datetime, functools, http.server, subprocess, tempfile, threading, pathlib
 from playwright.sync_api import sync_playwright
@@ -16,7 +18,7 @@ def RES(oid, who, n):
                  "lines": [{"sku": "XF-01", "name": "香蕉", "qty": 2, "unit_price": 30}]}
 V1 = {"items": {"XF-01": IT("XF-01", "Bar Pro", "Banana Buzz", "香蕉", 30)},
       "movements": {"in-1": {"type": "in", "sku": "XF-01", "name": "香蕉", "qty": 40, "date": TODAY, "at": TODAY + "T00:30:00Z", "note": "进货", "cost": 1000}},
-      "orders": dict([RES("r-amy", "Amy", 1), RES("r-bob", "Bob", 2)]),
+      "orders": dict([RES("r-amy", "Amy", 1), RES("r-bob", "Bob", 2), RES("r-cat", "Cat", 3), RES("r-dan", "Dan", 4)]),
       "expenses": {}, "purchases": {}, "transfers": {}, "settlements": {}, "customers": {}, "followups": {}}
 tmp = pathlib.Path(tempfile.mkdtemp())
 (tmp / "v1.json").write_text(json.dumps(V1, ensure_ascii=False), encoding="utf8")
@@ -82,9 +84,9 @@ with sync_playwright() as p:
         check("选「客人多给了」：原因换成「转多了 / 没零钱找」，不再是配送费没给", vis(pg, '#f-diff [data-for="-1"]') and not vis(pg, '#f-diff [data-for="1"]') and "转多了" in pg.inner_text('#f-diff [data-for="-1"]') and pg.get_attribute("#f-diffwhy", "placeholder") == "比如：转多了")
         check("多出「这钱要还他吗」，默认「下次还他」", vis(pg, "#f-giftrow") and pg.is_checked('#f-giftrow input[value=""]'))
         pg.click('#f-diff label:has(input[value="1"])'); pg.wait_for_timeout(100)
-        check("换回「少给了」：原因换回配送费没给…，没有「要还他吗」", vis(pg, '#f-diff [data-for="1"]') and not vis(pg, "#f-giftrow") and "配送费没给" in pg.inner_text('#f-diff [data-for="1"]'))
+        check("换回「少给了」：原因换回配送费没给…，问的变成「下次要收回来吗」", vis(pg, '#f-diff [data-for="1"]') and pg.inner_text("#f-giftq") == "下次要收回来吗" and "配送费没给" in pg.inner_text('#f-diff [data-for="1"]'))
         pg.click('#f-diff label:has(input[value="-1"])'); pg.fill("#f-diffamt", "10"); pg.click('#f-giftrow label:has(input[value="1"])'); pg.wait_for_timeout(100)
-        check("选「送我的」：提示写不算你欠他、不会提醒", "不算你欠他" in pg.inner_text("#f-diffhint"))
+        check("选「送我的」：提示写不算谁欠谁、不会提醒", "送你的" in pg.inner_text("#f-diffhint") and "不算谁欠谁" in pg.inner_text("#f-diffhint"))
         check("合计下面写这次实际收 $70（合计 $60 + 多给的 $10）", "这次实际收 $70" in pg.inner_text("#f-baltot"), pg.inner_text("#f-baltot"))
         save(pg)
         b = (order(pg, "r-amy").get("bal") or [{}])[0]
@@ -111,6 +113,32 @@ with sync_playwright() as p:
         settle(pg, "r-bob"); new_sale(pg, "Bob")
         check("下次给 Bob 记单：提醒「上次多给了你 $5」", "上次多给了你 $5" in pg.inner_text("#f-balold"), pg.inner_text("#f-balold") if pg.locator("#f-balold").count() else "")
         close(pg)
+
+        # 少给：下次收回来（默认）/ 不用收了
+        edit(pg, "r-cat"); pg.click("#f-diff-open"); pg.click('#f-diff label:has(input[value="1"])'); pg.wait_for_timeout(100)
+        check("选「客人少给了」：也有「下次要收回来吗：下次收回来 / 不用收了」，默认收回来", vis(pg, "#f-giftrow") and pg.inner_text("#f-giftq") == "下次要收回来吗" and "不用收了" in pg.inner_text("#f-giftrow") and pg.is_checked('#f-giftrow input[value=""]'))
+        pg.fill("#f-diffamt", "20"); save(pg); settle(pg, "r-cat")
+        check("Cat 少给 $20、下次收回来：Cat 欠你 $20", not (order(pg, "r-cat").get("bal") or [{}])[0].get("gift") and order(pg, "r-cat").get("status") == "paid")
+        edit(pg, "r-dan"); pg.click("#f-diff-open"); pg.click('#f-diff label:has(input[value="1"])'); pg.fill("#f-diffamt", "20"); pg.fill("#f-diffwhy", "上次多收了他 $20")
+        pg.click('#f-giftrow label:has(input[value="1"])'); pg.wait_for_timeout(100)
+        check("选「不用收了」：提示写不算谁欠谁、不会提醒", "不算谁欠谁" in pg.inner_text("#f-diffhint"))
+        save(pg)
+        check("预定卡片写「这单少给 $20 · 不用收了」", "这单少给 $20 · 不用收了" in card(pg, "r-dan"), card(pg, "r-dan"))
+        settle(pg, "r-dan"); new_sale(pg, "Dan")
+        check("下次给 Dan 记单：不提醒收回", pg.is_hidden("#f-balold"))
+        close(pg)
+        new_sale(pg, "Cat")
+        check("下次给 Cat 记单：提醒「上次少给你 $20」", "上次少给你 $20" in pg.inner_text("#f-balold"))
+        close(pg)
+
+        # 财务：收款按实际收到的，收入按合计
+        go(pg, "finance"); pg.wait_for_timeout(300)
+        paysum = pg.inner_text("#f-paysum")
+        check("财务「收款」：现金 $215（Amy 多给 10 → 70、Bob 多给 5 → 65、Cat 少给 20 → 40、Dan 少给 20 → 40）", "现金 $215" in paysum, paysum)
+        check("收入照旧按合计：$240", "$240" in pg.inner_text("#f-inc"), pg.inner_text("#f-inc"))
+        pg.evaluate("document.querySelectorAll('details.day').forEach((d) => { d.open = true; })"); pg.wait_for_timeout(150)
+        day = pg.inner_text("body")
+        check("那一单写「现金 $40」", "现金 $40" in day, day[:300])
         ctx.close()
     br.close()
 print(f"\n{sum(results)}/{len(results)} 通过")
