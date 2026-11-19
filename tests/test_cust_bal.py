@@ -66,6 +66,7 @@ def diff(pg, k, amt, why):
     c = pg.locator(f'#f-diff [data-for="{k}"] [data-diffwhy="{why}"]')  # 少给 / 多给的原因小标签不一样（11-18）
     if c.count(): c.click()
     else: pg.fill("#f-diffwhy", why)
+    pg.check("#f-track")  # 这几种情况都要下次找回：点亮「下次核对」（11-20 起默认不亮）
 
 with sync_playwright() as p:
     br = p.chromium.launch(executable_path=os.environ.get("CHROME", "/usr/bin/google-chrome"), args=["--no-sandbox"])

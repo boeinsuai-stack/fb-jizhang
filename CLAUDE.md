@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-19 线上 fb-app-v29，分支 feat-bal-cash 是 v30）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-19 线上 fb-app-v29，分支 feat-bal-cash → feat-form-tidy 是 v30，一起上线）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -271,6 +271,14 @@
 - 少给 / 多给选了任一边就出现一行（`#f-giftrow`，问题 `#f-giftq`、两个选项文字跟着换）：少给「下次要收回来吗：下次收回来 / 不用收了（比如抵上次多收的）」，多给「这钱要还他吗：下次还他 / 送我的，不用还」。选第二个都存 `gift: true`（不算谁欠谁、不提醒），卡片写「· 不用收了 / · 送你的」
 - `balCash(o)` = 这单实际收到的钱跟合计差多少 = −Σ(diff + back 的 amt)（waive 不动钱）。`payParts(o, amt)` 用它：财务「收款」、每天的收款、单子上的付款标签（`payBadgeO` 有差额时写「现金 $40」）都按实际收到的；现金+转账的差额先从转账那部分扣。**收入、净赚照旧按合计**
 - 测试 test_gift 48/48
+
+## 预定表单再整理（feat-form-tidy，2026-11-20）
+- Bowen：按钮重复、太土；页面要整洁。改成：
+  - **配送 / 自取不用选**：`handoffOf(o)` = 有配送费 → 配送，没有 → 自取（以前的 handoff 字段、按备注猜都不要了）；卡片上的标签只显示、不能点；表单里没有这两个按钮
+  - **交货**：去掉今天 / 明天 / 后天那一排，日期框默认今天 + 几点（并排）；下面**见面地点**小标签（`placeList()` = 以前订单上用过的 `place`，用得多的在前，最多 10 个；再点取消；「＋ 地点」打新的，存在这单上以后就有了，两台手机都看得到，不用另外设置）。卡片名字旁边写地点（`.rv-place`）
+  - **少给 / 多给**：去掉「下次要收回来吗 / 这钱要还他吗」两选一，只剩一个「下次核对」小按钮（`#f-track` 勾选框，点亮变绿），**默认不亮** = `gift: true`（只记在这一单上，不算谁欠谁、不提醒）；点亮才找回。卡片：点亮的写「· 下次核对」。以前存的没有 gift 的照旧算要找回
+  - 新记单（记一笔 / 记预定 / 库存页购物车预定）都不放少给多给，只在编辑预定、结算、改已卖出的单里有（v29 就是这样，Bowen 11-20 又强调了一遍）
+- 测试：test_handoff 10、test_meet 32、test_gift 46、test_cust_bal 67（diff 助手点亮下次核对）
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超

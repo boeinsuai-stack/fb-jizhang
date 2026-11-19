@@ -172,9 +172,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .rv-main b { font-weight: 600; overflow-wrap: anywhere; }
 .rv-meet { font-size: .9rem; color: var(--fg); } .rv-meet.now { color: var(--accent); } .rv-meet.late { color: var(--warn); }
 .rv-nomeet { color: var(--muted); }
-.meet-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; } .meet-row input { width: auto; min-width: 9.5em; }
+.meet-row { display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; margin-bottom: 8px; } .meet-row input { width: 100%; min-width: 0; }
+#f-plnew { margin-top: 8px; }
 .rv-who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.tag-ho { font: inherit; font-size: .72rem; font-weight: 700; line-height: 1.3; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; cursor: pointer; }
+.tag-ho { font-size: .72rem; font-weight: 700; line-height: 1.3; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; }
+.rv-place { font-size: .8rem; color: var(--muted); }
+.chip.track { justify-self: start; margin-top: 4px; } .chip.track:has(input:checked) { background: var(--accent); color: var(--surface); border-color: var(--accent); }
 .tag-ho.ho-d { background: var(--accent); color: var(--surface); }
 .tag-ho.ho-p { background: var(--surface); color: var(--fg); border-color: var(--fg); }
 .tag-ho.ho-u { background: transparent; color: var(--muted); border: 1px dashed var(--muted); font-weight: 500; }
@@ -1200,40 +1203,35 @@ details.restock > summary::-webkit-details-marker { display: none; }
     return ord.map((sr) => '<span class="ol-ser">' + esc(sr) + "</span>" + '<ul class="ol">' + g[sr].map((x) => "<li><span>" + esc(x.gen ? "口味" + (extra || "没记") : x.t) +
       (x.tag ? '<i class="ol-pick' + (x.cls ? " " + x.cls : "") + '">' + esc(x.tag) + "</i>" : "") + "</span><b>×" + esc(x.q) + "</b></li>").join("") + "</ul>").join("");
   }
-  /* 配送还是自取（2026-11-18 Bowen：预定上每个客人旁边要有个小标签）：订单字段 handoff；没记的：有配送费 = 配送，备注里写了自取 / 送到 = 照备注；都没有 = 不知道 */
-  const HO = ["配送", "自取"];
-  const handoffOf = (o) => { if (!o) return ""; if (HO.includes(o.handoff)) return o.handoff; if (Number(o.delivery_fee) > 0) return "配送";
-    const n = o.note || ""; return /自取|自提|来拿|来取|pick ?up/i.test(n) ? "自取" : /送到|送货|配送|deliver/i.test(n) ? "配送" : ""; };
-  const hoChips = (o) => '<div class="field"><span class="lbl">配送还是自取</span><div class="chips" id="f-ho" role="radiogroup" aria-label="配送还是自取">' +
-    HO.map((x) => '<label class="chip"><input type="radio" name="f-hor" value="' + x + '"' + (handoffOf(o) === x ? " checked" : "") + "> " + x + "</label>").join("") + "</div></div>";
-  const readHo = () => (document.querySelector('input[name="f-hor"]:checked') || {}).value || null;
-  function wireHo() { // 再点一下已选的 = 取消；填了配送费、还没选的自动选「配送」
-    const box = $("f-ho"); if (!box) return; let was = readHo();
-    box.addEventListener("click", (e) => { const r = e.target.closest('input[name="f-hor"]'); if (!r) return; if (r.value === was) { r.checked = false; was = null; } else was = r.value; });
-    const fee = $("f-fee"); if (fee) fee.addEventListener("input", () => { if (Number(fee.value) > 0 && !readHo()) { box.querySelector('input[value="配送"]').checked = true; was = "配送"; } });
+  /* 配送还是自取：填了配送费 = 配送，没填 = 自取（2026-11-20 Bowen：两个按钮是重复的，有配送费就是配送，不然就是自取）。
+     以前存的 handoff 字段不再看 */
+  const handoffOf = (o) => (o && Number(o.delivery_fee) > 0 ? "配送" : "自取");
+  /* 预定什么时候、在哪交货（2026-11-18 起；11-20 Bowen：今天 / 明天 / 后天那排不要，直接一个日期，默认今天；见面就那几个地方，点一下选）。
+     订单字段 meet_date（默认今天）、meet_time（可不填）、place（可不填）。地点 = 以前预定上用过的（用得多的在前）+ 「＋ 新地点」打一次以后就有 */
+  function placeList() {
+    const n = {}; for (const o of S.orders) { const p = (o.place || "").trim(); if (p) n[p] = (n[p] || 0) + 1; }
+    return Object.keys(n).sort((a, b) => n[b] - n[a] || a.localeCompare(b)).slice(0, 10);
   }
-  /* 预定什么时候交货 / 见面（2026-11-18 Bowen：时间别写在备注里，单独一栏放在客户下面；预定按时间排）。
-     订单字段 meet_date（YYYY-MM-DD）、meet_time（HH:MM），都可以不填；只填了几点没选哪天 = 今天 */
-  const MEET_D = [["0", "今天"], ["1", "明天"], ["2", "后天"]];
   function meetHtml(o, show) {
-    const td = today(), d = o && o.meet_date, k = d ? (MEET_D.find(([n]) => addDays(td, Number(n)) === d) || ["d"])[0] : "";
-    return '<div class="field" id="f-meet"' + (show ? "" : " hidden") + '><span class="lbl">什么时候交货（见面）</span><div class="chips" id="f-md" role="radiogroup" aria-label="哪天">' +
-      MEET_D.map(([n, t]) => '<label class="chip"><input type="radio" name="f-mdr" value="' + n + '"' + (k === n ? " checked" : "") + "> " + t + "</label>").join("") +
-      '<label class="chip"><input type="radio" name="f-mdr" value="d"' + (k === "d" ? " checked" : "") + "> 选日期</label></div>" +
-      '<div class="meet-row"><input id="f-mdate" type="date" value="' + esc(d || "") + '"' + (k === "d" ? "" : " hidden") + ' aria-label="哪天">' +
-      '<input id="f-mtime" type="time" value="' + esc((o && o.meet_time) || "") + '" aria-label="几点"><span class="hint">几点（可不填）</span></div></div>';
+    const d = (o && o.meet_date) || today(), pl = (o && o.place) || "", L = placeList(); if (pl && !L.includes(pl)) L.unshift(pl);
+    return '<div class="field" id="f-meet"' + (show ? "" : " hidden") + '><span class="lbl">交货</span>' +
+      '<div class="meet-row"><input id="f-mdate" type="date" value="' + esc(d) + '" aria-label="哪天交货">' +
+      '<input id="f-mtime" type="time" value="' + esc((o && o.meet_time) || "") + '" aria-label="几点（可不填）"></div>' +
+      '<div class="chips" id="f-pl" role="radiogroup" aria-label="在哪见面">' + L.map((x) => '<label class="chip"><input type="radio" name="f-plr" value="' + esc(x) + '"' + (x === pl ? " checked" : "") + "> " + esc(x) + "</label>").join("") +
+      '<button type="button" class="chip" id="f-pladd">＋ 地点</button></div>' +
+      '<input id="f-plnew" placeholder="新的见面地点，比如 Cockburn Coles" aria-label="新的见面地点" hidden></div>';
   }
   function readMeet() {
-    if (!$("f-meet") || $("f-meet").hidden) return { meet_date: null, meet_time: null };
-    const v = (document.querySelector('input[name="f-mdr"]:checked') || {}).value, tm = $("f-mtime").value || null;
-    let d = v == null ? null : v === "d" ? $("f-mdate").value || null : addDays(today(), Number(v));
-    if (!d && tm) d = today();
-    return { meet_date: d, meet_time: tm };
+    if (!$("f-meet") || $("f-meet").hidden) return { meet_date: null, meet_time: null, place: null };
+    const nw = $("f-plnew").hidden ? "" : $("f-plnew").value.trim();
+    return { meet_date: $("f-mdate").value || today(), meet_time: $("f-mtime").value || null, place: nw || (document.querySelector('input[name="f-plr"]:checked') || {}).value || null };
   }
   function wireMeet() {
-    const box = $("f-md"); if (!box) return; let was = (document.querySelector('input[name="f-mdr"]:checked') || {}).value;
-    box.addEventListener("click", (e) => { const r = e.target.closest('input[name="f-mdr"]'); if (!r) return; if (r.value === was) { r.checked = false; was = null; } else was = r.value;
-      const dd = $("f-mdate"); dd.hidden = was !== "d"; if (!dd.hidden && !dd.value) dd.value = addDays(today(), 3); });
+    const box = $("f-pl"); if (!box) return; let was = (document.querySelector('input[name="f-plr"]:checked') || {}).value;
+    box.addEventListener("click", (e) => {
+      if (e.target.closest("#f-pladd")) { const n = $("f-plnew"); n.hidden = false; n.focus(); box.querySelectorAll('input[name="f-plr"]').forEach((r) => { r.checked = false; }); was = null; return; }
+      const r = e.target.closest('input[name="f-plr"]'); if (!r) return; if (r.value === was) { r.checked = false; was = null; } else { was = r.value; $("f-plnew").value = ""; $("f-plnew").hidden = true; }
+    });
   }
   const meetKey = (o) => o.meet_date ? o.meet_date + "T" + (o.meet_time || "99:99") : "";
   function meetTxt(o) {
@@ -1576,12 +1574,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
         /* 少给、多给的原因不一样：选了多给，下面换成多给的原因 + 这钱要不要还他 */
         '<div class="chips" data-for="1"' + (d && d.amt < 0 ? " hidden" : "") + ">" + BAL_WHY.map((w) => '<button type="button" class="chip" data-diffwhy="' + esc(w) + '">' + esc(w) + "</button>").join("") + "</div>" +
         '<div class="chips" data-for="-1"' + (d && d.amt < 0 ? "" : " hidden") + ">" + BAL_WHY_OVER.map((w) => '<button type="button" class="chip" data-diffwhy="' + esc(w) + '">' + esc(w) + "</button>").join("") + "</div>" +
-        /* 少给 / 多给都能选「这就两清了」（2026-11-19 Bowen：有时客人少给 $20 是因为上次我多收了他 $20，下次不用再收）：gift: true，不算谁欠谁、不提醒 */
-        '<div id="f-giftrow"' + (d ? "" : " hidden") + '><span class="lbl" id="f-giftq">' + (d && d.amt > 0 ? "下次要收回来吗" : "这钱要还他吗") + '</span><div class="chips" role="radiogroup" aria-label="下次要不要找回">' +
-          '<label class="chip"><input type="radio" name="f-gift" value=""' + (d && d.gift ? "" : " checked") + '> <span id="f-gift0">' + (d && d.amt > 0 ? "下次收回来" : "下次还他（下次少收）") + "</span></label>" +
-          '<label class="chip"><input type="radio" name="f-gift" value="1"' + (d && d.gift ? " checked" : "") + '> <span id="f-gift1">' + (d && d.amt > 0 ? "不用收了（比如抵上次多收的）" : "送我的，不用还") + "</span></label></div></div>" +
-        '<div class="chips"><button type="button" class="linkbtn" id="f-diff-clear">不记了</button></div>' +
-        '<p class="hint" id="f-diffhint">' + (d && d.gift ? (d.amt > 0 ? "不用收了" : "送你的") + "：只记在这一单上，不算谁欠谁，也不会提醒。" : "记在这一单上。下次跟这个客人记单时会提醒你收回来 / 少收。" + (o && isReserved(o) ? "预定也可以先记，结算时照这个收。" : "")) + "</p></div>";
+        /* 2026-11-20 Bowen：默认少给、多给都不用再找回来，只要一个按钮「下次核对」——点亮了，下次给他记单才提醒、才算谁欠谁 */
+        '<label class="chip track"><input type="checkbox" id="f-track"' + (d && !d.gift ? " checked" : "") + "> 下次核对</label>" +
+        '<div class="chips"><button type="button" class="linkbtn" id="f-diff-clear">不记了</button></div></div>';
   }
   function wireBal(o, getName, take) {
     const id = o ? o.id : null, had = balOf(o).find((e) => e.kind === "back");
@@ -1617,12 +1612,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
     $("f-diff-open").addEventListener("click", () => { $("f-diff").hidden = false; $("f-diff-open").hidden = true; });
     $("f-diff-clear").addEventListener("click", () => { $("f-diff").hidden = true; $("f-diff-open").hidden = false; $("f-diffamt").value = ""; $("f-diffwhy").value = ""; document.querySelectorAll('input[name="f-diffk"]').forEach((r) => { r.checked = false; }); tot(); });
     const syncK = () => {
-      const k = (document.querySelector('input[name="f-diffk"]:checked') || {}).value, over = k === "-1", gift = !!k && (document.querySelector('input[name="f-gift"]:checked') || {}).value === "1";
+      const k = (document.querySelector('input[name="f-diffk"]:checked') || {}).value, over = k === "-1";
       $("f-diff").querySelectorAll("[data-for]").forEach((g) => { g.hidden = g.dataset.for !== (over ? "-1" : "1"); });
-      $("f-giftrow").hidden = !k; $("f-diffwhy").placeholder = over ? "比如：转多了" : "比如：配送费没给";
-      $("f-giftq").textContent = over ? "这钱要还他吗" : "下次要收回来吗";
-      $("f-gift0").textContent = over ? "下次还他（下次少收）" : "下次收回来"; $("f-gift1").textContent = over ? "送我的，不用还" : "不用收了（比如抵上次多收的）";
-      $("f-diffhint").textContent = gift ? (over ? "送你的" : "不用收了") + "：只记在这一单上，不算谁欠谁，也不会提醒。" : "记在这一单上。下次跟这个客人记单时会提醒你" + (over ? "少收他这些。" : "收回来。") + (o && isReserved(o) ? "预定也可以先记，结算时照这个收。" : "");
+      $("f-diffwhy").placeholder = over ? "比如：转多了" : "比如：配送费没给";
     };
     $("f-diff").addEventListener("input", tot); $("f-diff").addEventListener("change", () => { syncK(); tot(); });
     $("f-diff").addEventListener("click", (e) => { const c = e.target.closest("[data-diffwhy]"); if (c) $("f-diffwhy").value = c.dataset.diffwhy; });
@@ -1639,7 +1631,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
           if (!dk) throw userError("选一下客人是少给了还是多给了。");
           if (da == null || da <= 0) throw userError("填一下差了多少钱。");
           if (!(getName() || "").trim()) throw userError("要记客人少给/多给，先写客户名字（下次才能提醒你）。");
-          const gift = (document.querySelector('input[name="f-gift"]:checked') || {}).value === "1";
+          const gift = !$("f-track").checked; // 没点「下次核对」= 只记在这单上，不提醒、不算谁欠谁
           out.push(Object.assign({ amt: r2(Number(dk) * da), why: dw || null, kind: "diff", date }, gift ? { gift: true } : {}));
         }
         if (isPaid && cur.amt && $("f-baltake") && $("f-baltake").checked) out.push({ amt: r2(-cur.amt), why: (cur.amt > 0 ? "收回上次少给的" : "抵掉上次多给的") + (cur.why.length ? "：" + cur.why.map((x) => x.why).filter(Boolean).join("、") : ""), kind: "back", date });
@@ -1673,14 +1665,13 @@ details.restock > summary::-webkit-details-marker { display: none; }
       lumpHtml(!!edit && edit.lump_total != null, edit ? edit.lump_total : null) +
       /* 付款方式：一排小标签，点一下（以前是下拉框，iPhone 上要 点开 → 滚轮 → 完成）；再点一下已选的 = 取消 */
       '<div class="field"><span class="lbl">付款方式</span><div class="chips" id="f-paychips" role="radiogroup" aria-label="付款方式">' + PAY.concat([MIX]).map((x) => '<label class="chip"><input type="radio" name="f-payr" value="' + esc(x) + '"' + (edit && edit.payment === x ? " checked" : "") + "> " + esc(x) + "</label>").join("") + "</div></div>" +
-      hoChips(edit) +
       '<div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="' + esc(edit && edit.delivery_fee ? edit.delivery_fee : "") + '"></div>' +
       mixRowHtml(edit || null) +
       /* 2026-11-18 Bowen：少给 / 多给是交货时临时发生的，记单的时候不知道 → 新记的单不放这个（编辑预定、结算、改已卖出的单才有）；
          上次少给 / 多给的提醒照旧。备注直接放出来；预定已经有交货时间，「更多」（日期、下次跟进）只在记卖出时有 */
       custNameHtml(custPre) + meetHtml(edit, !!(edit || reserve)) + balHtml(edit, !edit) +
       '<p class="total">合计<b id="f-total">–</b></p><p id="f-baltot" hidden></p>' +
-      '<div class="field"><label for="f-note">备注</label><textarea id="f-note" rows="2" placeholder="在哪见面、其他说明">' + esc(edit ? edit.note || "" : "") + "</textarea></div>" +
+      '<div class="field"><label for="f-note">备注</label><textarea id="f-note" rows="2" placeholder="其他说明">' + esc(edit ? edit.note || "" : "") + "</textarea></div>" +
       '<details class="more" id="f-more"' + (edit || reserve ? " hidden" : "") + (edit && edit.follow_up ? " open" : "") + '><summary id="f-more-sum">更多：日期、下次跟进</summary><div class="more-body">' +
         '<div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + esc((edit && edit.date) || today()) + '"></div>' +
         custMoreHtml(custPre) +
@@ -1750,7 +1741,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const oid = rid("o"), at = new Date().toISOString(), resv = $("f-resv").checked, B = bal.read(!resv);
       const pk = $("f-pfrom-wrap").hidden ? { pick_from: null, pick_split: null } : splitter.read(), pfrom = pk.pick_from;
       const P = readPay(!resv, orderTotal({ lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
-      await db.collection("orders").doc(oid).set(Object.assign({ status: resv ? "reserved" : "paid", date, at, lines, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, readHo() ? { handoff: readHo() } : {}, resv ? dropNulls(readMeet()) : {}, { payment: P.payment }, dropNulls({ pay_cash: P.pay_cash, pay_other: P.pay_other }), dropNulls(readCust(null)),
+      await db.collection("orders").doc(oid).set(Object.assign({ status: resv ? "reserved" : "paid", date, at, lines, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, resv ? dropNulls(readMeet()) : {}, { payment: P.payment }, dropNulls({ pay_cash: P.pay_cash, pay_other: P.pay_other }), dropNulls(readCust(null)),
         lump != null ? { lump_total: lump } : {}, pfrom ? { pick_from: pfrom } : {}, pk.pick_split ? { pick_split: pk.pick_split } : {}, B ? { bal: B } : {}));
       if (resv) { if (onDone) onDone(); return "已记预定 " + lines.reduce((a, l) => a + l.qty, 0) + " 根，在「客户」页结算。"; }
       const msg = "已记一笔卖出" + await commitSale(oid, lines, date, at, pfrom, pk.pick_split);
@@ -1761,7 +1752,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const id = edit.id;
       const pk = $("f-pfrom-wrap").hidden ? { pick_from: edit.pick_from || null, pick_split: null } : splitter.read();
       const P = readPay(false, orderTotal({ lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee }));
-      await db.doc("orders/" + id).update(Object.assign({ date, lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim(), handoff: readHo() }, readMeet(), P, readCust(edit), { pick_from: pk.pick_from || null, pick_split: pk.pick_split || null }, { bal: bal.read(false) }));
+      await db.doc("orders/" + id).update(Object.assign({ date, lines, lump_total: lump, delivery_fee: fee == null ? 0 : fee, note: $("f-note").value.trim() }, readMeet(), P, readCust(edit), { pick_from: pk.pick_from || null, pick_split: pk.pick_split || null }, { bal: bal.read(false) }));
       /* 已经从合伙人那拿到的货：这个口味换掉了或数量减少了，就留作库存（跟取消预定一样） */
       const want = {}, got = {};
       for (const l of lines) want[l.sku] = (want[l.sku] || 0) + l.qty;
@@ -1780,7 +1771,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     let bal = null;
     openSheet(edit ? "编辑预定" : reserve ? "记一笔预定" : "记一笔卖出", html, submit, () => {
       splitter.bind();
-      bal = wireBal(edit, () => $("f-cust").value, () => !$("f-resv").checked); wireHo(); // 预定还没付钱：只提醒，不能当场收回
+      bal = wireBal(edit, () => $("f-cust").value, () => !$("f-resv").checked); // 预定还没付钱：只提醒，不能当场收回
       if (preset.length) preset.forEach((x) => { addLine(x.sku, x.qty); if (x.price != null) $("f-price-" + (n - 1)).value = x.price; }); else addLine("");
       $("f-addline").addEventListener("click", () => { addLine(""); recalc(); });
       $("f-lines").addEventListener("click", (e) => {
@@ -2927,12 +2918,6 @@ details.restock > summary::-webkit-details-marker { display: none; }
   });
   $("resv").addEventListener("click", (e) => {
     const t = e.target.closest("button"); if (!t) return;
-    if (t.dataset.ho) { // 卡片上的「配送 / 自取」：点一下换（没写 → 配送 → 自取 → 配送），不展开卡片
-      e.preventDefault(); const o = S.orders.find((x) => x.id === t.dataset.ho); if (!o) return;
-      const nx = handoffOf(o) === "配送" ? "自取" : "配送";
-      (async () => { try { needDb(); await db.doc("orders/" + o.id).update({ handoff: nx }); haptic(); } catch (x) { toast(x.userMsg || errText(x)); } })();
-      return;
-    }
     if (t.dataset.settle) { const o = S.orders.find((x) => x.id === t.dataset.settle); if (!resvReady(o)) settleForm(t.dataset.settle); else if (!o.payment || (o.customer && custBal(o.customer, o.id).amt) || balOf(o).some((e) => e.kind === "diff")) payPickSettle(t.dataset.settle); else arm(t, "再点一次确认", () => quickSettle(t.dataset.settle)); }
     else if (t.dataset.editOrder) orderEditForm(t.dataset.editOrder);
     else if (t.dataset.voidOrder) arm(t, "确认取消？", () => voidOrder(t.dataset.voidOrder));
@@ -4789,7 +4774,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const open = openCust === c.id, f = c.fu, n = c.paid.length, cb = custBal(c.name);
       const pills = (c.p.type === "wholesale" ? '<span class="tag">批发</span>' : '<span class="tag" style="background:var(--line);color:var(--muted)">零售</span>') + (cb.amt ? '<span class="pill ' + (cb.amt > 0 ? "warn" : "ok") + '">' + (cb.amt > 0 ? "少给你 " : "多给了 ") + money(Math.abs(cb.amt)) + "</span>" : "") + (n >= 2 ? '<span class="pill">回头客 · ' + n + " 次</span>" : "") + (c.resv.length ? '<span class="pill warn">有预定</span>' : "") + (f ? '<span class="pill ' + (f.restocked ? "" : f.contacted_at ? "na" : "warn") + '">' + (f.restocked ? "到货了" : f.contacted_at ? "等回复" : "要跟进") + "</span>" : "");
       const sub = [n ? "买过 " + n + " 次、" + c.qty + " 根" : c.enq.length ? "问过 " + c.enq.length + " 次，还没成交" : "还没成交", c.last ? "上次 " + fmtD(c.last) + "（" + agoText(c.last) + "）" : ""].filter(Boolean).join(" · ");
-      const balNote = (o) => balOf(o).map((e) => (e.kind === "diff" ? (e.amt > 0 ? "少给 " : "多给 ") + money(Math.abs(e.amt)) + (e.gift ? (e.amt > 0 ? "（不用收了）" : "（送你的）") : "") : e.kind === "back" ? (e.amt < 0 ? "收回 " : "抵掉 ") + money(Math.abs(e.amt)) : "不追了 " + money(Math.abs(e.amt))) + (e.why && e.kind === "diff" ? "：" + e.why : "")).join("；");
+      const balNote = (o) => balOf(o).map((e) => (e.kind === "diff" ? (e.amt > 0 ? "少给 " : "多给 ") + money(Math.abs(e.amt)) + (e.gift ? "" : "（下次核对）") : e.kind === "back" ? (e.amt < 0 ? "收回 " : "抵掉 ") + money(Math.abs(e.amt)) : "不追了 " + money(Math.abs(e.amt))) + (e.why && e.kind === "diff" ? "：" + e.why : "")).join("；");
       /* 买过什么（2026-11-18 Bowen：格式太乱）→ 跟合伙人对账单一样：日期一行，下面每个系列几根，再下面每个口味竖着排 */
       const hist = c.orders.map((o) => { const t = orderTotal(o), g = {};
         for (const l of o.lines || []) { const it = itemBy(l.sku), sr = seriesOf(it); (g[sr] = g[sr] || []).push({ k: isGeneric(it) ? "（口味没记）" : nm(l.sku, l.name), q: Number(l.qty) || 0 }); }
@@ -4967,12 +4952,12 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const mt = meetTxt(o);
       return '<details class="rv"><summary><span class="rv-main"><span class="l-date"><span class="tag-resv">预定</span>' +
         (mt ? '<b class="rv-meet' + (o.meet_date < today() ? " late" : o.meet_date === today() ? " now" : "") + '">' + esc(mt) + "</b>" : '<span class="rv-nomeet">' + fmtD(o.date) + " 记 · 没定时间</span>") + "</span>" +
-        '<span class="rv-who"><b>' + esc(who || "（没写客人名字）") + "</b>" + (() => { const h = handoffOf(o);
-          return '<button type="button" class="tag-ho' + (h === "配送" ? " ho-d" : h === "自取" ? " ho-p" : " ho-u") + '" data-ho="' + esc(o.id) + '" aria-label="配送还是自取：' + (h || "没写") + '，点一下换">' + (h || "配送/自取？") + "</button>"; })() + "</span>" +
+        '<span class="rv-who"><b>' + esc(who || "（没写客人名字）") + "</b>" + (() => { const h = handoffOf(o); return '<span class="tag-ho' + (h === "配送" ? " ho-d" : " ho-p") + '">' + h + "</span>"; })() +
+          (o.place ? '<span class="rv-place">' + esc(o.place) + "</span>" : "") + "</span>" +
         '<span class="l-sub">' + esc(serTxt(serQty([o]))) + "</span>" + rvNote +
         ((() => { const cb = o.customer ? custBal(o.customer, o.id) : { amt: 0 }; const d = balOf(o).find((e) => e.kind === "diff");
           return (cb.amt ? '<span class="pill ' + (cb.amt > 0 ? "warn" : "ok") + '">' + (cb.amt > 0 ? "上次少给 " : "上次多给 ") + money(Math.abs(cb.amt)) + "</span>" : "") +
-            (d ? '<span class="pill ' + (d.amt > 0 ? "warn" : "ok") + '">' + (d.amt > 0 ? "这单少给 " : "这单多给 ") + money(Math.abs(d.amt)) + (d.gift ? (d.amt > 0 ? " · 不用收了" : " · 送你的") : "") + (d.why ? "：" + esc(d.why) : "") + "</span>" : ""); })()) +
+            (d ? '<span class="pill ' + (d.amt > 0 ? "warn" : "ok") + '">' + (d.amt > 0 ? "这单少给 " : "这单多给 ") + money(Math.abs(d.amt)) + (d.gift ? "" : " · 下次核对") + (d.why ? "：" + esc(d.why) : "") + "</span>" : ""); })()) +
         (pk ? '<span class="pick-tag">要找' + Object.entries(RW[o.id] || {}).map(([w, n]) => esc(w) + "拿 " + n + " 根").join("、") + "</span>" : "") +
         (PKO[o.id] ? PKO[o.id].map((g) => '<span class="pick-tag done">已从' + esc(gWho(g)) + "拿货 · " + (g.sid ? "已结账" : "还没结账") + "</span>").join("") : "") + "</span>" +
         '<span class="l-amt">' + (t == null ? '<span class="pill warn">未定价</span>' : money(t)) + "</span></summary>" +

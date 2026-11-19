@@ -1,8 +1,6 @@
-"""客人多给：原因换成多给的、可以标「送我的，不用还」（2026-11-18 Bowen：选了多给，下面那些还是少给的；有的客人多给就是送我的，不用下次还他）
-- 选「客人多给了」：原因换成 转多了 / 没零钱找，提示写「下次少收他」，多出「这钱要还他吗：下次还他 / 送我的，不用还」；换回少给就换回来
-- 送我的：订单 bal 上 gift: true；卡片写「这单多给 $10 · 送你的」；结算后不算你欠他，下次记单不提醒，客户页不标「多给了」
-- 下次还他（默认）：照旧，下次记单提醒「上次多给了你 $5」
-- 少给也能选「不用收了」（11-19 Bowen：有时少给 $20 是因为上次我多收了他 $20）：gift: true，不提醒、不算他欠你
+"""客人少给 / 多给：只记在那一单上，「下次核对」点亮了才找回（2026-11-20 Bowen：默认都不用再找回来，只要一个按钮，点亮了就是下次要跟他核对）
+- 选「客人多给了」：原因换成 转多了 / 没零钱找；换回少给就换回来（11-18）
+- 「下次核对」默认不亮：存 gift: true（不算谁欠谁、不提醒、客户页不标）；点亮：下次给他记单提醒收回 / 少收，卡片写「· 下次核对」
 - 财务「收款」按实际收到的写（11-19 Bowen：少给 $20，现金还写 $60，应该写 $40）；收入、净赚照旧按合计
 用编出来的小数据，旧结构 / 新结构各一遍，GitHub 上也跑。运行：python3 tests/test_gift.py"""
 import os, sys, json, datetime, functools, http.server, subprocess, tempfile, threading, pathlib
@@ -82,18 +80,17 @@ with sync_playwright() as p:
         check("打开时少给 / 多给都没选", not pg.evaluate("!!document.querySelector('input[name=f-diffk]:checked')"))
         pg.click('#f-diff label:has(input[value="-1"])'); pg.wait_for_timeout(100)
         check("选「客人多给了」：原因换成「转多了 / 没零钱找」，不再是配送费没给", vis(pg, '#f-diff [data-for="-1"]') and not vis(pg, '#f-diff [data-for="1"]') and "转多了" in pg.inner_text('#f-diff [data-for="-1"]') and pg.get_attribute("#f-diffwhy", "placeholder") == "比如：转多了")
-        check("多出「这钱要还他吗」，默认「下次还他」", vis(pg, "#f-giftrow") and pg.is_checked('#f-giftrow input[value=""]'))
+        check("只有一个「下次核对」按钮，默认不亮", vis(pg, "#f-track") is not None and pg.locator("#f-diff #f-track").count() == 1 and not pg.is_checked("#f-track") and pg.locator('input[name="f-gift"]').count() == 0)
         pg.click('#f-diff label:has(input[value="1"])'); pg.wait_for_timeout(100)
-        check("换回「少给了」：原因换回配送费没给…，问的变成「下次要收回来吗」", vis(pg, '#f-diff [data-for="1"]') and pg.inner_text("#f-giftq") == "下次要收回来吗" and "配送费没给" in pg.inner_text('#f-diff [data-for="1"]'))
-        pg.click('#f-diff label:has(input[value="-1"])'); pg.fill("#f-diffamt", "10"); pg.click('#f-giftrow label:has(input[value="1"])'); pg.wait_for_timeout(100)
-        check("选「送我的」：提示写不算谁欠谁、不会提醒", "送你的" in pg.inner_text("#f-diffhint") and "不算谁欠谁" in pg.inner_text("#f-diffhint"))
+        check("换回「少给了」：原因换回配送费没给…", vis(pg, '#f-diff [data-for="1"]') and "配送费没给" in pg.inner_text('#f-diff [data-for="1"]'))
+        pg.click('#f-diff label:has(input[value="-1"])'); pg.fill("#f-diffamt", "10"); pg.wait_for_timeout(100)
         check("合计下面写这次实际收 $70（合计 $60 + 多给的 $10）", "这次实际收 $70" in pg.inner_text("#f-baltot"), pg.inner_text("#f-baltot"))
         save(pg)
         b = (order(pg, "r-amy").get("bal") or [{}])[0]
         check("存了：多给 $10、gift = true", b.get("amt") == -10 and b.get("gift") is True and b.get("kind") == "diff", b)
-        check("预定卡片写「这单多给 $10 · 送你的」", "这单多给 $10 · 送你的" in card(pg, "r-amy"), card(pg, "r-amy"))
+        check("预定卡片写「这单多给 $10」，不写下次核对", "这单多给 $10" in card(pg, "r-amy") and "下次核对" not in card(pg, "r-amy"), card(pg, "r-amy"))
         edit(pg, "r-amy")
-        check("再打开编辑：多给、$10、送我的 都还选着", pg.is_checked('#f-diff input[value="-1"]') and pg.input_value("#f-diffamt") == "10" and pg.is_checked('#f-giftrow input[value="1"]') and vis(pg, '#f-diff [data-for="-1"]'))
+        check("再打开编辑：多给、$10 还在，下次核对没亮", pg.is_checked('#f-diff input[value="-1"]') and pg.input_value("#f-diffamt") == "10" and not pg.is_checked("#f-track") and vis(pg, '#f-diff [data-for="-1"]'))
         close(pg)
         settle(pg, "r-amy")
         check("结算了：送你的还记在那一单上", order(pg, "r-amy").get("status") == "paid" and (order(pg, "r-amy").get("bal") or [{}])[0].get("gift") is True)
@@ -103,27 +100,26 @@ with sync_playwright() as p:
         go(pg, "customers"); pg.fill("#cq", "amy"); pg.wait_for_timeout(250)
         check("客户页 Amy 那行不标「多给了」", "多给了" not in pg.inner_text("#c-list"))
         pg.evaluate("""() => { const b = [...document.querySelectorAll('[data-cu]')].find((x) => /Amy/.test(x.innerText)); b.click(); }"""); pg.wait_for_timeout(250)
-        check("点开 Amy：买过什么里写「多给 $10（送你的）」", "多给 $10（送你的）" in pg.inner_text("#c-list"))
+        check("点开 Amy：买过什么里写「多给 $10」", "多给 $10" in pg.inner_text("#c-list") and "下次核对" not in pg.inner_text("#c-list"))
         pg.fill("#cq", ""); pg.wait_for_timeout(200)
 
-        # 下次还他：照旧提醒
-        edit(pg, "r-bob"); pg.click("#f-diff-open"); pg.click('#f-diff label:has(input[value="-1"])'); pg.fill("#f-diffamt", "5"); pg.click('#f-diff [data-for="-1"] [data-diffwhy="转多了"]'); save(pg)
+        # 点亮「下次核对」：照旧提醒
+        edit(pg, "r-bob"); pg.click("#f-diff-open"); pg.click('#f-diff label:has(input[value="-1"])'); pg.fill("#f-diffamt", "5"); pg.click('#f-diff [data-for="-1"] [data-diffwhy="转多了"]'); pg.check("#f-track"); save(pg)
         b = (order(pg, "r-bob").get("bal") or [{}])[0]
-        check("Bob 多给 $5「转多了」、默认下次还他：没有 gift", b.get("amt") == -5 and not b.get("gift") and b.get("why") == "转多了", b)
+        check("Bob 多给 $5「转多了」、点亮下次核对：没有 gift", b.get("amt") == -5 and not b.get("gift") and b.get("why") == "转多了", b)
+        check("卡片写「这单多给 $5 · 下次核对」", "这单多给 $5 · 下次核对" in card(pg, "r-bob"), card(pg, "r-bob"))
         settle(pg, "r-bob"); new_sale(pg, "Bob")
         check("下次给 Bob 记单：提醒「上次多给了你 $5」", "上次多给了你 $5" in pg.inner_text("#f-balold"), pg.inner_text("#f-balold") if pg.locator("#f-balold").count() else "")
         close(pg)
 
-        # 少给：下次收回来（默认）/ 不用收了
+        # 少给：点亮「下次核对」才收回
         edit(pg, "r-cat"); pg.click("#f-diff-open"); pg.click('#f-diff label:has(input[value="1"])'); pg.wait_for_timeout(100)
-        check("选「客人少给了」：也有「下次要收回来吗：下次收回来 / 不用收了」，默认收回来", vis(pg, "#f-giftrow") and pg.inner_text("#f-giftq") == "下次要收回来吗" and "不用收了" in pg.inner_text("#f-giftrow") and pg.is_checked('#f-giftrow input[value=""]'))
-        pg.fill("#f-diffamt", "20"); save(pg); settle(pg, "r-cat")
-        check("Cat 少给 $20、下次收回来：Cat 欠你 $20", not (order(pg, "r-cat").get("bal") or [{}])[0].get("gift") and order(pg, "r-cat").get("status") == "paid")
+        check("选「客人少给了」：同一个「下次核对」，默认不亮", not pg.is_checked("#f-track"))
+        pg.fill("#f-diffamt", "20"); pg.check("#f-track"); save(pg); settle(pg, "r-cat")
+        check("Cat 少给 $20、点亮下次核对：Cat 欠你 $20", not (order(pg, "r-cat").get("bal") or [{}])[0].get("gift") and order(pg, "r-cat").get("status") == "paid")
         edit(pg, "r-dan"); pg.click("#f-diff-open"); pg.click('#f-diff label:has(input[value="1"])'); pg.fill("#f-diffamt", "20"); pg.fill("#f-diffwhy", "上次多收了他 $20")
-        pg.click('#f-giftrow label:has(input[value="1"])'); pg.wait_for_timeout(100)
-        check("选「不用收了」：提示写不算谁欠谁、不会提醒", "不算谁欠谁" in pg.inner_text("#f-diffhint"))
         save(pg)
-        check("预定卡片写「这单少给 $20 · 不用收了」", "这单少给 $20 · 不用收了" in card(pg, "r-dan"), card(pg, "r-dan"))
+        check("Dan 少给 $20、没点下次核对：卡片写「这单少给 $20」，gift = true", "这单少给 $20" in card(pg, "r-dan") and (order(pg, "r-dan").get("bal") or [{}])[0].get("gift") is True, card(pg, "r-dan"))
         settle(pg, "r-dan"); new_sale(pg, "Dan")
         check("下次给 Dan 记单：不提醒收回", pg.is_hidden("#f-balold"))
         close(pg)

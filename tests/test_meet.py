@@ -1,6 +1,6 @@
 """预定的交货时间单独一栏 + 预定按时间排（2026-11-18 Bowen：时间别写在备注里，放在客户下面；预定页按时间排好）
-- 记预定 / 编辑预定：客户下面「什么时候交货（见面）」：今天 / 明天 / 后天 / 选日期 + 几点（都可以不填；只填几点 = 今天）；记卖出时不出现
-- 订单字段 meet_date / meet_time；预定卡片上写「今天 18:00」「明天 15:00」「已过 · 11月17日 10:00」，没定的写「11月17日 记 · 没定时间」
+- 记预定 / 编辑预定：客户下面「交货」：日期（默认今天，11-20 Bowen：今天/明天/后天那排不要）+ 几点（可不填）+ 见面地点（以前用过的点一下选，「＋ 地点」打新的）；记卖出时不出现
+- 订单字段 meet_date / meet_time / place；预定卡片上写「今天 18:00」「明天 15:00」「已过 · 11月17日 10:00」，没定的写「11月17日 记 · 没定时间」；地点写在名字旁边
 - 预定列表：定了时间的按时间从早到晚（过了的在最上面），没定时间的在后面
 用编出来的小数据，旧结构 / 新结构各一遍，GitHub 上也跑。运行：python3 tests/test_meet.py"""
 import os, sys, json, datetime, functools, http.server, subprocess, tempfile, threading, pathlib
@@ -20,7 +20,7 @@ def RES(oid, who, n, md=None, mt=None):
     return oid, o
 V1 = {"items": {"XF-01": IT("XF-01", "Bar Pro", "Banana Buzz", "香蕉", 30)},
       "movements": {"in-1": {"type": "in", "sku": "XF-01", "name": "香蕉", "qty": 40, "date": DD(-2), "at": DD(-2) + "T00:30:00Z", "note": "进货", "cost": 1000}},
-      "orders": dict([RES("r-none", "Amy", 1), RES("r-tmr", "Bob", 2, 1, "15:00"), RES("r-tonight", "Cat", 3, 0, "18:00"), RES("r-late", "Dan", 4, -1, "10:00"), RES("r-today", "Eve", 5, 0)]),
+      "orders": dict([RES("r-none", "Amy", 1), RES("r-tmr", "Bob", 2, 1, "15:00"), RES("r-tonight", "Cat", 3, 0, "18:00"), RES("r-late", "Dan", 4, -1, "10:00"), RES("r-today", "Eve", 5, 0)] + [("o-old", {"status": "paid", "date": DD(-3), "at": DD(-3) + "T01:00:00Z", "customer": "Zed", "payment": "现金", "delivery_fee": 0, "place": "Coles 停车场", "lines": [{"sku": "XF-01", "name": "香蕉", "qty": 1, "unit_price": 30}]})]),
       "expenses": {}, "purchases": {}, "transfers": {}, "settlements": {}, "customers": {}, "followups": {}}
 tmp = pathlib.Path(tempfile.mkdtemp())
 (tmp / "v1.json").write_text(json.dumps(V1, ensure_ascii=False), encoding="utf8")
@@ -60,6 +60,7 @@ def mix(pg, cash, other=None):
 
 def order(pg, oid): return next((x for x in S(pg, "orders") if x["id"] == oid), {})
 def cards(pg): return pg.evaluate("""[...document.querySelectorAll('#resv details.rv')].map((d) => [d.querySelector('[data-settle]').dataset.settle, d.querySelector('.l-date').innerText.replace(/\\s+/g, ' ').trim()])""")
+def close(pg): pg.click('#sheet-close'); pg.wait_for_timeout(250)
 def fmt(d): x = datetime.date.fromisoformat(d); return f"{x.month}月{x.day}日"
 
 with sync_playwright() as p:
@@ -84,40 +85,45 @@ with sync_playwright() as p:
         before = {x["id"] for x in S(pg, "orders")}
         go(pg, "finance"); pg.click("#fin-sale"); pg.wait_for_selector("#f-skuq-0")
         pg.fill("#f-skuq-0", "香蕉"); pg.press("#f-skuq-0", "Enter"); pg.fill("#f-qty-0", "1")
-        check("记卖出：没有交货时间这一栏；备注直接放出来，「更多：日期、下次跟进」收着", pg.is_hidden("#f-meet") and pg.is_visible("#f-note") and pg.is_visible("#f-more") and "日期、下次跟进" in pg.inner_text("#f-more-sum"))
+        check("记卖出：没有交货这一栏；备注直接放出来，「更多：日期、下次跟进」收着", pg.is_hidden("#f-meet") and pg.is_visible("#f-note") and pg.is_visible("#f-more") and "日期、下次跟进" in pg.inner_text("#f-more-sum"))
         pg.check("#f-resv"); pg.wait_for_timeout(100)
         check("勾「只是预定」：「更多」（日期、下次跟进）不要了，只剩备注", pg.is_hidden("#f-more") and pg.is_visible("#f-note"))
-        check("勾「只是预定」：出现，就在客户那一栏下面", pg.is_visible("#f-meet") and pg.evaluate("(() => { const c = document.getElementById('f-cust').closest('.field'); let n = c.nextElementSibling; while (n && n.offsetParent === null) n = n.nextElementSibling; return n && n.id; })()") == "f-meet")
+        check("勾「只是预定」：交货出现，就在客户那一栏下面", pg.is_visible("#f-meet") and pg.evaluate("(() => { const c = document.getElementById('f-cust').closest('.field'); let n = c.nextElementSibling; while (n && n.offsetParent === null) n = n.nextElementSibling; return n && n.id; })()") == "f-meet")
+        check("没有今天 / 明天 / 后天那一排；日期默认今天", pg.locator('input[name="f-mdr"]').count() == 0 and pg.input_value("#f-mdate") == TODAY)
+        check("地点：以前用过的「Coles 停车场」点一下就行，还有「＋ 地点」", pg.locator('#f-pl input[value="Coles 停车场"]').count() == 1 and pg.is_visible("#f-pladd"))
         pg.locator("#f-cust").press_sequentially("Fay")
-        pg.click('#f-md label:has(input[value="1"])'); pg.fill("#f-mtime", "16:30"); save(pg)
+        pg.fill("#f-mdate", DD(1)); pg.fill("#f-mtime", "16:30"); pg.click('#f-pl label:has(input[value="Coles 停车场"])'); save(pg)
         new = [x for x in S(pg, "orders") if x["id"] not in before]
-        check("存了：明天 16:30", len(new) == 1 and new[0].get("meet_date") == DD(1) and new[0].get("meet_time") == "16:30", new and {k: new[0].get(k) for k in ("meet_date", "meet_time", "status")})
+        check("存了：明天 16:30、Coles 停车场", len(new) == 1 and new[0].get("meet_date") == DD(1) and new[0].get("meet_time") == "16:30" and new[0].get("place") == "Coles 停车场", new and {k: new[0].get(k) for k in ("meet_date", "meet_time", "place")})
         go(pg, "customers"); C = cards(pg)
         check("新预定排在「明天 15:00」后面、没定时间的前面", [c[0] for c in C][3:5] == ["r-tmr", new[0]["id"]] if new else False, [c[0] for c in C])
+        check("卡片上写「明天 16:30」，地点写在名字旁边", new and dict(C).get(new[0]["id"]) == "预定明天 16:30" and "Coles 停车场" in pg.evaluate(f"""document.querySelector('[data-settle="{new[0]['id']}"]').closest('details').querySelector('.rv-who').innerText"""))
 
-        # 只填几点 = 今天；记卖出不存时间
+        # 什么都不动 = 今天；新地点；记卖出不存
         before = {x["id"] for x in S(pg, "orders")}
         go(pg, "finance"); pg.click("#fin-sale"); pg.wait_for_selector("#f-skuq-0")
         pg.fill("#f-skuq-0", "香蕉"); pg.press("#f-skuq-0", "Enter"); pg.fill("#f-qty-0", "1"); pg.check("#f-resv")
-        pg.fill("#f-mtime", "20:00"); save(pg)
+        pg.click("#f-pladd"); pg.fill("#f-plnew", "Rockingham 火车站"); save(pg)
         n2 = [x for x in S(pg, "orders") if x["id"] not in before]
-        check("只填几点没选哪天：当成今天", n2 and n2[0].get("meet_date") == TODAY and n2[0].get("meet_time") == "20:00", n2 and {k: n2[0].get(k) for k in ("meet_date", "meet_time")})
+        check("日期没动 = 今天；打的新地点存上", n2 and n2[0].get("meet_date") == TODAY and not n2[0].get("meet_time") and n2[0].get("place") == "Rockingham 火车站", n2 and {k: n2[0].get(k) for k in ("meet_date", "meet_time", "place")})
+        go(pg, "finance"); pg.click("#fin-sale"); pg.wait_for_selector("#f-skuq-0"); pg.check("#f-resv")
+        check("下次记预定：新地点「Rockingham 火车站」也能点了", pg.locator('#f-pl input[value="Rockingham 火车站"]').count() == 1)
+        close(pg)
         before = {x["id"] for x in S(pg, "orders")}
         go(pg, "finance"); pg.click("#fin-sale"); pg.wait_for_selector("#f-skuq-0")
         pg.fill("#f-skuq-0", "香蕉"); pg.press("#f-skuq-0", "Enter"); pg.fill("#f-qty-0", "1"); pg.click('#f-paychips label:has(input[value="现金"])'); save(pg)
         n3 = [x for x in S(pg, "orders") if x["id"] not in before]
-        check("记卖出：不存交货时间", n3 and "meet_date" not in n3[0] and n3[0].get("status") == "paid", n3 and n3[0])
+        check("记卖出：不存交货时间、地点", n3 and "meet_date" not in n3[0] and "place" not in n3[0] and n3[0].get("status") == "paid", n3 and n3[0])
 
-        # 编辑预定：带出来，可以改、可以清掉
+        # 编辑预定：带出来，可以改
         go(pg, "customers"); pg.evaluate("""() => document.querySelector('[data-edit-order="r-tmr"]').click()"""); pg.wait_for_selector("#f-meet")
-        check("编辑 Bob 的预定：「明天」选着、15:00", pg.is_visible("#f-meet") and pg.is_checked('#f-md input[value="1"]') and pg.input_value("#f-mtime") == "15:00")
-        pg.click('#f-md label:has(input[value="d"])'); pg.fill("#f-mdate", DD(5)); pg.fill("#f-mtime", "11:00"); save(pg)
+        check("编辑 Bob 的预定：日期是明天、15:00", pg.is_visible("#f-meet") and pg.input_value("#f-mdate") == DD(1) and pg.input_value("#f-mtime") == "15:00")
+        pg.fill("#f-mdate", DD(5)); pg.fill("#f-mtime", "11:00"); pg.click('#f-pl label:has(input[value="Coles 停车场"])'); save(pg)
         o = order(pg, "r-tmr")
-        check("改成选日期 5 天后 11:00", o.get("meet_date") == DD(5) and o.get("meet_time") == "11:00", {k: o.get(k) for k in ("meet_date", "meet_time")})
-        pg.evaluate("""() => document.querySelector('[data-edit-order="r-tonight"]').click()"""); pg.wait_for_selector("#f-meet")
-        pg.click('#f-md label:has(input[value="0"])'); pg.fill("#f-mtime", ""); save(pg)
-        o = order(pg, "r-tonight")
-        check("再点一下「今天」取消、清掉几点：不定时间，排到后面", o.get("meet_date") is None and o.get("meet_time") is None and cards(pg)[-1][0] in ("r-tonight", "r-none"), {k: o.get(k) for k in ("meet_date", "meet_time")})
+        check("改成 5 天后 11:00、Coles 停车场；卡片写几月几号", o.get("meet_date") == DD(5) and o.get("meet_time") == "11:00" and o.get("place") == "Coles 停车场" and fmt(DD(5)) in dict(cards(pg)).get("r-tmr", ""), {k: o.get(k) for k in ("meet_date", "meet_time", "place")})
+        pg.evaluate("""() => document.querySelector('[data-edit-order="r-tmr"]').click()"""); pg.wait_for_selector("#f-meet")
+        pg.click('#f-pl label:has(input[value="Coles 停车场"])'); save(pg)
+        check("再点一下已选的地点 = 不选", not order(pg, "r-tmr").get("place"))
         ctx.close()
     br.close()
 print(f"\n{sum(results)}/{len(results)} 通过")
