@@ -20,7 +20,7 @@ V1 = {"items": {"XF-01": IT("XF-01", "Bar Pro", "Banana Buzz", "香蕉", 30), "X
       "movements": {"m-in": {"type": "in", "sku": "XF-01", "name": "香蕉", "qty": 200, "date": D(-30), "at": D(-30) + "T01:00:00Z", "cost": 6000, "note": "进货"}},
       "orders": dict([PAID("o-b1", "Ben", D(-17), 1), PAID("o-b2", "Ben", D(-12), 1), PAID("o-b3", "Ben", D(-7), 1), PAID("o-c1", "Cat", D(-20), 10), PAID("o-h1", "Hal", D(-20), 50), PAID("o-g1", "Gus", D(-2), 1),
                       ("o-f1", {"status": "reserved", "date": D(-1), "at": D(-1) + "T03:00:00Z", "customer": "Fay", "lines": [{"sku": "XF-01", "name": "香蕉", "qty": 2, "unit_price": 60}], "delivery_fee": 0, "payment": "", "note": ""})]),
-      "followups": dict([FU("fu-a", "Amy", D(-3), "要一盒 Ali", D(-6)), FU("fu-d", "Dan", None, "葡萄冰到货告诉他", D(-4)), FU("fu-e", "Eve", D(5), "下周问", D(-1)), FU("fu-f", "Fay", D(-1), "问一下", D(-3)), FU("fu-g", "Gus", D(-4), "过几天", D(-5))]),
+      "followups": dict([FU("fu-a", "Amy", D(-3), "要一盒 Ali", D(-6)), FU("fu-d", "Dan", None, "葡萄冰到货告诉他", D(-4)), FU("fu-e", "Eve", D(5), "下周问", D(-1)), FU("fu-k", "Kit", D(1), "明天问", D(-1)), FU("fu-l", "Lou", D(2), "后天问", D(-1)), FU("fu-f", "Fay", D(-1), "问一下", D(-3)), FU("fu-g", "Gus", D(-4), "过几天", D(-5))]),
       "customers": {"c_hal": {"name": "Hal", "key": "hal", "type": "wholesale", "created_at": D(-20) + "T00:00:00Z"}},
       "expenses": {}, "purchases": {}, "settlements": {}, "transfers": {}}
 tmp = pathlib.Path(tempfile.mkdtemp())
@@ -79,11 +79,11 @@ with sync_playwright() as p:
         print("== " + mode)
         go(pg, "customers"); pg.wait_for_timeout(300)
         names = fu_names(pg)
-        check("按日子从早到晚：Cat（重点，已过 6 天）→ Amy（已过 3 天）→ Ben（按节奏，已过 2 天）→ Dan（没定日子）", names == ["Cat", "Amy", "Ben", "Dan"], names)
+        check("离今天近的在上面：Kit（明天）→ Lou（后天）→ Ben（按节奏，已过 2 天）→ Amy（已过 3 天）→ Cat（重点，已过 6 天）→ Dan（没定日子）", names == ["Kit", "Lou", "Ben", "Amy", "Cat", "Dan"], names)
         check("三天以后的收进「以后」：Eve", fold_names(pg) == ["Eve"] and "以后要找的 · 1 个" in pg.inner_text("#fu-list .fu-later > summary"), fold_names(pg))
         check("有预定的 Fay、记跟进以后又买了的 Gus 不列", "Fay" not in names and "Gus" not in names)
         lbl = pg.evaluate("[...document.querySelectorAll('#fu-list > .fu2 .fu-when')].map((x) => x.innerText)")
-        check("日子写「已过 6 天 / 已过 3 天 / 已过 2 天 / 没定日期」", lbl == ["已过 6 天", "已过 3 天", "已过 2 天", "没定日期"], lbl)
+        check("日子写「明天 / 后天 / 已过 2 天 / 已过 3 天 / 已过 6 天 / 没定日期」", lbl == ["明天", "后天", "已过 2 天", "已过 3 天", "已过 6 天", "没定日期"], lbl)
         c1 = row(pg, "Cat").first
         check("Cat 标「重点」，写「一次买过 10 根」", c1.locator(".tag-vip").count() == 1 and "一次买过 10 根" in c1.locator(".fu-why").inner_text(), c1.inner_text())
         check("收起时看不到按钮", not c1.locator("[data-au-resv]").is_visible())
@@ -99,11 +99,14 @@ with sync_playwright() as p:
         pg.click('#f-lwq [data-lw="发了信息没回"]'); pg.check('input[name="f-whenr"][value="3"]'); save(pg)
         cp = cust(pg, "Cat")
         check("Cat：下次 3 天后，记一笔「发了信息没回」", cp.get("next") == D(3) and (cp.get("touches") or [{}])[-1].get("what") == "发了信息没回", (cp.get("next"), cp.get("touches")))
-        check("Cat 挪到「以后」", fu_names(pg) == ["Amy", "Ben", "Dan"] and "Cat" in fold_names(pg), (fu_names(pg), fold_names(pg)))
+        check("Cat 挪到「以后」（3 天后，还没到前两天）", fu_names(pg) == ["Kit", "Lou", "Ben", "Amy", "Dan"] and "Cat" in fold_names(pg), (fu_names(pg), fold_names(pg)))
         row(pg, "Amy").first.locator("summary").click(); pg.wait_for_timeout(150)
         row(pg, "Amy").first.locator("[data-fu-done]").click(); pg.wait_for_timeout(500)
         fa = next(x for x in S(pg, "followups") if x["id"] == "fu-a")
-        check("Amy 不用跟了 → 这条关掉", fa.get("done") is True and fu_names(pg) == ["Ben", "Dan"], (fa.get("done"), fu_names(pg)))
+        check("Amy 不用跟了 → 这条关掉", fa.get("done") is True and fu_names(pg) == ["Kit", "Lou", "Ben", "Dan"], (fa.get("done"), fu_names(pg)))
+        # 「以后」里的到了前两天自己出来：把 Eve 改成后天
+        pg.evaluate("window.__GM.S.followups.find((f) => f.id === 'fu-e').date = '" + D(2) + "'"); go(pg, "inventory"); go(pg, "customers")
+        check("「以后」里的 Eve 到了前两天，自己出来排在上面（后天那一档）", fu_names(pg)[:3] == ["Kit", "Eve", "Lou"] and "Eve" not in fold_names(pg), (fu_names(pg), fold_names(pg)))
 
         # 重点客户
         pg.click('[data-cs="vip"]'); pg.wait_for_timeout(250)

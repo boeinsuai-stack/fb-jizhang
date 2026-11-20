@@ -5155,14 +5155,17 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="fu-body">' + extra + '<div class="l-actions">' + fuButtons(x) + "</div></div></details>";
   }
   function renderFuResv() {
-    /* 要联系的客户（2026-11-21 Bowen 重排）：手动记的跟进和按节奏 / 重点客户的自动提醒合成一个列表，按日子从早到晚（过了的最上面），没定日子的跟在后面，
+    /* 要联系的客户（2026-11-21 Bowen 重排）：手动记的跟进和按节奏 / 重点客户的自动提醒合成一个列表，离今天近的在上面（见下面 near），没定日子的跟在后面，
        三天以后的收进「以后」。每条默认两行（哪天 · 谁 · 为什么找他），点开才有按钮 */
     const td = today(), CBF = {}; for (const c of customerBook()) CBF[normName(c.name)] = c;
     const items = openFUs().map((x) => Object.assign({ c: CBF[normName(x.customer || "")] || null }, x)).concat(autoFUs());
     const rank = (x) => x.date || "9999-99-99";
     items.sort((a, b) => rank(a).localeCompare(rank(b)) || ((b.c && b.c.vip) - (a.c && a.c.vip)) || String(a.customer || "").localeCompare(String(b.customer || "")));
     const soon = items.filter((x) => !x.date || dayGap(td, x.date) <= 2), later = items.filter((x) => x.date && dayGap(td, x.date) > 2);
-    soon.sort((a, b) => (!a.date - !b.date) || rank(a).localeCompare(rank(b))); // 没定日子的放在有日子的后面
+    /* 2026-11-21 Bowen：过期很久的重点客户把上面占满了，今天、明天要找的反而看不到 → 离今天越近越靠上：
+       今天 → 明天 → 后天（「以后」里的提前两天自己出来）→ 过了的（刚过的在前，过了很久的在后）→ 没定日子的 */
+    const near = (x) => { if (!x.date) return 1e6; const g = dayGap(td, x.date); return g >= 0 ? g : 1000 - g; };
+    soon.sort((a, b) => near(a) - near(b) || ((b.c && b.c.vip) - (a.c && a.c.vip)) || String(a.customer || "").localeCompare(String(b.customer || "")));
     $("fu-sec").hidden = !items.length;
     $("fu-n").textContent = soon.length ? String(soon.length) : "";
     $("fu-list").innerHTML = soon.map(fuRow).join("") + (later.length ? '<details class="fu-later"><summary>以后要找的 · ' + later.length + " 个</summary>" + later.map(fuRow).join("") + "</details>" : "");
