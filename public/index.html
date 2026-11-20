@@ -4391,7 +4391,6 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const names = partnerNames(), qtyAll = lines.reduce((a, l) => a + l.qty, 0);
     const html =
       '<div class="field"><label for="f-xwho">跟谁拿的</label><input id="f-xwho" list="f-pnames" autocomplete="off" placeholder="例如 小王" value="' + esc(names[0] || "") + '"><datalist id="f-pnames">' + names.map((x) => '<option value="' + esc(x) + '">').join("") + "</datalist></div>" +
-      (names.length > 1 ? '<div class="chips" id="f-pchips">' + names.slice(0, 6).map((x) => '<button type="button" class="chip" data-pn="' + esc(x) + '">' + esc(x) + "</button>").join("") + "</div>" : "") +
       '<div class="pt-lines">' + lines.map((l, k) => '<div class="pt-line"><span class="pt-name">' + esc(nm(l.sku)) + '</span><span class="pt-q">×' + l.qty + '</span><label class="pt-u"><span>$</span><input id="f-unit-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + giveUnit(l.sku) + '" aria-label="' + esc(nm(l.sku)) + ' 每根多少钱"></label></div>').join("") + "</div>" +
       ptSerpBox(lines) +
       '<p class="hint">一般整个系列同一个价，在「整系列每根」填一次就行；个别口味不一样再单独改。</p>' +
@@ -4407,7 +4406,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const pos = (x) => (x > 0 ? W + " 欠你 " + money(x) : x < 0 ? "你欠 " + W + " " + money(-x) : "你们两清");
       $("f-xsum").innerHTML = paid ? "你拿 " + W + " " + qtyAll + " 根，当场付了 " + money(v) + " → 这笔两清"
         : "你拿 " + W + " " + qtyAll + " 根 → 记成 <b>你欠 " + W + " " + money(v) + "</b>" + (w ? "<br><small>算上之前没结的账，记完后" + pos(r2(ptBal(w) - v)) + "</small>" : "");
-      document.querySelectorAll("#f-pchips .chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.pn === w)));
+      if ($("f-xwho").__syncChips) $("f-xwho").__syncChips();
     }
     openSheet("我跟合伙人拿货", html, async () => {
       needDb();
@@ -4427,7 +4426,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       $("sheet-save").textContent = "记下来";
       wirePtSerp(lines);
       sheetOn("input", recalc); sheetOn("change", recalc); wirePay(() => xLineVal(read()));
-      if ($("f-pchips")) $("f-pchips").addEventListener("click", (e) => { const b = e.target.closest("[data-pn]"); if (b) { $("f-xwho").value = b.dataset.pn; recalc(); } });
+      /* 名字按钮由 enhancePartnerInputs 统一加（2026-11-20：以前这里又自己加了一排，合伙人名字出现两次） */
       recalc();
     });
   }
@@ -4435,7 +4434,6 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const D = derive(), names = partnerNames(), qtyAll = lines.reduce((a, l) => a + l.qty, 0);
     const html =
       '<div class="field"><label for="f-xwho">谁拿的</label><input id="f-xwho" list="f-pnames" autocomplete="off" placeholder="例如 小王" value="' + esc(names[0] || "") + '"><datalist id="f-pnames">' + names.map((x) => '<option value="' + esc(x) + '">').join("") + "</datalist></div>" +
-      (names.length > 1 ? '<div class="chips" id="f-pchips">' + names.slice(0, 6).map((x) => '<button type="button" class="chip" data-pn="' + esc(x) + '">' + esc(x) + "</button>").join("") + "</div>" : "") +
       '<div class="pt-lines">' + lines.map((l, k) => '<div class="pt-line"><span class="pt-name">' + esc(nm(l.sku)) + '</span><span class="pt-q">×' + l.qty + '</span><label class="pt-u"><span>$</span><input id="f-unit-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + ptUnit(l.sku) + '" aria-label="' + esc(nm(l.sku)) + ' 每根多少钱"></label></div>').join("") + "</div>" +
       ptSerpBox(lines) +
       '<p class="hint">默认按进价，说好别的价就在「整系列每根」填一次；个别口味不一样再单独改。</p>' +
@@ -4452,7 +4450,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const pos = (x) => (x > 0 ? W + " 欠你 " + money(x) : x < 0 ? "你欠 " + W + " " + money(-x) : "你们两清");
       $("f-xsum").innerHTML = paid ? W + " 拿走 " + qtyAll + " 根，当场付了 " + money(v) + " → 这笔两清"
         : W + " 拿走 " + qtyAll + " 根 → 记成 <b>" + W + " 欠你 " + money(v) + "</b>" + (w ? "<br><small>算上之前没结的账，记完后" + pos(r2(bal(w) + v)) + "</small>" : "");
-      document.querySelectorAll("#f-pchips .chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.pn === w)));
+      if ($("f-xwho").__syncChips) $("f-xwho").__syncChips();
     }
     openSheet("合伙人拿货", html, async () => {
       needDb();
@@ -4474,7 +4472,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       $("sheet-save").textContent = "记下来";
       wirePtSerp(lines);
       sheetOn("input", recalc); sheetOn("change", recalc); wirePay(() => xLineVal(read()));
-      if ($("f-pchips")) $("f-pchips").addEventListener("click", (e) => { const b = e.target.closest("[data-pn]"); if (b) { $("f-xwho").value = b.dataset.pn; recalc(); } });
+      /* 名字按钮由 enhancePartnerInputs 统一加（2026-11-20：以前这里又自己加了一排，合伙人名字出现两次） */
       recalc();
     });
   }

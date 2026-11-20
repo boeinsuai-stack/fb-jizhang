@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-19 线上 fb-app-v29，分支 feat-bal-cash → feat-form-tidy 是 v30，一起上线）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-19 线上 fb-app-v29，分支 feat-bal-cash → feat-form-tidy → fix-pname-dup 是 v30，一起上线）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -279,6 +279,10 @@
   - **少给 / 多给**：去掉「下次要收回来吗 / 这钱要还他吗」两选一，只剩一个「下次核对」小按钮（`#f-track` 勾选框，点亮变绿），**默认不亮** = `gift: true`（只记在这一单上，不算谁欠谁、不提醒）；点亮才找回。卡片：点亮的写「· 下次核对」。以前存的没有 gift 的照旧算要找回
   - 新记单（记一笔 / 记预定 / 库存页购物车预定）都不放少给多给，只在编辑预定、结算、改已卖出的单里有（v29 就是这样，Bowen 11-20 又强调了一遍）
 - 测试：test_handoff 10、test_meet 32、test_gift 46、test_cust_bal 67（diff 助手点亮下次核对）
+
+## 合伙人名字按钮重复（fix-pname-dup，2026-11-20）
+- Bowen：合伙人拿货那边选名字的按钮出现两次。原因：`enhancePartnerInputs()` 已经给每个 `input[list="f-pnames"]` 下面加一排名字按钮（`data-pname`），我拿货 / 他拿货（`partnerTakeForm/partnerGiveForm`）又自己加了一排 `#f-pchips` → 拿掉自己那排，高亮改用 `inp.__syncChips()`。**以后新弹窗的合伙人框只要 `list="f-pnames"`，别再自己加按钮**
+- 测试 `tests/test_pnames.py` 16/16（订货、记往来、合伙人拿货·卖出、我拿货、他拿货每个名字只出现一次；旧代码 12/16）
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超

@@ -26,6 +26,7 @@ run python3 tests/test_followup.py
 run python3 tests/test_handoff.py
 run python3 tests/test_meet.py
 run python3 tests/test_gift.py
+run python3 tests/test_pnames.py
 run python3 tests/test_fifo_gap.py
 run python3 tests/test_copy_flavours.py
 run node tests/orderparse_test.js
