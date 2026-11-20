@@ -381,6 +381,9 @@ label.chip:has(input:checked) { background: var(--accent-soft); color: var(--acc
 .al-row:last-child { border-bottom: 0; }
 .al-row[hidden] { display: none; }
 .al-row.has { background: var(--accent-soft); }
+.sw-ser { padding: 6px 10px 2px; font-size: .78rem; font-weight: 700; color: var(--muted); border-bottom: 1px solid var(--line); background: var(--bg); }
+.sw-ser[hidden] { display: none; }
+#f-swin { max-height: none; } .sw-warn { color: var(--warn); font-size: .85rem; } .sw-hist li span { color: var(--fg); }
 .al-name { min-width: 0; font-size: .9rem; overflow-wrap: anywhere; }
 .al-name small { display: block; color: var(--muted); font-size: .74rem; }
 .al-row input { text-align: center; font-weight: 600; }
@@ -3238,6 +3241,80 @@ details.restock > summary::-webkit-details-marker { display: none; }
       upd();
     });
   }
+  /* ---------- 没到的换货（2026-11-20 Bowen：订的货有些没到，供货人会换成别的口味、甚至别的系列）----------
+     上面填「换掉几根」（只能换还没到的），下面填「换成什么」（任何系列的口味，或者只知道系列、口味到货再分），一个「每根成本」默认 = 换掉那几根的平均成本。
+     保存 = 改订货单的 lines（换掉的减掉；没到过的减到 0 就拿掉）+ 加上换成的 + 重算 total（旧结构顺带改付款那笔支出、按新单价重算已到货的成本，跟「编辑订货」一样）。
+     换过什么记在 po.swaps（订货单上显示「11月20日 换货：Grape Ice ×5 → Mango Ice ×5」） */
+  function swapForm(pid) {
+    const po = S.purchases.find((p) => p.id === pid); if (!po) return;
+    const recv = poRecv(pid), out = (po.lines || []).map((l) => ({ l, left: Math.max(0, l.qty - (recv[lineKey(l)] || 0)) })).filter((x) => x.left > 0);
+    if (!out.length) { toast("这张订货单都到齐了，没有可以换的。"); return; }
+    const lab = (l) => (isSerLine(l) ? l.series + "（口味到货再分）" : nm(l.sku, l.name));
+    const items = S.items.filter((i) => !isGeneric(i)).sort((a, b) => seriesOf(a).localeCompare(seriesOf(b)) || ((a.status === "停售") - (b.status === "停售")) || bySku(a, b));
+    let lastSer = "";
+    const html =
+      '<span class="flabel">换掉的（还没到的）</span>' +
+      '<div class="alloc">' + out.map((x, k) => '<label class="al-row"><span class="al-name">' + esc(lab(x.l)) + "<small>还没到 " + x.left + " 根" + (x.l.unit_cost != null ? " · " + money(x.l.unit_cost) + "/根" : "") + "</small></span>" +
+        '<input type="number" min="0" step="1" inputmode="numeric" placeholder="0" class="sw-out" data-k="' + k + '" data-max="' + x.left + '" aria-label="' + esc(lab(x.l)) + ' 换掉几根"></label>').join("") + "</div>" +
+      '<div class="actions"><button type="button" class="btn ghost small" id="f-swall">没到的全换掉</button></div>' +
+      '<span class="flabel">换成</span>' +
+      '<input type="search" class="al-filter" id="f-swq" placeholder="搜口味（中英文都行）" aria-label="搜口味">' +
+      '<div class="alloc" id="f-swin">' +
+        allSeries().map((sr) => '<label class="al-row" data-text="' + esc(sr.toLowerCase()) + '"><span class="al-name">' + esc(sr) + "<small>只知道系列，口味到货再分</small></span>" +
+          '<input type="number" min="0" step="1" inputmode="numeric" placeholder="0" class="sw-in" data-ser="' + esc(sr) + '" aria-label="' + esc(sr) + ' 换成几根"></label>').join("") +
+        items.map((i) => { const sr = seriesOf(i), head = sr !== lastSer ? '<div class="sw-ser">' + esc(sr) + "</div>" : ""; lastSer = sr;
+          return head + '<label class="al-row" data-text="' + esc([i.variant, i.name, i.sku, sr].join(" ").toLowerCase()) + '"><span class="al-name">' + esc(enOf(i)) + (i.variant ? "<small>" + esc(i.name) + "</small>" : "") + "</span>" +
+            '<input type="number" min="0" step="1" inputmode="numeric" placeholder="0" class="sw-in" data-sku="' + esc(i.sku) + '" aria-label="' + esc(enOf(i)) + ' 换成几根"></label>'; }).join("") + "</div>" +
+      '<div class="field"><label for="f-swcost">换成的每根成本 $</label><input id="f-swcost" type="number" min="0" step="0.01" inputmode="decimal"></div>' +
+      '<p class="total" id="f-swsum">换掉 0 根 → 换成 0 根</p>';
+    const rd = (sel) => Array.from(document.querySelectorAll("#sheet-form " + sel)).map((x) => ({ x, q: Number(x.value) || 0 })).filter((a) => a.q !== 0);
+    const avgOut = () => { const o = rd(".sw-out"); let n = 0, c = 0, ok = true; for (const a of o) { const l = out[a.x.dataset.k].l; n += a.q; if (l.unit_cost == null) ok = false; else c += l.unit_cost * a.q; } return n && ok ? r2(c / n) : null; };
+    openSheet("换货 · " + poWho(po), html, async () => {
+      needDb();
+      const O = rd(".sw-out"), I = rd(".sw-in");
+      if (O.some((a) => !Number.isInteger(a.q) || a.q < 0 || a.q > Number(a.x.dataset.max)) ) throw userError("换掉的根数只能是 0 到还没到的根数。");
+      if (I.some((a) => !Number.isInteger(a.q) || a.q < 0)) throw userError("换成的根数要是 0 或以上的整数。");
+      const nOut = O.reduce((a, x) => a + x.q, 0), nIn = I.reduce((a, x) => a + x.q, 0);
+      if (!nOut) throw userError("先填换掉哪个、几根。"); if (!nIn) throw userError("填一下换成什么、几根。");
+      const uc = numOrNull($("f-swcost").value);
+      const lines = (po.lines || []).map((l) => Object.assign({}, l));
+      for (const a of O) { const key = lineKey(out[a.x.dataset.k].l), l = lines.find((x) => lineKey(x) === key); l.qty -= a.q; }
+      for (const a of I) {
+        const sku = a.x.dataset.sku, ser = a.x.dataset.ser, ex = lines.find((x) => (sku ? !isSerLine(x) && x.sku === sku : isSerLine(x) && x.series === ser));
+        if (ex) { const c0 = ex.unit_cost, c1 = uc; ex.unit_cost = c0 == null || c1 == null ? (c0 == null ? c1 : c0) : r2((c0 * ex.qty + c1 * a.q) / (ex.qty + a.q)); ex.qty += a.q; }
+        else if (sku) { const it = itemBy(sku); lines.push({ sku, name: (it && it.name) || sku, series: seriesOf(it), qty: a.q, unit_cost: uc }); }
+        else lines.push({ series: ser, sku: null, name: ser + "（口味到货再分）", qty: a.q, unit_cost: uc });
+      }
+      const keep = lines.filter((l) => l.qty > 0 || (recv[lineKey(l)] || 0) > 0);
+      const total = r2(keep.reduce((a, l) => a + (l.unit_cost == null ? 0 : l.unit_cost * l.qty), 0));
+      const sw = { date: today(), at: new Date().toISOString(), out: O.map((a) => ({ k: lineKey(out[a.x.dataset.k].l), t: lab(out[a.x.dataset.k].l), qty: a.q })),
+        in: I.map((a) => ({ k: a.x.dataset.sku || "series:" + a.x.dataset.ser, t: a.x.dataset.sku ? nm(a.x.dataset.sku) : a.x.dataset.ser + "（口味到货再分）", qty: a.q })), unit_cost: uc };
+      await db.doc("purchases/" + pid).update({ lines: keep, total, swaps: (po.swaps || []).concat([sw]) });
+      const ex = S.expenses.find((x) => x.po_id === pid), enote = "订货 " + keep.map((l) => (isSerLine(l) ? l.series : nm(l.sku, l.name)) + " ×" + l.qty).join("、");
+      if (ex && total > 0) await db.doc("expenses/" + ex.id).update({ amount: total, note: enote });
+      else if (ex) await db.doc("expenses/" + ex.id).delete();
+      else if (total > 0) await db.collection("expenses").doc(pid + "-pay").set({ date: po.date, at: po.at || new Date().toISOString(), amount: total, category: "进货成本", note: enote, po_id: pid });
+      const unit = Object.fromEntries(keep.map((l) => [lineKey(l), l.unit_cost])), npo = { lines: keep };
+      await Promise.all(S.moves.filter((m) => m.po_id === pid).map((m) => { const u = unit[poLineOf(npo, m)]; const c = u == null ? null : r2(u * m.qty); return c === m.cost ? null : db.doc("movements/" + m.id).update({ cost: c }); }));
+      const d = r2(total - (Number(po.total) || 0));
+      return "已换货：" + sw.out.map((x) => x.t + " ×" + x.qty).join("、") + " → " + sw.in.map((x) => x.t + " ×" + x.qty).join("、") + (d ? "；订货单金额 " + (d > 0 ? "多了 " : "少了 ") + money(Math.abs(d)) + "，现在 " + money(total) : "") + "。";
+    }, () => {
+      const upd = () => {
+        const nOut = rd(".sw-out").reduce((a, x) => a + x.q, 0), nIn = rd(".sw-in").reduce((a, x) => a + x.q, 0);
+        document.querySelectorAll("#sheet-form .sw-out, #sheet-form .sw-in").forEach((x) => x.closest(".al-row").classList.toggle("has", Number(x.value) > 0));
+        const c = $("f-swcost"); if (!c.dataset.touched) { const a = avgOut(); c.value = a == null ? "" : a; }
+        const uc = numOrNull(c.value), dOut = rd(".sw-out").reduce((a, x) => { const l = out[x.x.dataset.k].l; return a + (l.unit_cost || 0) * x.q; }, 0), dIn = uc == null ? 0 : uc * nIn, d = r2(dIn - dOut);
+        $("f-swsum").innerHTML = "换掉 <b>" + nOut + "</b> 根 → 换成 <b>" + nIn + "</b> 根" + (nOut && nIn && nOut !== nIn ? '<span class="sw-warn">（根数不一样）</span>' : "") + (d ? "<br>订货单金额 " + (d > 0 ? "多 " : "少 ") + money(Math.abs(d)) : "");
+      };
+      $("f-swall").addEventListener("click", () => { document.querySelectorAll("#sheet-form .sw-out").forEach((x) => { x.value = x.dataset.max; }); upd(); });
+      $("f-swcost").addEventListener("input", (e) => { e.target.dataset.touched = "1"; });
+      sheetOn("input", (e) => {
+        if (e.target.id === "f-swq") { const q = e.target.value.trim().toLowerCase(); $("f-swin").querySelectorAll(".al-row").forEach((r) => { r.hidden = !!q && !r.dataset.text.includes(q) && !r.querySelector("input").value; }); $("f-swin").querySelectorAll(".sw-ser").forEach((h) => { h.hidden = !!q; }); return; }
+        upd();
+      });
+      upd();
+    }, { focus: false });
+  }
   async function voidReceipt(pid, rc) {
     try {
       needDb();
@@ -3287,9 +3364,11 @@ details.restock > summary::-webkit-details-marker { display: none; }
         (po.lines || []).map((l) => { const g = recv[lineKey(l)] || 0, lf = Math.max(0, l.qty - g);
           return "<tr><td>" + (isSerLine(l) ? "<b>" + esc(l.series) + '</b><small class="cn"> 口味到货再分</small>' : esc(nm(l.sku, l.name)) + '<small class="cn"> ' + esc((itemBy(l.sku) || {}).name || "") + "</small>") + "</td><td>" + l.qty + "</td><td>" + g + '</td><td class="' + (lf ? "left" : "") + '">' + lf + "</td><td>" + (l.unit_cost == null ? "–" : money(l.unit_cost)) + "</td></tr>"; }).join("") +
         "</tbody></table></div>" +
+        ((po.swaps || []).length ? '<ul class="hist sw-hist">' + po.swaps.map((w) => "<li><span>" + fmtD(w.date) + " 换货：" + esc(w.out.map((x) => x.t + " ×" + x.qty).join("、")) + " → " + esc(w.in.map((x) => x.t + " ×" + x.qty).join("、")) + "</span></li>").join("") + "</ul>" : "") +
         (rlist.length ? '<ul class="hist">' + rlist.map(([rc, r]) => "<li><span>" + fmtD(r.date) + " 到货：" + esc(r.items.map((m) => nm(m.sku, m.name) + " ×" + m.qty).join("、")) + '</span><button class="btn small ghost danger" type="button" data-void-rcpt="' + esc(rc) + '" data-po="' + esc(po.id) + '">撤销</button></li>').join("") + "</ul>" : "") +
         '<div class="row-actions">' +
           (s !== "done" ? '<button class="btn small primary" type="button" data-rcv="' + esc(po.id) + '">' + (hasSer ? "到货 · 分配口味" : "登记到货") + "</button>" : "") +
+          (s !== "done" ? '<button class="btn small" type="button" data-swap-po="' + esc(po.id) + '">换货</button>' : "") +
           (poUnpaid(po) ? '<button class="btn small" type="button" data-pay-po="' + esc(po.id) + '">结款</button>' : "") +
           '<button class="btn small" type="button" data-edit-po="' + esc(po.id) + '">编辑</button>' +
           (rlist.length ? "" : '<button class="btn small ghost danger" type="button" data-void-po="' + esc(po.id) + '">撤销订货</button>') +
@@ -3299,6 +3378,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   $("po-list").addEventListener("click", (e) => {
     const t = e.target.closest("button"); if (!t) return;
     if (t.dataset.rcv) receiveForm(t.dataset.rcv);
+    else if (t.dataset.swapPo) swapForm(t.dataset.swapPo);
     else if (t.dataset.editPo) poForm(t.dataset.editPo);
     else if (t.dataset.payPo) poPayForm(t.dataset.payPo);
     else if (t.dataset.voidPo) arm(t, "确认撤销？", () => voidPO(t.dataset.voidPo));
