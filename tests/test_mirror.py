@@ -38,7 +38,7 @@ COLLECT = (T / "golden.py").read_text(encoding="utf8").split('COLLECT = r"""', 1
 def relay_of(fx, at):
     data = {c: dict(fx.get(c) or {}) for c in ["items", "orders", "movements", "expenses", "purchases", "transfers", "settlements", "customers", "followups"]}
     data["log"] = {"l-t-1": {"at": "2026-11-15T00:00:00.000Z", "by": "u1", "op": "新增", "col": "orders", "ref": "x", "text": "测试记录"}}
-    data["meta"] = {"schema": {"version": 2}}  # App 迁移后上传的文件里有这个；镜像不能照抄（不然会去读 v2_*）
+    data["meta"] = {"schema": {"version": 2}, "places": {"list": [{"name": "测试地点", "text": "地址：1 Test St"}]}}  # schema：App 迁移后上传的文件里有这个，镜像不能照抄（不然会去读 v2_*）；places（见面地点）要抄
     return {"format": "fb-jizhang-relay/1", "uploaded_at": at, "saved_at": at, "uploaded_by": "测试", "counts": {c: len(v) for c, v in data.items()},
             "last_record": {"at": at, "collection": "orders", "id": "x", "text": "测试"}, "data": data}
 
@@ -96,11 +96,13 @@ with sync_playwright() as p:
     bar = pg.inner_text("#mirror-bar")
     check("① 打开就从中转站同步，界面显示出来", "App 数据截至" in bar and pg.is_visible("#inv-view"), bar.replace("\n", " ")[:80])
     check("① 中转站文件里的 meta（数据结构版本）没抄进镜像，App 走旧样子", not pg.evaluate("Object.keys(window.__store).some((p) => p.startsWith('meta/schema') || p.startsWith('v2_'))"))
+    check("① 见面地点（meta/places）抄进镜像，页面能用", pg.evaluate("JSON.stringify(window.__GM.S.places)") == json.dumps([{"name": "测试地点", "text": "地址：1 Test St"}], ensure_ascii=False, separators=(",", ":")), pg.evaluate("JSON.stringify(window.__GM.S.places)"))
     check("① 页面没有报错", not errs, errs[:3])
 
     got = pg.evaluate(COLLECT)
     want = json.loads(ref.read_text(encoding="utf8"))
     want["counts"]["log"] = got["counts"].get("log")  # 镜像多了中转站里的操作记录，手机那边测试数据里没有
+    want["counts"]["places"] = got["counts"].get("places")  # 见面地点也是（上面单独查过）
     diff = [k for k in want if json.dumps(want[k], sort_keys=True, ensure_ascii=False) != json.dumps(got.get(k), sort_keys=True, ensure_ascii=False)]
     check("② 镜像算出的数字 == 手机 App 算出的（库存、每天、合伙人、结账状态、客户…）", not diff, diff)
     check("   库存总根数一样", sum(got["st"].values()) == sum(want["st"].values()), (sum(got["st"].values()), sum(want["st"].values())))

@@ -72,8 +72,13 @@ def mix(pg, cash, other=None):
     if other: pg.select_option("#f-payother", other)
     pg.wait_for_timeout(150)
 
-def rows(pg): return pg.evaluate("[...document.querySelectorAll('#fu-list .lrow')].map((r) => r.innerText)")
-def row(pg, who): return next((r for r in rows(pg) if ("\n" + who + "\n") in ("\n" + r + "\n") or r.split("\n")[1:2] == [who] or (" " + who) in r.split("\n")[1]), "")
+# 2026-11-21 起每条是收起来的 details（.fu2）：名字在 .fu-l1 b，其余在 .l-sub；三天以后的在 .fu-later 里
+def rows(pg): return pg.evaluate("[...document.querySelectorAll('#fu-list .fu2')].map((r) => [r.querySelector('.fu-l1 b').textContent, [...r.querySelectorAll('.fu-l1, .l-sub')].map((x) => x.textContent).join('\\n'), !!r.closest('.fu-later')])")
+def names_(pg, later=None): return [r[0] for r in rows(pg) if later is None or r[2] == later]
+def row(pg, who): return next((r[1] for r in rows(pg) if r[0] == who), "")
+def act(pg, sel):  # 先点开那一条，再点按钮
+    b = pg.locator("#fu-list " + sel).first
+    pg.evaluate("(b) => { const d = b.closest('details'); if (d) { d.open = true; const f = d.parentElement.closest('details'); if (f) f.open = true; } }", b.element_handle()); pg.wait_for_timeout(80); b.click()
 def cust(pg, cid): return next((x for x in S(pg, "customers") if x["id"] == cid), {})
 def fu(pg, fid): return next((x for x in S(pg, "followups") if x["id"] == fid), {})
 def pick_when(pg, v): pg.click(f'#f-when label:has(input[value="{v}"])'); pg.wait_for_timeout(80)
@@ -92,29 +97,29 @@ with sync_playwright() as p:
         pg.goto(URL); pg.wait_for_function("window.__GM && window.__GM.S.loaded", timeout=15000); pg.wait_for_timeout(500)
         print("== " + mode)
         go(pg, "customers")
-        names = [r.split("\n")[1] for r in rows(pg)]
+        names = names_(pg)
         check("要联系的客户：Kim（跟进）、Amy（按记录 5 天一次）、Dan（你设的每 3 天）", set(names) == {"Kim", "Amy", "Dan"}, names)
         check("不提醒：Bob（只买过 2 次）、Cat（已经有预定）、Eve（60 天没来、不是你设的）", not ({"Bob", "Cat", "Eve"} & set(names)), names)
         a = row(pg, "Amy")
-        check("Amy：写他的节奏和上次哪天", "按记录大概 5 天买一次（买过 3 次）" in a and "4 天前" in a, a)
+        check("Amy：写他的节奏和上次哪天", "大概 5 天买一次 · 上次" in a and "买过 3 次" in a and "4 天前" in a, a)
         check("Amy：常买的按根数排，写现在有没有货", "常买：Banana Buzz ×4 有 40、Pink Lemon ×3 有 40、Grape Ice ×2 有 40" in a, a)
         d = row(pg, "Dan")
         check("Dan：「你设的每 3 天一次」+ 你写的「很热情，买得多」", "你设的每 3 天一次" in d and "很热情，买得多" in d, d)
 
         # 1. 跟进往后排
-        pg.click('[data-fu-later="fu-kim"]'); pg.wait_for_selector("#f-lwhat")
-        check("跟进「往后排」：有 明天 / 3 天后 / 一周后 / 两周后 / 不定 / 选日期", pg.locator('#f-when input[name="f-whenr"]').count() == 6 and pg.is_checked('#f-when input[value="3"]'))
+        act(pg, '[data-fu-later="fu-kim"]'); pg.wait_for_selector("#f-lwhat")
+        check("跟进「联系过了」：有 明天 / 3 天后 / 一周后 / 两周后 / 不定 / 选日期", pg.locator('#f-when input[name="f-whenr"]').count() == 6 and pg.is_checked('#f-when input[value="3"]'))
         pg.fill("#f-lwhat", "他说下周再要"); pick_when(pg, "7"); save(pg)
         f = fu(pg, "fu-kim"); want = (datetime.date.fromisoformat(TODAY) + datetime.timedelta(days=7)).isoformat()
         check("存了：日期改到一周后，联系记录记一笔「他说下周再要」", f.get("date") == want and (f.get("touches") or [{}])[-1].get("what") == "他说下周再要" and not f.get("done"), {k: f.get(k) for k in ("date", "touches", "done")})
         k = row(pg, "Kim")
-        check("列表上写下次哪天、上次联系说了什么", "上次联系" in k and "他说下周再要" in k, k)
-        pg.click('[data-fu-sent="fu-kim"]'); pg.wait_for_timeout(400)
-        check("再点「已发信息」：等回复，也记一笔", (fu(pg, "fu-kim").get("touches") or [{}])[-1].get("what") == "发了信息" and fu(pg, "fu-kim").get("contacted_at") == TODAY)
-        pg.click('[data-fu-later="fu-kim"]'); pg.wait_for_selector("#f-lwhat"); pick_when(pg, "d"); pg.fill("#f-whend", D(-10)); save(pg)
+        check("列表上写上次联系说了什么；一周后的收在「以后要找的」", "上次联系" in k and "他说下周再要" in k and "Kim" in names_(pg, True), k)
+        act(pg, '[data-fu-later="fu-kim"]'); pg.wait_for_selector("#f-lwq")
+        check("「联系过了」常用说法一点就填（以前的「已发信息」并到这里）", pg.locator("#f-lwq [data-lw]").count() == 4 and pg.locator('#fu-list [data-fu-sent]').count() == 0)
+        pg.click('#f-lwq [data-lw="发了信息没回"]'); pick_when(pg, "d"); pg.fill("#f-whend", D(-10)); save(pg)
         f = fu(pg, "fu-kim")
-        check("等回复的也能往后排（选日期）：日期改了、不再是「等回复」，记录有 3 笔", f.get("date") == D(-10) and not f.get("contacted_at") and len(f.get("touches") or []) == 3, {k: f.get(k) for k in ("date", "contacted_at")})
-        pg.click('[data-fu-later="fu-kim"]'); pg.wait_for_selector("#f-lwhat"); pick_when(pg, ""); save(pg)
+        check("选日期：日期改了，记录 2 笔，最后一笔「发了信息没回」", f.get("date") == D(-10) and not f.get("contacted_at") and len(f.get("touches") or []) == 2 and f["touches"][-1]["what"] == "发了信息没回", {k: f.get(k) for k in ("date", "contacted_at", "touches")})
+        act(pg, '[data-fu-later="fu-kim"]'); pg.wait_for_selector("#f-lwhat"); pick_when(pg, ""); save(pg)
         check("往后排选「不定」：没日期，还留在列表里", fu(pg, "fu-kim").get("date") is None and "没定日期" in row(pg, "Kim"))
 
         # 2. 新记跟进：默认不定
@@ -125,13 +130,13 @@ with sync_playwright() as p:
         check("存了：没日期", z and z.get("date") is None and not z.get("done"), z)
 
         # 3. 自动提醒：往后排 / 不用提醒
-        pg.click('[data-au-later="c_amy"]'); pg.wait_for_selector("#f-lwhat")
+        act(pg, '[data-au-later="c_amy"]'); pg.wait_for_selector("#f-lwhat")
         check("Amy「联系过了 · 往后排」：默认「按他的节奏（5 天后）」，没有「不定」", pg.is_checked('#f-when input[value="r"]') and "5 天后" in pg.inner_text("#f-when") and pg.locator('#f-when input[value=""]').count() == 0)
         pg.fill("#f-lwhat", "发了新口味"); save(pg)
         c = cust(pg, "c_amy")
-        check("记在 Amy 的资料上：下次 5 天后，联系记录一笔；这次先不在列表里", c.get("next") == (datetime.date.fromisoformat(TODAY) + datetime.timedelta(days=5)).isoformat() and (c.get("touches") or [{}])[-1].get("what") == "发了新口味" and "Amy" not in [r.split("\n")[1] for r in rows(pg)], {k: c.get(k) for k in ("next", "touches")})
-        pg.click('[data-au-off="c_dan"]'); pg.wait_for_timeout(400)
-        check("Dan「不用提醒他」：资料 every = 0，不在列表里；你写的备注还在", cust(pg, "c_dan").get("every") == 0 and cust(pg, "c_dan").get("note") == "很热情，买得多" and "Dan" not in [r.split("\n")[1] for r in rows(pg)], (cust(pg, "c_dan"), [r.split("\n")[1] for r in rows(pg)]))
+        check("记在 Amy 的资料上：下次 5 天后，联系记录一笔；挪到「以后要找的」", c.get("next") == (datetime.date.fromisoformat(TODAY) + datetime.timedelta(days=5)).isoformat() and (c.get("touches") or [{}])[-1].get("what") == "发了新口味" and "Amy" in names_(pg, True) and "Amy" not in names_(pg, False), ({k: c.get(k) for k in ("next", "touches")}, rows(pg)))
+        act(pg, '[data-au-off="c_dan"]'); pg.wait_for_timeout(400)
+        check("Dan「不用跟了」：资料 every = 0，不在列表里；你写的备注还在", cust(pg, "c_dan").get("every") == 0 and cust(pg, "c_dan").get("note") == "很热情，买得多" and "Dan" not in names_(pg), (cust(pg, "c_dan"), names_(pg)))
 
         # 4. 客户资料：大概多久买一次
         pg.evaluate("""() => { const b = [...document.querySelectorAll('[data-cu]')].find((x) => /Amy/.test(x.innerText)); b.click(); }"""); pg.wait_for_timeout(300)

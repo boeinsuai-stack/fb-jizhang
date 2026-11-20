@@ -1,6 +1,6 @@
 """预定的交货时间单独一栏 + 预定按时间排（2026-11-18 Bowen：时间别写在备注里，放在客户下面；预定页按时间排好）
 - 记预定 / 编辑预定：客户下面「交货」：日期（默认今天，11-20 Bowen：今天/明天/后天那排不要）+ 几点（可不填）+ 见面地点（以前用过的点一下选，「＋ 地点」打新的）；记卖出时不出现
-- 订单字段 meet_date / meet_time / place；预定卡片上写「今天 18:00」「明天 15:00」「已过 · 11月17日 10:00」，没定的写「11月17日 记 · 没定时间」；地点写在名字旁边
+- 订单字段 meet_date / meet_time / place；预定卡片上写「今天 18:00」「明天 15:00」「已过 · 11月17日 10:00」，没定的写「11月17日 记 · 暂未确定时间」（11-21 起；只定了哪天没写几点 =「今天 · 暂未确定时间」）；地点写在名字旁边
 - 预定列表：定了时间的按时间从早到晚（过了的在最上面），没定时间的在后面
 用编出来的小数据，旧结构 / 新结构各一遍，GitHub 上也跑。运行：python3 tests/test_meet.py"""
 import os, sys, json, datetime, functools, http.server, subprocess, tempfile, threading, pathlib
@@ -78,7 +78,7 @@ with sync_playwright() as p:
         print("== " + mode)
         go(pg, "customers"); C = cards(pg)
         check("按交货时间排：过了的 → 今天 18:00 → 今天（没写几点）→ 明天 15:00 → 没定时间的", [c[0] for c in C] == ["r-late", "r-tonight", "r-today", "r-tmr", "r-none"], [c[0] for c in C])
-        want = {"r-late": "预定已过 · " + fmt(DD(-1)) + " 10:00", "r-tonight": "预定今天 18:00", "r-today": "预定今天", "r-tmr": "预定明天 15:00", "r-none": "预定" + fmt(DD(-1)) + " 记 · 没定时间"}
+        want = {"r-late": "预定已过 · " + fmt(DD(-1)) + " 10:00", "r-tonight": "预定今天 18:00", "r-today": "预定今天 · 暂未确定时间", "r-tmr": "预定明天 15:00", "r-none": "预定" + fmt(DD(-1)) + " 记 · 暂未确定时间"}  # 11-21：没写几点 =「暂未确定时间」
         check("卡片上写交货时间（不是记单那天）", dict(C) == want, dict(C))
 
         # 记卖出：不出现；勾「只是预定」才出现，在客户下面

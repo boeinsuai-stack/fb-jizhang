@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-20 线上 fb-app-v30）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-20 线上 fb-app-v30，分支 feat-place-fu 是 v31）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -290,6 +290,21 @@
 - 保存：lines 换掉的减掉（没到过的减到 0 就拿掉，到过的留着）；换成的已有同一口味/系列就合并（单价按根数加权）；total 重算；`swaps:[{date,at,out:[{k,t,qty}],in:[{k,t,qty}],unit_cost}]`；旧结构 po_id 那笔支出跟着改；已到货的成本不动
 - 订货单上一行「11月20日 换货：A ×10 → B ×4、C ×6」；在途、登记到货跟着变。新结构 swaps 跟着订货单源头存
 - 测试 `tests/test_po_swap.py` 24/24（编的数据，旧/新结构，GitHub 上也跑）
+
+## 要联系的客户重排、重点客户、见面地点（feat-place-fu，2026-11-21）
+- Bowen：跟进的顺序要按日期从近到远；跟进板块很难用；要见面地点（标签打在客人身上、写好地址和停哪一点就复制）；客人说「下午几点到几点联系」也要体现在预定上；一次买过一盒（8 根以上）的零售客要重点跟
+- **要联系的客户**（renderFuResv / fuRow）：手动跟进（openFUs）+ 自动提醒（autoFUs）合成一个列表，按日子从早到晚（过了的最上面，「已过 N 天」橙），没定日子的跟在后面，三天以后的收进「以后要找的 · N 个」。
+  每条是收起来的 details：哪天 · 名字 · 重点 · 地点 + 一行为什么找他（+ 几点方便联系）；点开才有四个按钮：记预定 / 联系过了 / 不用跟了 / 改（data-fu-* / data-au-* 跟以前一样）。「已发信息」并进「联系过了」（laterForm：常用说法 发了信息没回 / 他说过几天 / 他说下周 / 现在不要）
+  - 不列：这个客人现在有预定，或记跟进以后他又买过（按订单 at 比 created_at / 订单上的跟进比那一单的 at）。只是不显示，数据不改
+  - 自动提醒约好了哪天再问（customers.next）还没到的也列（在「以后」里），以前是不显示
+- **重点客户**：customerBook 的 box = 一单最多几根（已付款），vip = 资料 vip true，或（vip 不是 false 且不是批发且 box ≥ 8）。客户资料「重点客户」勾选跟自动算的一样就不存（vip 只存跟自动不一样的）。
+  没有自己的节奏（没设、买过不到 3 天）的重点客户按 14 天提醒（rhythmOf.boxDef，BOX_EVERY；真实记录：用得最快一天 0.5–0.67 根，一盒约 3 周）。客户页「重点客户」最久没买的在上面
+- **见面地点**：`meta/places = {list:[{name,text}]}`（中转站、备份都带着；镜像 mirror_shell 单独抄 meta/places；import.html 恢复时一起恢复；快照 SNAPF 有 places）。
+  标题右边「地点」（库存、客户页）→ 每个地点「复制」= 复制 text（发给客人的地址、停哪），点名字改 / 删；改名字时客户资料 place、还没结算的预定 place 跟着改
+  - 客户资料：place（一般在哪见面）、call = "16:00-18:00"（一般几点方便联系，哪头都可以空，callTxt →「下午 4–6 点」，18 点还叫下午）
+  - 记预定 / 编辑预定：写了客人名字自动带上他的地点、联系时间（自己点过地点就不动）；存预定后新地点进地点库、客人没有地点标签就打上、联系时间记到客户资料（afterMeet）。预定字段 call_win
+  - 预定卡片：没写几点 =「今天 · 暂未确定时间」，下面一行绿字「下午 4–6 点联系」；地点 = 预定的，没有就用客人的；点开有「复制地点」
+- 测试 `tests/test_place_fu.py` 72/72（编的数据，旧/新结构）；test_followup / test_meet / test_mirror 跟着改
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超

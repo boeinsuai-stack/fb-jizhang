@@ -24,7 +24,7 @@ pre{white-space:pre-wrap;background:#fff;border:1px solid #dde1dc;border-radius:
 <pre id="out"></pre>
 </main>
 <script>
-/* 恢复的是「旧样子」的 9 类账本记录；meta（数据结构版本、备份记录、中转站记录）和操作记录不动，只把数据结构版本改回 1。
+/* 恢复的是「旧样子」的 9 类账本记录 + 见面地点（meta/places）；其他 meta（数据结构版本、备份记录、中转站记录）和操作记录不动，只把数据结构版本改回 1。
    读写都直接用 Firestore（shim 给页面的那个 db 只能订阅，不能 get；批量写入会自动带上同步用的 _u，删除留标记，另一台手机能同步到）。 */
 const LEDGER = ["items", "movements", "orders", "expenses", "purchases", "settlements", "transfers", "customers", "followups"];
 const V1COL = { orders: "orders", movements: "moves", expenses: "expenses", purchases: "purchases", transfers: "transfers", settlements: "settles" };
@@ -47,6 +47,7 @@ function readBundle(j) {
   if (!d || typeof d !== "object" || !LEDGER.some((c) => d[c] && typeof d[c] === "object")) throw new Error("不认识");
   const b = {};
   for (const c of LEDGER) { b[c] = {}; for (const [id, x] of Object.entries(d[c] || {})) if (x && typeof x === "object" && !x._deleted && !id.startsWith(".")) b[c][id] = clean(x); }
+  const pl = d.meta && d.meta.places; if (pl && Array.isArray(pl.list)) b.places = clean(pl); // 见面地点（2026-11-21）：跟账一起恢复
   return { b, when: (j && (j.saved_at || j.uploaded_at)) || "" };
 }
 document.getElementById("f").addEventListener("change", async (e) => {
@@ -110,6 +111,7 @@ document.getElementById("go").addEventListener("click", async () => {
       for (let i = 0; i < ops.length; i += 400) { const b = fs.batch(); ops.slice(i, i + 400).forEach((f) => f(b)); await b.commit(); }
       log(`${c}：写了 ${ops.length} 条`);
     }
+    if (bundle.places) { await fs.doc("meta/places").set(bundle.places); log("见面地点：" + bundle.places.list.length + " 个"); }
     // 回到旧结构（两台手机看到会自动刷新）；新结构的记录留着，重新「确认迁移」时会整份换掉
     await fs.doc("meta/schema").set({ version: 1, restored_at: new Date().toISOString(), by: window.__fbMyId || null });
     log("\n等云端收下…");
