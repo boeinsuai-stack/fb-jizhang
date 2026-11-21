@@ -622,7 +622,16 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 .rs-need { font-family: var(--font-display); font-weight: 700; font-size: 1.5rem; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rs-need small { font-family: var(--font-body); font-size: .72rem; font-weight: 400; color: var(--muted); margin-left: 2px; }
 .restock .empty { padding: 10px 0; }
-.rs-slow { padding: 10px 12px; border-radius: 8px; background: var(--bg); }
+.rs-tier { padding: 10px 16px 4px; font-size: .78rem; font-weight: 700; color: var(--muted); }
+.rs-few { font-weight: 600; color: var(--warn); }
+.rs-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .rs-top input { width: 4.2em; text-align: center; }
+.rs-plan { display: grid; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; } .rs-plan .rs-tier { padding: 8px 12px 2px; background: var(--hover); }
+.rs-prow { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); } .rs-prow.off { opacity: .5; } .rs-prow.fixed .rs-step b { color: var(--accent); }
+.rs-have { flex: 1; min-width: 0; display: flex !important; flex-direction: row !important; gap: 10px; align-items: flex-start; margin: 0; padding: 0; font-weight: 400; }
+.rs-have input { flex: none; width: 20px; height: 20px; margin: 2px 0 0; padding: 0; }
+.rs-have span { display: grid; min-width: 0; flex: 1; } .rs-have b { font-weight: 600; line-height: 1.25; } .rs-have small { color: var(--muted); font-size: .76rem; line-height: 1.35; }
+.rs-step { display: flex; align-items: center; gap: 6px; } .rs-step b { min-width: 1.4em; text-align: center; font-size: 1.05rem; }
+.rs-total { font-size: .92rem; } .rs-total .warn { color: var(--warn); }
 /* 口味排行：左边名次 + 名字，右边「几单 · 几根」和现在的库存 */
 .rk-basis { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
 .rk-row { grid-template-columns: 1.6em minmax(0, 1fr) auto; }
@@ -827,10 +836,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <button class="btn ghost" id="inv-resv" type="button" hidden>预定</button>
     </div>
     <details class="restock" id="rs-sec" hidden>
-      <summary><span class="rs-sum" id="rs-sum">补货建议</span><span class="sb-chev">展开</span></summary>
-      <div class="rs-head"><p class="hint" id="rs-basis"></p><button class="btn small" id="rs-copy" type="button">复制补货单</button></div>
+      <summary><span class="rs-sum" id="rs-sum">补货</span><span class="sb-chev">展开</span></summary>
+      <div class="chips" id="rs-ser" role="group" aria-label="系列"></div>
+      <div class="rs-head"><p class="hint" id="rs-basis"></p><button class="btn small primary" id="rs-plan" type="button">做补货单</button></div>
       <div class="rs-list" id="rs-list"></div>
-      <p class="hint rs-slow" id="rs-slow" hidden></p>
     </details>
     <details class="restock" id="rk-sec" hidden>
       <summary><span class="rs-sum" id="rk-sum">口味排行</span><span class="sb-chev">展开</span></summary>
@@ -2275,20 +2284,139 @@ details.restock > summary::-webkit-details-marker { display: none; }
   try { if (localStorage.getItem("mk-sb") === "0") sbSet(false); } catch (_) {}
   $("sb-toggle").addEventListener("click", () => { const open = $("sb-toggle").getAttribute("aria-expanded") !== "true"; sbSet(open); try { localStorage.setItem("mk-sb", open ? "1" : "0"); } catch (_) {} });
 
-  /* ---------- restock: how fast each flavour sold in the last 7 days vs what's left ---------- */
-  const RS_DAYS = 7, RS_TARGET = 7;
-  function restockPlan() {
-    const D = derive(), RV = reservedQty(), TR = inTransit(), since = ymd(new Date(Date.now() - (RS_DAYS - 1) * 864e5)), sold = {};
-    for (const m of S.moves) if (m.type === "out" && m.order_id && (m.date || "") >= since) sold[m.sku] = (sold[m.sku] || 0) + (Number(m.qty) || 0);
-    const rows = S.items.filter((i) => !isGeneric(i) && i.status !== "停售").map((i) => {
-      const s = sold[i.sku] || 0, on = Math.max(0, D.st[i.sku] || 0), rv = RV[i.sku] || 0, tr = TR[i.sku] || 0, avail = on - rv + tr, rate = s / RS_DAYS;
-      return { i, s, on, rv, tr, avail, days: rate ? avail / rate : Infinity, need: Math.max(0, Math.ceil(rate * RS_TARGET) - avail) };
-    });
-    return {
-      since,
-      hot: rows.filter((r) => r.s > 0 && r.days < 3 && r.need > 0).sort((a, b) => a.days - b.days || b.s - a.s),
-      slow: rows.filter((r) => r.s === 0 && r.on >= 3).sort((a, b) => b.on - a.on),
-    };
+  /* ---------- 补货（2026-11-22 Bowen 重做）：一次补一个系列 N 盒（一盒 10 根、一盒一个口味），口味看供货商当时有什么。
+     用真实数据回测过（见 CLAUDE.md）：一款一周只卖几根，「这周卖得好」大多是噪音 → 看最近 8 周、只算有货的日子、一单超过 3 根按 3 根（大单不带偏）、
+     数据少的往同系列平均拉（相当于先当它卖了 14 天平均速度）。分档按「一盒 10 根要卖几周」：≤1.5 卖得好 · ≤3 一般 · ≤6 偏冷（最多补一盒）· 更久且有货满 3 周 很冷（不补）；没进过的只标出来
+     分盒子：这批（N 盒 + 手上的）按各口味的速度份额估「这批里大概卖几根」，一盒一盒给「多这一盒能多卖出最多」的口味（泊松分布的期望） ---------- */
+  const RS_WIN = 56, RS_PRIOR = 14, RS_FEW = 14, RS_BOX = 10, RS_N = 20;
+  const RS_TIERS = ["卖得好", "一般", "偏冷", "很冷", "没卖过"];
+  function rsModel() {
+    const td = today(), since = addDays(td, -(RS_WIN - 1)), ev = {}, ever = new Set();
+    for (const m of S.moves) {
+      if (!m.sku || !m.date) continue; const q = Number(m.qty) || 0, e = ev[m.sku] || (ev[m.sku] = []);
+      if (m.type === "in" || m.type === "adjust") { e.push([m.date, q, 0, 0]); if (q > 0) ever.add(m.sku); }
+      else if (m.type === "out") e.push([m.date, -q, m.order_id ? Math.min(q, 3) : 0, m.order_id ? 1 : 0]);
+    }
+    const R = {};
+    for (const i of S.items) {
+      if (isGeneric(i) || i.status === "停售") continue;
+      const es = (ev[i.sku] || []).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+      let st = 0, k = 0, sold = 0, ins = 0;
+      while (k < es.length && es[k][0] < since) st += es[k++][1];
+      for (let d = since; d <= td; d = addDays(d, 1)) {
+        let inc = 0, got = 0, sale = 0;
+        while (k < es.length && es[k][0] === d) { const e = es[k++]; inc += e[1]; if (e[1] > 0) got = 1; sold += e[2]; sale += e[3]; }
+        if (st > 0 || got || sale) ins++; // 这一天有货（断货的日子不算）
+        st += inc;
+      }
+      R[i.sku] = { i, sold, ins, never: !ever.has(i.sku) };
+    }
+    const ser = {}; for (const r of Object.values(R)) { const a = ser[seriesOf(r.i)] || (ser[seriesOf(r.i)] = [0, 0]); a[0] += r.sold; a[1] += r.ins; }
+    for (const r of Object.values(R)) {
+      const a = ser[seriesOf(r.i)], mean = a[1] ? a[0] / a[1] : 0;
+      r.rate = (r.sold + RS_PRIOR * mean) / (r.ins + RS_PRIOR); r.wk = r.rate > 0 ? RS_BOX / (r.rate * 7) : 99; r.few = r.ins < RS_FEW;
+      r.tier = r.never ? "没卖过" : r.wk <= 1.5 ? "卖得好" : r.wk <= 3 || r.few ? "一般" : r.wk <= 6 || r.ins < 21 ? "偏冷" : "很冷"; // 数据少的不算冷门
+    }
+    return R;
+  }
+  const poisMin = (lam, a) => { if (a <= 0) return 0; let p = Math.exp(-lam), cdf = 0, e = 0; for (let d = 0; d < a; d++) { cdf += p; e += 1 - cdf; p *= lam / (d + 1); } return e; };
+  /* 这批货大概卖几天：整个系列（不算很冷、没卖过的）平时一天卖多少根 → (N 盒 + 手上的) ÷ 这个，夹在 7–21 天（Bowen：200 根一般一到两周）
+     每款「这批里大概卖几根」= 它的速度 × 这么多天（跟供货商这次有几款无关）；盒子一定分满，多出来的给「多一盒最可能卖掉」的 */
+  function rsDays(R, ser, n, avail) {
+    const all = Object.values(R).filter((r) => seriesOf(r.i) === ser && r.tier !== "没卖过" && r.tier !== "很冷");
+    const sp = all.reduce((a, r) => a + r.rate, 0); if (!sp) return 14;
+    return Math.min(21, Math.max(7, (RS_BOX * n + all.reduce((a, r) => a + (avail[r.i.sku] || 0), 0)) / sp));
+  }
+  /* skus = 这次供货商有的；fixed = 自己改过的 {sku: 盒}；返回 { box: {sku: 盒}, lam: {sku: 这批大概卖几根}, days } */
+  function rsAlloc(R, ser, skus, n, avail, fixed) {
+    const box = Object.assign({}, fixed), lam = {}, used = Object.values(fixed).reduce((a, b) => a + b, 0);
+    let days = rsDays(R, ser, n, avail);
+    const part = skus.filter((s) => R[s] && (fixed[s] != null || (R[s].tier !== "没卖过" && R[s].tier !== "很冷")));
+    const setLam = () => { for (const s of part) lam[s] = R[s].rate * days; }; setLam();
+    const el = part.filter((s) => fixed[s] == null);
+    const gain = (s) => { const b = box[s] || 0; if (R[s].tier === "偏冷" && b >= 1) return -1; const a = (avail[s] || 0) + RS_BOX * b; return poisMin(lam[s], a + RS_BOX) - poisMin(lam[s], a); };
+    /* 多一盒在这些天里大概多卖不到 2 根 = 这批货（供货商这次口味少）要卖更久：天数往后延再分，多出来的按速度摊开，不堆在一款上 */
+    for (let left = n - used; left > 0; ) {
+      let best = null, bg = -0.5; for (const s of el) { const g = gain(s); if (g > bg + 1e-9 || (best && Math.abs(g - bg) <= 1e-9 && R[s].rate > R[best].rate)) { best = s; bg = g; } }
+      if (!best || bg < 0) break;
+      if (bg < 2 && days < 90) { days *= 1.15; setLam(); continue; }
+      box[best] = (box[best] || 0) + 1; left--;
+    }
+    return { box, lam, days };
+  }
+  const rsAvail = () => { const D = derive(), RV = reservedQty(), TR = inTransit(), A = {}; for (const i of S.items) A[i.sku] = Math.max(0, (D.st[i.sku] || 0) - (RV[i.sku] || 0) + (TR[i.sku] || 0)); return A; };
+  const rsTxt = (r) => (r.never ? "没卖过" : "一盒约 " + (r.wk >= 20 ? "20+" : r.wk < 1 ? "不到 1" : (Math.round(r.wk * 10) / 10)) + " 周卖完");
+  let rsSer = (() => { try { return localStorage.getItem("mk-rs-ser") || ""; } catch (_) { return ""; } })();
+  function renderRestock() {
+    if (!S.loaded) { $("rs-sec").hidden = true; return; }
+    const R = rsModel(), sers = allSeries().filter((x) => Object.values(R).some((r) => seriesOf(r.i) === x && !r.never));
+    $("rs-sec").hidden = !sers.length; if (!sers.length) return;
+    if (!sers.includes(rsSer)) rsSer = sers[0];
+    const A = rsAvail(), rows = Object.values(R).filter((r) => seriesOf(r.i) === rsSer).sort((a, b) => RS_TIERS.indexOf(a.tier) - RS_TIERS.indexOf(b.tier) || b.rate - a.rate);
+    const cnt = (t) => rows.filter((r) => r.tier === t).length;
+    $("rs-sum").innerHTML = "补货 <small>" + esc(rsSer) + " 卖得好 " + cnt("卖得好") + " 款 · 一般 " + cnt("一般") + " 款" + (cnt("很冷") ? " · 很冷 " + cnt("很冷") + " 款" : "") + "</small>";
+    $("rs-ser").innerHTML = sers.map((x) => '<button class="chip" type="button" data-rs-ser="' + esc(x) + '" aria-pressed="' + (x === rsSer) + '">' + esc(x) + "</button>").join("");
+    $("rs-basis").textContent = "按最近 8 周有货的日子算卖得多快（断货的日子不算，一单超过 3 根按 3 根）。一盒要卖几周：1.5 周内 卖得好 · 3 周内 一般 · 6 周内 偏冷 · 更久 很冷（不补）。";
+    let last = "";
+    $("rs-list").innerHTML = rows.map((r) => { const h = r.tier !== last ? '<div class="rs-tier">' + r.tier + "</div>" : ""; last = r.tier; const a = A[r.i.sku] || 0;
+      return h + '<div class="rs-row"><div class="rs-what"><span class="name">' + esc(enOf(r.i)) + '</span><span class="cn">' + esc(r.i.name) + "</span>" +
+        '<span class="dates">' + rsTxt(r) + (r.never ? "" : " · 8 周里有货 " + r.ins + " 天、卖 " + r.sold + " 根") + (r.few && !r.never ? ' · <b class="rs-few">数据少</b>' : "") + "</span></div>" +
+        '<span class="rs-side"><span class="pill' + (a > 0 ? "" : " bad") + '">' + (a > 0 ? "剩 " + a : "没货") + "</span></span></div>"; }).join("");
+  }
+  $("rs-sec").addEventListener("click", (e) => {
+    const c = e.target.closest("[data-rs-ser]"); if (c) { rsSer = c.dataset.rsSer; try { localStorage.setItem("mk-rs-ser", rsSer); } catch (_) {} renderRestock(); }
+    else if (e.target.closest("#rs-plan")) restockSheet(rsSer);
+  });
+  /* 补货单：这次补几盒、供货商有哪些（可以粘贴他的清单）→ 自动分盒子，每行能 + / −（改过的不再动），「做成订货单」带进订货单 */
+  function restockSheet(ser) {
+    const R = rsModel(), A = rsAvail();
+    const rows = Object.values(R).filter((r) => seriesOf(r.i) === ser).sort((a, b) => RS_TIERS.indexOf(a.tier) - RS_TIERS.indexOf(b.tier) || b.rate - a.rate);
+    const have = new Set(rows.filter((r) => !r.never).map((r) => r.i.sku)), fixed = {};
+    let n = RS_N, plan = { box: {}, lam: {} };
+    openSheet("补货单 · " + ser,
+      '<div class="rs-top"><span>这次补</span><button type="button" class="btn small" data-rsn="-1" aria-label="少一盒">−</button><input id="rs-n" type="number" min="1" step="1" inputmode="numeric" value="' + n + '" aria-label="补几盒"><button type="button" class="btn small" data-rsn="1" aria-label="多一盒">＋</button><span>盒（一盒 ' + RS_BOX + " 根）</span></div>" +
+      '<button type="button" class="linkbtn" id="rs-pastebtn" aria-expanded="false">粘贴供货商这次有的口味</button><div id="rs-pastebox" hidden><textarea id="rs-paste" rows="5" placeholder="把供货商发来的口味清单贴在这里"></textarea><button type="button" class="btn small" id="rs-parse">只留这些口味</button></div><p class="hint" id="rs-parsed" hidden></p>' +
+      '<p class="hint">勾掉供货商这次没有的；每行 − / ＋ 自己改（改过的不再自动动）。<button type="button" class="linkbtn" id="rs-reset">重新分</button></p>' +
+      '<div class="rs-plan" id="rs-rows"></div><p class="rs-total" id="rs-total"></p>' +
+      '<button type="button" class="btn ghost small" id="rs-copy">复制清单</button>',
+      async () => {
+        const lines = rows.filter((r) => (plan.box[r.i.sku] || 0) > 0).map((r) => [r.i.sku, plan.box[r.i.sku] * RS_BOX]);
+        if (!lines.length) throw userError("一盒也没分到，先勾上供货商有的口味。");
+        setTimeout(() => poForm(null, { series: ser, lines }), 0);
+        return "";
+      }, () => {
+        $("sheet-save").textContent = "做成订货单";
+        const draw = () => {
+          plan = rsAlloc(R, ser, rows.map((r) => r.i.sku).filter((s) => have.has(s)), n, A, fixed);
+          let last = "";
+          $("rs-rows").innerHTML = rows.map((r) => { const s = r.i.sku, on = have.has(s), b = plan.box[s] || 0, h = r.tier !== last ? '<div class="rs-tier">' + r.tier + "</div>" : ""; last = r.tier;
+            return h + '<div class="rs-prow' + (on ? "" : " off") + (fixed[s] != null ? " fixed" : "") + '"><label class="rs-have"><input type="checkbox" data-have="' + esc(s) + '"' + (on ? " checked" : "") + '><span><b>' + esc(enOf(r.i)) + "</b><small>" + esc(r.i.name) + " · " + (A[s] ? "剩 " + A[s] : "没货") + (on && plan.lam[s] != null ? " · 这批大概卖 " + Math.round(plan.lam[s]) + " 根" : r.never ? " · 没卖过" : r.tier === "很冷" ? " · 很冷，不补" : "") + "</small></span></label>" +
+              '<span class="rs-step"><button type="button" class="btn small" data-bx="-1" data-s="' + esc(s) + '"' + (on && b ? "" : " disabled") + ' aria-label="少一盒">−</button><b>' + b + '</b><button type="button" class="btn small" data-bx="1" data-s="' + esc(s) + '"' + (on ? "" : " disabled") + ' aria-label="多一盒">＋</button></span></div>'; }).join("");
+          const tot = Object.values(plan.box).reduce((a, b) => a + b, 0);
+          $("rs-total").innerHTML = "已分 <b>" + tot + "</b> / " + n + " 盒 · " + tot * RS_BOX + " 根 · 按这批大概卖 " + Math.round(plan.days) + " 天算" + (tot !== n ? ' <span class="warn">' + (tot < n ? "还差 " + (n - tot) + " 盒（勾上的只剩偏冷的，自己加）" : "多了 " + (tot - n) + " 盒") + "</span>" : "");
+        };
+        sheetOn("click", (e) => {
+          const bx = e.target.closest("[data-bx]"), nb = e.target.closest("[data-rsn]");
+          if (bx) { e.preventDefault(); const s = bx.dataset.s; fixed[s] = Math.max(0, (plan.box[s] || 0) + Number(bx.dataset.bx)); draw(); }
+          else if (nb) { e.preventDefault(); n = Math.max(1, n + Number(nb.dataset.rsn)); $("rs-n").value = n; draw(); }
+          else if (e.target.closest("#rs-reset")) { e.preventDefault(); for (const k in fixed) delete fixed[k]; draw(); }
+          else if (e.target.closest("#rs-pastebtn")) { e.preventDefault(); const b = $("rs-pastebox"); b.hidden = !b.hidden; $("rs-pastebtn").setAttribute("aria-expanded", String(!b.hidden)); if (!b.hidden) $("rs-paste").focus(); }
+          else if (e.target.closest("#rs-parse")) { e.preventDefault();
+            const r = window.FBParse.parseOrder($("rs-paste").value, rows.map((x) => ({ sku: x.i.sku, series: ser, variant: x.i.variant, name: x.i.name })), { series: ser });
+            if (!r.lines.length) { $("rs-parsed").textContent = "一种口味也没认出来，手动勾吧。"; $("rs-parsed").hidden = false; return; }
+            have.clear(); for (const l of r.lines) have.add(l.sku); for (const k in fixed) if (!have.has(k)) delete fixed[k];
+            $("rs-parsed").innerHTML = "认出 <b>" + r.lines.length + "</b> 种，只留这些。" + (r.unknown.length ? '<br><span class="warn">没认出（可能是没进过的新口味）：</span>' + esc(r.unknown.join(" ／ ")) : "");
+            $("rs-parsed").hidden = false; $("rs-pastebox").hidden = true; draw(); }
+          else if (e.target.closest("#rs-copy")) { e.preventDefault();
+            const L = rows.filter((x) => plan.box[x.i.sku]).map((x) => enOf(x.i) + "（" + x.i.name + "）× " + plan.box[x.i.sku] + " 盒");
+            copyText(ser + " 补货 " + fmtD(today()) + "\n" + L.join("\n") + "\n共 " + Object.values(plan.box).reduce((a, b) => a + b, 0) + " 盒"); }
+        });
+        sheetOn("change", (e) => {
+          const h = e.target.closest("[data-have]"); if (h) { if (h.checked) have.add(h.dataset.have); else { have.delete(h.dataset.have); delete fixed[h.dataset.have]; } draw(); }
+          else if (e.target.id === "rs-n") { const v = Math.round(Number($("rs-n").value)); if (v >= 1) { n = v; draw(); } }
+        });
+        draw();
+      }, { focus: false });
   }
   /* ---------- 口味排行（2026-11-16 Bowen）：一段时间里哪个口味卖得最好。两个标准：被几单买过（多少客人要）、一共卖了几根（出了多少货）。
      只算已经卖出的单（预定结算后才算）；一单里同一个口味只算一单。一单就占了一半以上根数的（批发）标出来，不然按根数排会被一个大单带偏 ---------- */
@@ -2337,26 +2465,6 @@ details.restock > summary::-webkit-details-marker { display: none; }
     if (d) rk.days = Number(d.dataset.rkDays); else if (sr) rk.ser = sr.dataset.rkSer; else if (e.target.closest("#rk-by")) rk.by = rk.by === "u" ? "n" : "u"; else if (e.target.closest("#rk-more")) rk.all = !rk.all; else return;
     try { localStorage.setItem(RK_KEY, JSON.stringify({ days: rk.days, ser: rk.ser, by: rk.by })); } catch (_) {}
     renderRank();
-  });
-  function renderRestock() {
-    if (!S.loaded) { $("rs-sec").hidden = true; return; }
-    const P = restockPlan();
-    $("rs-sec").hidden = !P.hot.length && !P.slow.length;
-    $("rs-sum").innerHTML = P.hot.length ? "补货建议 · " + P.hot.length + " 款要补 <small>共 " + P.hot.reduce((a, r) => a + r.need, 0) + " 根</small>" : "补货建议 <small>暂时不用补</small>";
-    $("rs-basis").textContent = "按最近 7 天（" + fmtD(P.since) + "起）每款的卖出速度，补到够卖一周。已扣掉预定，算上在途。";
-    $("rs-list").innerHTML = P.hot.length ? P.hot.map((r) => {
-      const out = r.avail <= 0, left = out ? "已断货" : r.days < 1 ? "不到 1 天卖完" : "约 " + Math.round(r.days) + " 天卖完";
-      return '<div class="rs-row"><div class="rs-what"><span class="name">' + esc(enOf(r.i)) + '</span><span class="cn">' + esc(seriesOf(r.i) + " · " + r.i.name) + "</span>" +
-        '<span class="dates">7 天卖了 ' + r.s + " 根 · 还能卖 " + Math.max(0, r.avail) + " 根" + (r.rv ? " · 预定 " + r.rv : "") + (r.tr ? " · 在途 " + r.tr : "") + "</span></div>" +
-        '<span class="rs-side"><span class="pill ' + (out ? "bad" : "warn") + '">' + left + '</span><b class="rs-need">补 ' + r.need + "<small>根</small></b></span></div>";
-    }).join("") : '<div class="empty">卖得快的几款都还够，暂时不用补。</div>';
-    $("rs-slow").hidden = !P.slow.length;
-    $("rs-slow").textContent = P.slow.length ? "这 7 天一根没卖、手上还有 3 根以上：" + P.slow.map((r) => seriesOf(r.i) + " " + r.i.name + " " + r.on + " 根").join("、") + "。先别补，发帖时可以重点推。" : "";
-  }
-  $("rs-copy").addEventListener("click", () => {
-    const P = restockPlan();
-    if (!P.hot.length) { toast("现在没有要补的款。"); return; }
-    copyText("补货单 " + fmtD(today()) + "\n" + P.hot.map((r) => seriesOf(r.i) + " " + enOf(r.i) + "（" + r.i.name + "）×" + r.need).join("\n") + "\n共 " + P.hot.reduce((a, r) => a + r.need, 0) + " 根");
   });
 
   function renderInventory() {
@@ -3132,7 +3240,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }, () => { $("sheet-save").textContent = "确认已付"; wirePay(() => poOweAmt(po)); });
   }
 
-  function poForm(pid) {
+  function poForm(pid, preset) { // preset = { series, lines: [[sku, 根数]] }（补货单带过来的）
     const po = pid ? S.purchases.find((p) => p.id === pid) : null;
     const recv = po ? poRecv(po.id) : {};
     const D = derive();
@@ -3325,6 +3433,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       $("f-date-edit").addEventListener("click", () => { $("f-date").hidden = false; $("f-date-edit").hidden = true; $("f-date").focus(); });
       $("f-date").addEventListener("change", dTxt); dTxt();
       flavSync();
+      if (preset) { pTab = preset.series || pTab; for (const [sku, q] of preset.lines) addSku(sku, q, true); }
       sheetOn("click", (e) => { const b = e.target.closest("[data-step]"); if (!b) return; const i = $(b.dataset.for); i.value = Math.max(0, (Number(i.value) || 0) + Number(b.dataset.step)); recalc(); });
       sheetOn("input", recalc); sheetOn("change", recalc); recalc();
       const seg = $("f-paidseg");
