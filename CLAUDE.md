@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-21 线上 fb-app-v31）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-21 线上 fb-app-v31，分支 feat-cost-book 是 v32）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -306,6 +306,16 @@
   - 记预定 / 编辑预定：写了客人名字自动带上他的地点、联系时间（自己点过地点就不动）；存预定后新地点进地点库、客人没有地点标签就打上、联系时间记到客户资料（afterMeet）。预定字段 call_win
   - 预定卡片：没写几点 =「今天 · 暂未确定时间」，下面一行绿字「下午 4–6 点联系」；地点 = 预定的，没有就用客人的；点开有「复制地点」
 - 测试 `tests/test_place_fu.py` 72/72（编的数据，旧/新结构）；test_followup / test_meet / test_mirror 跟着改
+
+## 其他成本账本（feat-cost-book，2026-11-21）
+- Bowen：配送的邮费、Facebook 广告费这些要算进去，作为一个账本。真实数据里 68 笔支出全是进货成本，以前的「记一笔支出」（下拉框选类别）从来没用过
+- 财务净赚那块：「货的成本」只算货（以前「成本」= 货 + 费用）；下面一行按钮 `#f-oc`「其他成本 $X · 广告费 $a · 邮费 $b　账本 ›」
+- `costForm(id, back)`：「记成本」（原「记一笔支出」）/ 改一笔。类别 COST_CATS 邮费 / 广告费 / 油费 / 包装 / 其他 一排标签（必须选；旧类别如「推广」编辑时多出一个标签）；「上次 $X」一点就填金额；说明框按类别提示；改的时候「删掉这笔」点两下。
+  每天明细里点非进货成本的「编辑」（expenseForm）也走这里；进货成本照旧走 expenseForm
+- `costBook()`：跟着财务选的时间段（本周 / 本月 / 上月 / 今年 / 全部），一共多少、按类别标签（点了只看那一类）、一笔一行点开改；今年 / 全部按月分。存完 / 删完回到账本
+- 存的还是 expenses（category 不是「进货成本」），净赚照旧扣（finBook 的 opex），新旧结构一样
+- 标题右边按钮 `.hd-btns` margin-top 34px：右上角同步状态里的「中转站待更新 ↻」能点，以前「地点」离它只有 10 像素
+- 测试 `tests/test_cost_book.py` 46/46（编的数据，旧/新结构）；test_v2_diff 第 8 步要先点类别
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超

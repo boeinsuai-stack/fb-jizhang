@@ -166,7 +166,7 @@ with sync_playwright() as p:
 
     # 8 记一笔支出
     def expense(pg):
-        pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(200); pg.click("#fin-exp"); pg.fill("#f-amt", "12.5"); pg.fill("#f-note", "油费"); save(pg)
+        pg.evaluate("location.hash = '#finance'"); pg.wait_for_timeout(200); pg.click("#fin-exp"); pg.check('input[name="f-ccatr"][value="油费"]'); pg.fill("#f-amt", "12.5"); pg.fill("#f-note", "送货"); save(pg)
     both(A, B, expense); compare("8 记一笔支出", A, B)
     br.close()
 

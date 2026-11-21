@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v31"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v32"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -54,7 +54,7 @@ main { display: grid; gap: 24px; }
 .top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
 /* 复制口味：Bowen 打开 App 最常做的一件事，放在标题右边，一打开就点得到（以前在快速下单格子下面，要往下找） */
 .hd-copy { padding: 10px 16px; font-size: .95rem; }
-.hd-btns { align-self: flex-end; margin-bottom: 4px; display: flex; gap: 8px; }
+.hd-btns { align-self: flex-end; margin: 34px 0 4px; display: flex; gap: 8px; } /* 右上角「中转站待更新 ↻」也能点：按钮往下让开（2026-11-21 Bowen：地点离它太近） */
 .eyebrow { margin: 0 0 4px; font-size: .75rem; letter-spacing: .08em; color: var(--muted); }
 h1 { font-family: var(--font-display); font-weight: 700; font-size: 2.4rem; line-height: 1; margin: 0; letter-spacing: .01em; }
 /* 底部导航：手机单手就能换页，滑到哪都在 */
@@ -759,6 +759,14 @@ details.restock > summary::-webkit-details-marker { display: none; }
 .fu-body { display: grid; gap: 4px; padding: 0 16px 14px; } .fu-body .l-actions { margin-top: 6px; }
 .fu2[open] > summary { padding-bottom: 6px; }
 .fu-later { border-top: 1px solid var(--line); } .fu-later > summary { cursor: pointer; padding: 11px 16px; color: var(--muted); font-size: .88rem; }
+.hero-oc { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; margin-top: 10px; padding: 10px 0 0; border: 0; border-top: 1px solid var(--line); background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.hero-oc b { font-weight: 700; } .hero-oc small { color: var(--muted); font-size: .8rem; }
+.cb-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; } .cb-top .k { display: block; font-size: .8rem; color: var(--muted); } .cb-tot { font-size: 1.6rem; font-weight: 700; }
+.cb-list { display: grid; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.cb-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 12px; border: 0; border-top: 1px solid var(--line); background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; } .cb-row:first-child { border-top: 0; }
+.cb-row[hidden] { display: none; }
+.cb-l { display: grid; gap: 2px; min-width: 0; } .cb-d { font-size: .88rem; } .cb-n { font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
+.cb-month { display: flex; justify-content: space-between; padding: 8px 12px; background: var(--hover); font-size: .82rem; color: var(--muted); } .cb-month[hidden] { display: none; }
 .tag.tag-vip { background: var(--warn-soft); color: var(--warn); font-weight: 700; }
 .tag-pl { font-size: .72rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
 .rv-call { font-size: .82rem; color: var(--accent); font-weight: 600; }
@@ -994,16 +1002,17 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <div class="hero-main"><div class="hero-top"><span class="k" id="f-hero-k">本月净赚</span><span class="wkarr" id="f-wkarr" hidden><button type="button" data-wk="-1" aria-label="上一周">‹</button><button type="button" data-wk="1" aria-label="下一周">›</button></span></div><span class="v" id="f-profit">–</span></div>
       <div class="hero-row">
         <div><span class="k">收入（含配送费）</span><b id="f-inc">–</b></div>
-        <div><span class="k">成本</span><b id="f-exp">–</b></div>
+        <div><span class="k">货的成本</span><b id="f-exp">–</b></div>
         <div><span class="k">卖出</span><b id="f-qty">–</b></div>
       </div>
+      <button class="hero-oc" type="button" id="f-oc"></button>
       <p class="hero-sub" id="f-sers"></p>
       <div class="pay-sum" id="f-paysum"></div>
     </div>
     <div class="callout" id="f-missing" hidden></div>
     <div class="actions">
       <button class="btn primary" id="fin-sale" type="button">记一笔卖出</button>
-      <button class="btn" id="fin-exp" type="button">记一笔支出</button>
+      <button class="btn" id="fin-exp" type="button">记成本</button>
       <button class="btn ghost" id="fin-fee" type="button">记代送费</button>
       <button class="btn ghost" id="fin-xfer" type="button" hidden>合伙人往来</button>
     </div>
@@ -1135,6 +1144,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
   /* live total of an open form, or null while prices are missing */
   const formTotalNum = (ls, fee) => { if (lumpOn()) { const v = numOrNull($("f-lump").value); return v == null ? null : r2(v + fee); } if (!ls.length || ls.some((l) => l.price == null)) return null; return r2(ls.reduce((a, l) => a + l.qty * l.price, 0) + fee); };
   const EXP = ["进货成本", "包装材料", "配送/油费", "推广", "其他"];
+  /* 其他成本（2026-11-21 Bowen：配送的邮费、Facebook 广告费这些要算进去，单独一个账本）：进货成本以外的支出，净赚照旧扣掉 */
+  const COST_CATS = ["邮费", "广告费", "油费", "包装", "其他"];
+  const COST_HINT = { 邮费: "寄给谁 / 哪一单（可不填）", 广告费: "哪个广告、投了几天（可不填）", 油费: "去哪送货（可不填）", 包装: "买了什么（可不填）", 其他: "花在什么上" };
   const TYPE = { in: "进货", out: "卖出", adjust: "盘点调整" };
   const typeOf = (m) => (m.transfer_id ? (m.type === "in" ? "合伙人给我" : "给合伙人") : TYPE[m.type] || m.type);
   const FOLDER_ID = "";
@@ -2157,8 +2169,69 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }, () => { $("f-series").addEventListener("change", serNew); });
   }
 
+  /* 其他成本：一笔（类别是一排标签；「上次 $X」一点就填金额；改的时候可以删） */
+  function costForm(id, back) {
+    const x = id ? S.expenses.find((e) => e.id === id) : null;
+    const cats = COST_CATS.concat(x && x.category && !COST_CATS.includes(x.category) ? [x.category] : []);
+    let cat = x ? x.category || "其他" : "";
+    const lastOf = (c) => S.expenses.filter((e) => e.category === c && (!x || e.id !== x.id)).sort((a, b) => (b.date + (b.at || "")).localeCompare(a.date + (a.at || "")))[0] || null;
+    openSheet(x ? "改一笔成本" : "记成本",
+      '<div class="field"><span class="lbl">什么钱</span><div class="chips" id="f-ccat" role="radiogroup" aria-label="什么钱">' + cats.map((c) => '<label class="chip"><input type="radio" name="f-ccatr" value="' + esc(c) + '"' + (c === cat ? " checked" : "") + "> " + esc(c) + "</label>").join("") + "</div></div>" +
+      '<div class="field"><label for="f-amt">金额 $</label><input id="f-amt" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(x ? x.amount : "") + '"><div class="chips" id="f-clast"></div></div>' +
+      '<div class="field"><label for="f-note">说明</label><input id="f-note" value="' + esc(x ? x.note || "" : "") + '" placeholder="' + esc(COST_HINT[cat] || "可不填") + '"></div>' +
+      '<div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + esc(x ? x.date : today()) + '"></div>' +
+      (x ? '<button type="button" class="btn ghost danger small" id="f-cdel">删掉这笔</button>' : ""),
+      async () => {
+        needDb();
+        const c = (document.querySelector('input[name="f-ccatr"]:checked') || {}).value; if (!c) throw userError("选一下是什么钱（邮费、广告费…）。");
+        const amount = numOrNull($("f-amt").value); if (amount == null || amount <= 0) throw userError("请填大于 0 的金额。");
+        const data = { date: $("f-date").value || today(), amount: r2(amount), category: c, note: $("f-note").value.trim() };
+        if (x) await db.doc("expenses/" + x.id).update(data); else await db.collection("expenses").doc(rid("e")).set(Object.assign({ at: new Date().toISOString() }, data));
+        if (back) setTimeout(costBook, 0);
+        return (x ? "改好了：" : "记了一笔") + c + " " + money(data.amount) + "，净赚已经扣掉。";
+      }, () => {
+        const sync = () => {
+          cat = (document.querySelector('input[name="f-ccatr"]:checked') || {}).value || "";
+          $("f-note").placeholder = COST_HINT[cat] || "可不填";
+          const L = cat && lastOf(cat);
+          $("f-clast").innerHTML = L ? '<button type="button" class="chip" data-last="' + esc(L.amount) + '">上次 ' + money(L.amount) + "（" + fmtD(L.date) + "）</button>" : "";
+        };
+        $("f-ccat").addEventListener("change", sync); sync();
+        $("f-clast").addEventListener("click", (e) => { const b = e.target.closest("[data-last]"); if (b) $("f-amt").value = b.dataset.last; });
+        const del = $("f-cdel"); if (del) del.addEventListener("click", async () => {
+          if (!del.dataset.sure) { del.dataset.sure = "1"; del.textContent = "确定删掉？再点一下"; return; }
+          try { needDb(); await db.doc("expenses/" + x.id).delete(); closeSheet(); toast("已删掉这笔" + (x.category || "") + " " + money(x.amount) + "。"); if (back) costBook(); } catch (e) { toast(e.userMsg || errText(e)); }
+        });
+      }, { focus: false });
+  }
+  /* 其他成本账本：跟着财务上面选的时间段（本周 / 本月 / 全部…），按类别合计，点一笔改；一年 / 全部按月分 */
+  function costBook() {
+    const xs = S.expenses.filter((x) => x.category !== "进货成本" && inPeriod(x.date)).sort((a, b) => (b.date + (b.at || "")).localeCompare(a.date + (a.at || "")));
+    const tot = r2(xs.reduce((a, x) => a + (Number(x.amount) || 0), 0)), cats = {};
+    for (const x of xs) { const c = x.category || "其他"; cats[c] = r2((cats[c] || 0) + (Number(x.amount) || 0)); }
+    const byMonth = period === "year" || period === "all", months = {};
+    for (const x of xs) { const k = (x.date || "").slice(0, 7); months[k] = r2((months[k] || 0) + (Number(x.amount) || 0)); }
+    let lastM = "";
+    const rows = xs.map((x) => { const m = (x.date || "").slice(0, 7), head = byMonth && m !== lastM ? '<div class="cb-month"><span>' + Number(m.slice(5)) + "月</span><b>" + money(months[m]) + "</b></div>" : ""; lastM = m;
+      return head + '<button type="button" class="cb-row" data-cb="' + esc(x.id) + '" data-cat="' + esc(x.category || "其他") + '"><span class="cb-l"><span class="cb-d">' + fmtD(x.date) + " · " + esc(x.category || "其他") + "</span>" + (x.note ? '<span class="cb-n">' + esc(x.note) + "</span>" : "") + "</span><b>" + money(x.amount) + "</b></button>"; }).join("");
+    openSheet("其他成本 · " + plabel(),
+      '<div class="cb-top"><div><span class="k">一共</span><b class="cb-tot">' + money(tot) + '</b></div><button type="button" class="btn primary" id="cb-add">＋ 记一笔</button></div>' +
+      (Object.keys(cats).length > 1 ? '<div class="chips" id="cb-cats"><button type="button" class="chip" data-f="" aria-pressed="true">全部</button>' + Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([c, v]) => '<button type="button" class="chip" data-f="' + esc(c) + '" aria-pressed="false">' + esc(c) + " " + money(v) + "</button>").join("") + "</div>" : Object.keys(cats).length ? '<p class="hint">' + Object.keys(cats).map((c) => esc(c) + " " + money(cats[c])).join("") + "</p>" : "") +
+      (xs.length ? '<div class="cb-list">' + rows + "</div>" : '<p class="hint">' + esc(plabel()) + "还没记其他成本。邮费、Facebook 广告费、油费、包装都记在这里，净赚会扣掉。</p>"),
+      async () => "", () => {
+        $("sheet-form").querySelector(".sheet-actions").hidden = true;
+        sheetOn("click", (e) => {
+          const r = e.target.closest("[data-cb]"), f = e.target.closest("#cb-cats [data-f]");
+          if (r) { e.preventDefault(); costForm(r.dataset.cb, true); }
+          else if (e.target.closest("#cb-add")) { e.preventDefault(); costForm(null, true); }
+          else if (f) { e.preventDefault(); $("cb-cats").querySelectorAll(".chip").forEach((x) => x.setAttribute("aria-pressed", String(x === f)));
+            document.querySelectorAll(".cb-row").forEach((x) => { x.hidden = !!f.dataset.f && x.dataset.cat !== f.dataset.f; }); document.querySelectorAll(".cb-month").forEach((x) => { x.hidden = !!f.dataset.f; }); }
+        });
+      }, { focus: false });
+  }
   function expenseForm(id) {
     const x = id ? S.expenses.find((e) => e.id === id) : null;
+    if (x && x.category !== "进货成本") return costForm(id);
     const html =
       '<div class="grid2"><div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + esc(x ? x.date : today()) + '"></div>' +
       '<div class="field"><label for="f-amt">金额 $</label><input id="f-amt" type="number" min="0" step="0.01" inputmode="decimal" value="' + esc(x ? x.amount : "") + '"></div></div>' +
@@ -2633,7 +2706,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
       (period !== "last" ? '<button class="btn small" type="button" data-p="last">看上月</button>' : "") + '<button class="btn small" type="button" data-p="all">看全部</button>';
     $("f-profit").textContent = L ? money(T.net) : "–"; $("f-profit").className = "v" + (T.net < 0 ? " bad" : "");
     $("f-inc").textContent = L ? money(T.rev) : "–";
-    $("f-exp").textContent = L ? money(r2(T.cost + T.opex)) : "–";
+    $("f-exp").textContent = L ? money(T.cost) : "–";
+    const ocs = Object.entries(FB.cats).sort((a, b) => b[1] - a[1]);
+    $("f-oc").innerHTML = '<span>其他成本 <b>' + money(T.opex) + "</b>" + (ocs.length ? '<small> · ' + ocs.map(([c, v]) => esc(c) + " " + money(v)).join(" · ") + "</small>" : '<small> · 邮费、广告费…</small>') + '</span><span class="pt-more">账本 ›</span>';
     $("f-qty").textContent = L ? T.qty + " 根" : "–";
     $("f-paysum").innerHTML = L ? paySum(FB.list.flatMap((d) => d.orders.flatMap(({ o, b }) => payParts(o, b.rev)))) : "";
     $("f-sers").textContent = L ? ([serTxt(PQ), T.fee ? "含配送费 " + money(T.fee) : "", T.n ? T.n + " 单" : ""].filter(Boolean).join(" · ") || "这段时间还没有卖出。") : "";
@@ -2972,7 +3047,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }, { passive: true });
   }
   $("fin-sale").addEventListener("click", () => saleForm(""));
-  $("fin-exp").addEventListener("click", () => expenseForm(null));
+  $("fin-exp").addEventListener("click", () => costForm(null));
+  $("f-oc").addEventListener("click", () => costBook());
   $("fin-xfer").addEventListener("click", () => xferForm(""));
   $("inv-xfer").addEventListener("click", () => xferForm(""));
   $("xfers").addEventListener("click", (e) => { const t = e.target.closest("[data-void-xfer]"); if (t) arm(t, "确认撤销？", () => voidXfer(t.dataset.voidXfer)); });
