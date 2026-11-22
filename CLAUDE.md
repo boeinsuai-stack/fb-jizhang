@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-22 线上 fb-app-v32）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-22 线上 fb-app-v32，分支 feat-po-tidy 是 v33）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -342,6 +342,17 @@
 - saleForm 预定时（layout()）：客户 + 提示 + 交货挪到口味下面（DOM 挪动，记卖出时放回配送费下面）；付款方式 `#f-payf` 收起来，`#f-payshow`「付款方式（结算时再选；已经付了点这里）」；已经选了付款方式的照样显示
 - 「按整单总价」= 加一行旁边的小开关 `.addrow .lumpchip`（lumpWrapHtml；别的表还用 lumpHtml 整行）；配送费 `.fee-row` 一行（placeholder「0（自取）」）
 - 测试 `tests/test_resv_form.py` 36/36；test_meet / test_place_fu / test_cust_bal 填时间前先点「约好了」、预定选付款前先点 #f-payshow
+
+## 订货整理（feat-po-tidy，2026-11-23）
+- Bowen：粘贴清单能不能认「几盒」；按系列填几根更方便；订完货的卡片是一个很乱的大方框，要按系列从上往下排、× 几盒、最后每个系列合计几盒
+- **orderparse.js 认盒**：2盒 / x2盒 / 2 box(es) / 2bx / 盒 x2 / 中文数字（一盒、两盒、十盒、十二支）→ × opts.box（默认 10）；写根 / 支的照旧；
+  没写单位的数字：opts.unit（"box" / "pc"），没给就看这段文字——有写盒、没写根 / 支的按盒，不然按根。返回 { unit, bare }，每行 boxes
+  - 以前「2盒」被当成 2 根（错的）。测试：orderparse_test 逐条 + 盲测 2（300 份按盒写的，认错 0；真实口味表也 0）
+- 订货单表单：识别结果 `#f-parsed` 挪到口味格子下面、口味行上面（识别完滚到这里）；有没写单位的数字时出「没写单位的数字按 盒 / 根 算」可切（先减掉上次加的再重加）；
+  系列框头写几盒（boxTxt：正好整盒写盒，不然写根）；「按系列一起改」每个系列一行 `.po-sr`：每种几根（data-srq）+ 每根 $（data-sr），去掉了全部一起的「每种都订」（#f-allq）
+- 订货单卡片（renderPurchases）：标题 = 每个系列几盒；`details.po-items`（没完成的默认展开）里按系列 `.po-sg` 往下排，每种 `× N 盒`（成本一样的写在系列头上）、右边「已到 x · 差 y / 到齐」；最后 `.po-tot` 合计；
+  到货记录一笔一行「X月X日 到货 N 盒（M 根）」点开看口味；修了「现金 · 现金」重复；只知道系列的写「口味到货再分」
+- 测试 `tests/test_po_tidy.py` 28/28；test_pay_mix 改成按系列的框
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超

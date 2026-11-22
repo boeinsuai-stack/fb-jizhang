@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v32"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v33"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -634,6 +634,15 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 .rs-need { font-family: var(--font-display); font-weight: 700; font-size: 1.5rem; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rs-need small { font-family: var(--font-body); font-size: .72rem; font-weight: 400; color: var(--muted); margin-left: 2px; }
 .restock .empty { padding: 10px 0; }
+.po-items > summary { cursor: pointer; font-size: .85rem; color: var(--muted); padding: 6px 0; }
+.po-sg { margin-top: 8px; } .po-sgh { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0 4px; border-bottom: 1px solid var(--line); font-size: .88rem; } .po-sgh span { color: var(--muted); font-size: .82rem; }
+.po-it { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 6px 0 6px 10px; border-bottom: 1px dashed var(--line); }
+.po-n { min-width: 0; display: grid; } .po-n small { color: var(--muted); font-size: .76rem; }
+.po-q { white-space: nowrap; text-align: right; display: grid; font-variant-numeric: tabular-nums; font-weight: 600; } .po-q small { font-weight: 400; color: var(--muted); font-size: .74rem; } .po-q small.left { color: var(--warn); }
+.po-rc li { align-items: flex-start; } .po-rc details { flex: 1; min-width: 0; } .po-rc summary { cursor: pointer; } .po-rc small { display: block; color: var(--muted); font-size: .78rem; margin-top: 4px; }
+.po-tot { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-weight: 600; font-size: .9rem; }
+.po-sr { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; } .po-sr label { display: flex; align-items: center; gap: 4px; font-size: .85rem; white-space: nowrap; } .po-sr input { width: 4.6em; }
+.po-serp { display: grid; gap: 8px; } .po-unit { margin-top: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: .88rem; }
 .rs-tier { padding: 10px 16px 4px; font-size: .78rem; font-weight: 700; color: var(--muted); }
 .rs-few { font-weight: 600; color: var(--warn); } .rs-ask { font-weight: 600; color: var(--accent); }
 .askbtn { border: 1px dashed var(--line); background: none; border-radius: 999px; padding: 3px 9px; font: inherit; font-size: .74rem; color: var(--muted); cursor: pointer; white-space: nowrap; } .askbtn b { color: var(--accent); }
@@ -2324,6 +2333,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
      用真实数据回测过（见 CLAUDE.md）：一款一周只卖几根，「这周卖得好」大多是噪音 → 看最近 8 周、只算有货的日子、一单超过 3 根按 3 根（大单不带偏）、
      数据少的往同系列平均拉（相当于先当它卖了 14 天平均速度）。分档按「一盒 10 根要卖几周」：≤1.5 卖得好 · ≤3 一般 · ≤6 偏冷（最多补一盒）· 更久且有货满 3 周 很冷（不补）；没进过的只标出来
      分盒子：这批（N 盒 + 手上的）按各口味的速度份额估「这批里大概卖几根」，一盒一盒给「多这一盒能多卖出最多」的口味（泊松分布的期望） ---------- */
+  const PO_BOX = 10; // 一盒 10 根（Bowen：订货按盒，一盒一个口味）
+  const boxTxt = (q) => (q % PO_BOX === 0 && q > 0 ? q / PO_BOX + " 盒" : q + " 根"); // 正好整盒写盒，不然写根
   const RS_WIN = 56, RS_PRIOR = 14, RS_FEW = 14, RS_BOX = 10, RS_N = 20, ASK_DAYS = 28;
   /* 客人问了、但没货（2026-11-22 Bowen 同意加）：存在 followups，kind "ask"、done true（不进跟进列表）；断货时卖出记录是 0，这是唯一看得到需求的地方 */
   function asksOf(days) {
@@ -3322,15 +3333,14 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="po-flav"><div class="po-fh"><span class="flabel">指定口味 · 点口味加一根，再改根数</span><button type="button" class="btn ghost small" id="f-pastebtn" aria-expanded="false">粘贴清单</button></div>' +
         '<div id="f-pastebox" class="po-paste" hidden><textarea id="f-paste" rows="5" placeholder="把要订的清单粘贴进来，例如：&#10;Bar Pro&#10;Banana Buzz ×5&#10;蓝莓冰 3 根"></textarea>' +
           '<div class="actions"><button type="button" class="btn small" id="f-parse">识别口味</button><span class="hint">认出来的会加到下面，根数照清单填</span></div></div>' +
-        '<div class="callout po-parsed" id="f-parsed" hidden></div>' +
         '<div class="chips" id="f-ptabs" role="group" aria-label="按系列看口味">' + SERS.map((sr, k) => '<button type="button" class="chip" data-pt="' + esc(sr) + '" aria-pressed="' + (k === 0) + '">' + esc(sr) + "</button>").join("") + "</div>" +
         '<input id="f-pq" type="search" placeholder="搜口味（英文、中文都行）" aria-label="搜口味">' +
         '<div class="tiles po-tiles" id="f-ptiles"></div>' +
+        '<div class="callout po-parsed" id="f-parsed" hidden></div>' +
         '<div class="lines-head"><span>香型</span><span>订多少根</span><span>单根成本 $</span><span></span></div>' +
         '<div id="f-lines"></div>' +
-        '<div class="po-bulk" id="f-bulk" hidden><span class="flabel">选中的一起改</span>' +
-          '<label class="po-all" id="f-allbox" hidden>每种都订 <input id="f-allq" type="number" min="1" step="1" inputmode="numeric" aria-label="每种都订多少根"> 根</label>' +
-          '<div class="po-serp" id="f-serp"></div></div>' +
+        /* 每个系列一行：每种几根、每根 $（2026-11-23 Bowen：按系列填比「全部每种都订」方便） */
+        '<div class="po-bulk" id="f-bulk" hidden><span class="flabel">按系列一起改</span><div class="po-serp" id="f-serp"></div></div>' +
       "</div>" +
       '<details class="fold"' + (SERS.some((sr) => serLine(sr)) ? " open" : "") + '><summary>只知道系列，口味到货再分</summary>' +
       SERS.map((sr, k) => { const l = serLine(sr), unit = l ? l.unit_cost : defaultPickCost(sr);
@@ -3399,29 +3409,35 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const srs = SERS.filter((sr) => cnt[sr] >= 2), box = $("f-serp"), sig = srs.join("|");
       if (box.dataset.sig !== sig) {
         box.dataset.sig = sig;
-        box.innerHTML = srs.map((sr) => '<label class="po-gc">' + esc(sr) + ' 每根 $<input type="number" min="0" step="0.01" inputmode="decimal" data-sr="' + esc(sr) + '" value="' + esc(serVal[sr] != null ? serVal[sr] : "") + '" placeholder="同一个价" aria-label="' + esc(sr) + ' 每根成本一起改"></label>').join("");
+        box.innerHTML = srs.map((sr) => '<div class="po-sr"><b>' + esc(sr) + '</b><label>每种 <input type="number" min="1" step="1" inputmode="numeric" data-srq="' + esc(sr) + '" placeholder="10" aria-label="' + esc(sr) + ' 每种订几根"> 根</label>' +
+          '<label>每根 $<input type="number" min="0" step="0.01" inputmode="decimal" data-sr="' + esc(sr) + '" value="' + esc(serVal[sr] != null ? serVal[sr] : "") + '" placeholder="同价" aria-label="' + esc(sr) + ' 每根成本一起改"></label></div>').join("");
       }
-      $("f-allbox").hidden = rows.length < 2;
-      $("f-bulk").hidden = rows.length < 2 && !srs.length;
+      $("f-bulk").hidden = !srs.length;
     }
     function flavSync() {
       const rows = $("f-lines").querySelectorAll(".line");
       bulkSync();
       $("f-lines").querySelectorAll(".po-grp").forEach((g) => { const rs = g.querySelectorAll(".line"); if (!rs.length) { g.remove(); return; }
-        g.querySelector(".po-gn").textContent = Array.from(rs).reduce((a, r) => a + (Number($("f-qty-" + r.dataset.line).value) || 0), 0) + " 根"; });
+        g.querySelector(".po-gn").textContent = boxTxt(Array.from(rs).reduce((a, r) => a + (Number($("f-qty-" + r.dataset.line).value) || 0), 0)); });
       renderTiles(); recalc();
     }
-    function parsePaste() {
-      const txt = $("f-paste").value; if (!txt.trim()) { toast("先把清单粘贴进来。"); return; }
-      const r = window.FBParse.parseOrder(txt, list.map((i) => ({ sku: i.sku, series: seriesOf(i), variant: i.variant, name: i.name })), { series: pTab });
-      for (const l of r.lines) addSku(l.sku, l.qty, true);
+    let lastParse = null; // { txt, lines }：切换「按盒 / 按根」时先把上一次加的减掉
+    function parsePaste(unit) {
+      const txt = unit ? lastParse.txt : $("f-paste").value; if (!txt.trim()) { toast("先把清单粘贴进来。"); return; }
+      if (unit && lastParse) for (const l of lastParse.lines) { const r0 = rowOf(l.sku); if (r0) { const inp = $("f-qty-" + r0.dataset.line); inp.value = Math.max(0, (Number(inp.value) || 0) - l.qty); if (Number(inp.value) <= 0) r0.remove(); } }
+      const r = window.FBParse.parseOrder(txt, list.map((i) => ({ sku: i.sku, series: seriesOf(i), variant: i.variant, name: i.name })), { series: pTab, unit, box: PO_BOX });
+      for (const l of r.lines) addSku(l.sku, l.qty, !unit);
+      if (unit) flavSync();
+      lastParse = { txt, lines: r.lines.map((l) => ({ sku: l.sku, qty: l.qty })) };
       const lab = (sku) => enOf(itemBy(sku)), as = r.lines.filter((l) => l.assumed), nq = r.lines.filter((l) => l.noQty);
-      $("f-parsed").innerHTML = (r.lines.length ? "认出 <b>" + r.lines.length + "</b> 种、共 <b>" + r.lines.reduce((a, l) => a + l.qty, 0) + "</b> 根，已加到下面。" : "一种口味也没认出来。") +
+      const tot = r.lines.reduce((a, l) => a + l.qty, 0);
+      $("f-parsed").innerHTML = (r.lines.length ? "认出 <b>" + r.lines.length + "</b> 种、共 <b>" + (tot % PO_BOX ? tot + "</b> 根" : tot / PO_BOX + "</b> 盒（" + tot + " 根）") + "，已加到下面。" : "一种口味也没认出来。") +
+        (r.bare && r.lines.length ? '<div class="po-unit">没写单位的数字按 <span class="chips seg"><button type="button" class="chip" data-pu="box" aria-pressed="' + (r.unit === "box") + '">盒</button><button type="button" class="chip" data-pu="pc" aria-pressed="' + (r.unit === "pc") + '">根</button></span> 算（一盒 ' + PO_BOX + " 根）</div>" : "") +
         (as.length ? '<br><span class="warn">系列是猜的，看一下对不对：</span>' + esc(as.map((l) => lab(l.sku) + "（按 " + seriesOf(itemBy(l.sku)) + "）").join("、")) : "") +
         (nq.length ? '<br><span class="warn">没写根数，先按 1：</span>' + esc(nq.map((l) => lab(l.sku)).join("、")) : "") +
         (r.unknown.length ? '<br><span class="warn">没认出（在下面点口味手动加）：</span>' + esc(r.unknown.join(" ／ ")) : "");
       $("f-parsed").hidden = false;
-      if (r.lines.length) { $("f-pastebox").hidden = true; $("f-pastebtn").setAttribute("aria-expanded", "false"); }
+      if (r.lines.length) { $("f-pastebox").hidden = true; $("f-pastebtn").setAttribute("aria-expanded", "false"); setTimeout(() => $("f-parsed").scrollIntoView({ block: "start", behavior: "smooth" }), 50); }
     }
     function readLines(strict) {
       const out = [];
@@ -3492,8 +3508,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
       $("f-ptabs").addEventListener("click", (e) => { const c = e.target.closest("[data-pt]"); if (!c) return; pTab = c.dataset.pt; pQ = ""; $("f-pq").value = ""; renderTiles(); });
       $("f-pq").addEventListener("input", () => { pQ = $("f-pq").value; renderTiles(); });
       $("f-pastebtn").addEventListener("click", () => { const box = $("f-pastebox"); box.hidden = !box.hidden; $("f-pastebtn").setAttribute("aria-expanded", String(!box.hidden)); if (!box.hidden) $("f-paste").focus(); });
-      $("f-parse").addEventListener("click", parsePaste);
-      $("f-allq").addEventListener("input", () => { const q = Number($("f-allq").value); if (!Number.isInteger(q) || q < 1) return; $("f-lines").querySelectorAll(".line").forEach((r) => { $("f-qty-" + r.dataset.line).value = q; }); flavSync(); });
+      $("f-parse").addEventListener("click", () => parsePaste());
+      $("f-parsed").addEventListener("click", (e) => { const b = e.target.closest("[data-pu]"); if (b && lastParse && b.getAttribute("aria-pressed") !== "true") parsePaste(b.dataset.pu); });
+      $("f-serp").addEventListener("input", (e) => { const sr = e.target.dataset.srq; if (sr == null) return; const q = Number(e.target.value); if (!Number.isInteger(q) || q < 1) return;
+        $("f-lines").querySelectorAll(".po-grp").forEach((g) => { if (g.dataset.sr === sr) g.querySelectorAll(".line").forEach((r) => { $("f-qty-" + r.dataset.line).value = q; }); }); flavSync(); });
       const dTxt = () => { const v = $("f-date").value || today(); $("f-date-txt").textContent = v === today() ? "今天" : fmtD(v); };
       $("f-date-edit").addEventListener("click", () => { $("f-date").hidden = false; $("f-date-edit").hidden = true; $("f-date").focus(); });
       $("f-date").addEventListener("change", dTxt); dTxt();
@@ -3679,16 +3697,27 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const rcpts = {};
       for (const m of S.moves) if (m.po_id === po.id) { (rcpts[m.receipt_id] = rcpts[m.receipt_id] || { date: m.date, items: [] }).items.push(m); }
       const rlist = Object.entries(rcpts).sort((a, b) => (a[1].date || "").localeCompare(b[1].date || ""));
+      /* 2026-11-23 Bowen：以前是一大段口味连在一起 + 表格，很乱 → 按系列一个一个往下排，每种「× N 盒」，最后合计每个系列几盒 */
+      const lnSer = (l) => (isSerLine(l) ? l.series : seriesOf(itemBy(l.sku)) || l.series || "其他");
+      const grp = {}; for (const l of po.lines || []) (grp[lnSer(l)] = grp[lnSer(l)] || []).push(l);
+      const gks = Object.keys(grp).sort((a, b) => (SERIES.indexOf(a) + 1 || 99) - (SERIES.indexOf(b) + 1 || 99));
+      const sum = (ls) => ls.reduce((a, l) => a + (Number(l.qty) || 0), 0), allQ = sum(po.lines || []), gotQ = (po.lines || []).reduce((a, l) => a + Math.min(l.qty, recv[lineKey(l)] || 0), 0);
+      const serSum = gks.map((k) => k + " " + boxTxt(sum(grp[k]))).join(" · ");
+      const items = gks.map((k) => { const ls = grp[k], cs = [...new Set(ls.map((l) => l.unit_cost))], one = cs.length === 1 && cs[0] != null;
+        return '<div class="po-sg"><div class="po-sgh"><b>' + esc(k) + "</b><span>" + boxTxt(sum(ls)) + (one ? " · " + money(cs[0]) + "/根" : "") + "</span></div>" +
+          ls.map((l) => { const g = recv[lineKey(l)] || 0, lf = Math.max(0, l.qty - g);
+            return '<div class="po-it"><span class="po-n">' + (isSerLine(l) ? "口味到货再分" : esc(nm(l.sku, l.name)) + "<small>" + esc((itemBy(l.sku) || {}).name || "") + "</small>") + "</span>" +
+              '<span class="po-q">× ' + boxTxt(l.qty) + (one || l.unit_cost == null ? "" : "<small>" + money(l.unit_cost) + "/根</small>") + (g && lf ? '<small class="left">已到 ' + g + " · 差 " + lf + "</small>" : g ? "<small>到齐</small>" : "") + "</span></div>"; }).join("") + "</div>"; }).join("");
       return '<article class="po">' +
-        '<div class="po-head"><div><span class="l-date">订货 ' + fmtD(po.date) + (po.supplier ? " · " + esc(po.supplier) : "") + '</span><b class="po-title">' + esc(po.note || poLinesTxt(po)) + "</b>" +
-          '<span class="l-sub">' + (poUnpaid(po) ? "还没付" + (po.supplier ? "，记在你欠 " + esc(po.supplier) + " 的账里" : "") : "已付" + (po.paid_date ? " " + fmtD(po.paid_date) : "") + (po.payment ? " · " + esc(payWords(po, poOweAmt(po))) : "") + (po.settlement_id ? " · 跟" + esc(poWho(po)) + "结账时一起付" : po.payment ? " · " + esc(po.payment) : "")) + "</span></div>" +
+        '<div class="po-head"><div><span class="l-date">订货 ' + fmtD(po.date) + (po.supplier ? " · " + esc(po.supplier) : "") + '</span><b class="po-title">' + esc(serSum || "（没有口味）") + "</b>" + (po.note ? '<span class="l-sub">' + esc(po.note) + "</span>" : "") +
+          '<span class="l-sub">' + (poUnpaid(po) ? "还没付" + (po.supplier ? "，记在你欠 " + esc(po.supplier) + " 的账里" : "") : "已付" + (po.paid_date ? " " + fmtD(po.paid_date) : "") + (po.payment ? " · " + esc(payWords(po, poOweAmt(po))) : "") + (po.settlement_id ? " · 跟" + esc(poWho(po)) + "结账时一起付" : "")) + "</span></div>" +
         '<div class="po-amt"><span>' + money(poPaid(po)) + '</span><span class="pill ' + (poUnpaid(po) ? "bad" : "") + '">' + (poUnpaid(po) ? "未付" : "已付") + '</span><span class="pill ' + lab[1] + '">' + lab[0] + "</span></div></div>" +
-        '<div class="tblwrap"><table class="po-tbl"><thead><tr><th>订的</th><th>订</th><th>已到</th><th>未到</th><th>$/根</th></tr></thead><tbody>' +
-        (po.lines || []).map((l) => { const g = recv[lineKey(l)] || 0, lf = Math.max(0, l.qty - g);
-          return "<tr><td>" + (isSerLine(l) ? "<b>" + esc(l.series) + '</b><small class="cn"> 口味到货再分</small>' : esc(nm(l.sku, l.name)) + '<small class="cn"> ' + esc((itemBy(l.sku) || {}).name || "") + "</small>") + "</td><td>" + l.qty + "</td><td>" + g + '</td><td class="' + (lf ? "left" : "") + '">' + lf + "</td><td>" + (l.unit_cost == null ? "–" : money(l.unit_cost)) + "</td></tr>"; }).join("") +
-        "</tbody></table></div>" +
+        '<details class="po-items"' + (s !== "done" ? " open" : "") + '><summary>' + ((n) => (n ? n + " 种口味" : "口味到货再分"))((po.lines || []).filter((l) => !isSerLine(l)).length) + " · " + boxTxt(allQ) + (gotQ && gotQ < allQ ? " · 已到 " + gotQ + " 根" : "") + "</summary>" + items +
+          '<div class="po-tot">合计　' + esc(serSum) + (gks.length > 1 ? "　共 " + boxTxt(allQ) : "") + "（" + allQ + " 根）</div></details>" +
         ((po.swaps || []).length ? '<ul class="hist sw-hist">' + po.swaps.map((w) => "<li><span>" + fmtD(w.date) + " 换货：" + esc(w.out.map((x) => x.t + " ×" + x.qty).join("、")) + " → " + esc(w.in.map((x) => x.t + " ×" + x.qty).join("、")) + "</span></li>").join("") + "</ul>" : "") +
-        (rlist.length ? '<ul class="hist">' + rlist.map(([rc, r]) => "<li><span>" + fmtD(r.date) + " 到货：" + esc(r.items.map((m) => nm(m.sku, m.name) + " ×" + m.qty).join("、")) + '</span><button class="btn small ghost danger" type="button" data-void-rcpt="' + esc(rc) + '" data-po="' + esc(po.id) + '">撤销</button></li>').join("") + "</ul>" : "") +
+        /* 到货记录一笔一行（每种到没到齐上面已经写了）；点日期展开看这次到了哪些 */
+        (rlist.length ? '<ul class="hist po-rc">' + rlist.map(([rc, r]) => { const q = r.items.reduce((a, m) => a + (Number(m.qty) || 0), 0);
+          return '<li><details><summary>' + fmtD(r.date) + " 到货 " + boxTxt(q) + (q % PO_BOX === 0 ? "（" + q + " 根）" : "") + "</summary><small>" + esc(r.items.map((m) => nm(m.sku, m.name) + " ×" + m.qty).join("、")) + '</small></details><button class="btn small ghost danger" type="button" data-void-rcpt="' + esc(rc) + '" data-po="' + esc(po.id) + '">撤销</button></li>'; }).join("") + "</ul>" : "") +
         '<div class="row-actions">' +
           (s !== "done" ? '<button class="btn small primary" type="button" data-rcv="' + esc(po.id) + '">' + (hasSer ? "到货 · 分配口味" : "登记到货") + "</button>" : "") +
           (s !== "done" ? '<button class="btn small" type="button" data-swap-po="' + esc(po.id) + '">换货</button>' : "") +

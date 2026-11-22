@@ -37,6 +37,20 @@ if (!process.argv[2]) {
   { const { m } = got("banana buzz 5", { series: "Ali" }); check("…界面给了当前系列就用它", m.B1 === 5); }
   { const { r } = got("Bar Pro\nPink Lemon 3"); check("上面写了 Bar Pro、这行在 Bar Pro 里没有 → 认不出（不跑去别的系列）", r.lines.length === 0 && r.unknown.length === 1); }
   { const { r } = got("Ali\nStrawberry Zzzz Watermelon 2"); check("有词对不上、又有更长的名字包含其它词 → 认不出（不猜成短的）", r.lines.length === 0); }
+  // 盒（2026-11-23）：一盒 10 根
+  const box = [
+    ["「2盒」「x3盒」「1 box」「2 boxes」「盒 x2」都按盒", "Ali\nPink Lemon 2盒\nFTP x3盒\nBanana Buzz 1 box\nDouble Apple 2 boxes\nSkittles 盒 x2", { B2: 20, B7: 30, B1: 10, B9: 20, B3: 20 }],
+    ["中文数字：一盒、两盒、十盒", "Ali\n粉红柠檬 一盒\n香蕉 两盒\n双苹果 十盒", { B2: 10, B1: 20, B9: 100 }],
+    ["写了「盒」的清单里没写单位的也按盒", "Ali\nPink Lemon 2盒\nFTP 3\nDouble Apple x1", { B2: 20, B7: 30, B9: 10 }],
+    ["盒和根混着写：没写单位的按根", "Ali\nPink Lemon 2盒\nFTP 3根\nDouble Apple 4", { B2: 20, B7: 3, B9: 4 }],
+    ["一行几种带盒", "Ali pink lemon 2盒 banana buzz 1盒", { B2: 20, B1: 10 }],
+    ["「十二支」中文数字按根", "Ali 粉红柠檬 十二支", { B2: 12 }],
+  ];
+  for (const [name, text, want] of box) { const { m, r } = got(text); check(name, JSON.stringify(m) === JSON.stringify(want), JSON.stringify(m) + (r.unknown.length ? " 没认出 " + JSON.stringify(r.unknown) : "")); }
+  { const r = parseOrder("Ali\nPink Lemon 2盒\nFTP 3", items); check("结果告诉界面：没写单位的按盒算（unit box、有 bare）", r.unit === "box" && r.bare === true && r.lines.find((l) => l.sku === "B2").boxes === 2); }
+  { const { m } = got("Ali\nPink Lemon 2盒\nFTP 3", { unit: "pc" }); check("界面切成「按根」：没写单位的 3 → 3 根，写了盒的照样 20", m.B2 === 20 && m.B7 === 3); }
+  { const { m } = got("Ali\nPink Lemon 2\nFTP 3", { unit: "box" }); check("界面切成「按盒」：都没写单位的 2、3 → 20、30", m.B2 === 20 && m.B7 === 30); }
+  { const { m } = got("Ali\nPink Lemon 2盒", { box: 12 }); check("一盒几根可以改（opts.box）", m.B2 === 24); }
 }
 
 // 盲测
@@ -52,7 +66,8 @@ for (let n = 0; n < 300; n++) {
     const q = 1 + Math.floor(rnd() * 12); want[it.sku] = q;
     let name = rnd() < 0.3 ? it.name : it.variant;
     if (name === it.variant) { if (rnd() < 0.5) name = name.toLowerCase(); if (rnd() < 0.25) name = name.split(" ").map((w, k) => (k === 0 ? typo(w) : w)).join(" "); }
-    lines.push((mode === "prefix" ? sr + " " : "") + name + " " + pick(["×" + q, "x" + q, String(q), q + "根", q + " 支", "*" + q]));
+    const fmt = pick(["×" + q, "x" + q, String(q), q + "根", q + " 支", "*" + q]);
+    lines.push((mode === "prefix" ? sr + " " : "") + name + " " + fmt);
   }
   const r = parseOrder(rnd() < 0.2 ? lines.join("，") : lines.join("\n"), items, { series: mode === "none" ? sr : undefined });
   const m = Object.fromEntries(r.lines.map((l) => [l.sku, l.qty]));
@@ -60,5 +75,25 @@ for (let n = 0; n < 300; n++) {
   for (const sku of Object.keys(m)) if (!(sku in want)) { wrong++; if (ex.length < 5) ex.push(by[sku].series + " " + by[sku].variant + " ← " + JSON.stringify(lines)); }
 }
 check(`盲测 300 份订单 ${total} 行：认对 ${ok}、认不出 ${miss}、认错 ${wrong}（认错必须是 0，认不出 ≤ 2%）`, wrong === 0 && miss <= total * 0.02, ex.join(" | "));
+// 盲测 2：按盒写（2盒 / x2盒 / 2 box / 两盒 / 没写单位但别的行写了盒）→ 根数 = 盒 × 10
+{
+  const CNN = ["", "一", "两", "三", "四", "五", "六", "七", "八", "九", "十"];
+  let ok2 = 0, wrong2 = 0, miss2 = 0, tot2 = 0; const ex2 = [];
+  for (let n = 0; n < 300; n++) {
+    const sr = pick(sers), pool = items.filter((i) => i.series === sr).sort(() => rnd() - 0.5).slice(0, 2 + Math.floor(rnd() * 5));
+    const lines = [sr], want = {};
+    pool.forEach((it, k) => {
+      const b = 1 + Math.floor(rnd() * 10); want[it.sku] = b * 10;
+      const name = rnd() < 0.3 ? it.name : it.variant;
+      const f = k === 0 ? pick([b + "盒", b + " 盒", "x" + b + "盒", b + " box", b + " boxes", CNN[b] + "盒"]) : pick([b + "盒", "×" + b + "盒", b + " box", CNN[b] + "盒", String(b), "x" + b]);
+      lines.push(name + " " + f);
+    });
+    const r = parseOrder(lines.join("\n"), items);
+    const m = Object.fromEntries(r.lines.map((l) => [l.sku, l.qty]));
+    for (const [sku, q] of Object.entries(want)) { tot2++; if (m[sku] === q) ok2++; else if (m[sku] == null) miss2++; else { wrong2++; if (ex2.length < 5) ex2.push(sku + " " + m[sku] + "≠" + q + " ← " + JSON.stringify(lines)); } }
+    for (const sku of Object.keys(m)) if (!(sku in want)) wrong2++;
+  }
+  check(`盲测 300 份按盒写的订单 ${tot2} 行：认对 ${ok2}、认不出 ${miss2}、认错 ${wrong2}（认错必须是 0）`, wrong2 === 0 && miss2 <= tot2 * 0.02, ex2.join(" | "));
+}
 console.log(fail ? `\n${fail} 项没通过` : "\n全部通过");
 process.exit(fail ? 1 : 0);

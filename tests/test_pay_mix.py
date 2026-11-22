@@ -94,18 +94,18 @@ with sync_playwright() as p:
         check("系列框头上不再有价钱框", pg.locator("#f-lines .po-gh input").count() == 0)
         pg.click('[data-padd="XF-02"]'); pg.click('[data-padd="XF-03"]'); pg.click('#f-ptabs [data-pt="Ali"]'); pg.click('[data-padd="XF-04"]'); pg.wait_for_timeout(150)
         order = pg.evaluate("(() => { const a = [...document.querySelectorAll('#f-lines .line, #f-bulk')]; return a.map((x) => x.id || 'line'); })()")
-        check("「选中的一起改」在所有口味下面", order[-1] == "f-bulk" and order.count("line") == 4, order)
-        srp = pg.evaluate("[...document.querySelectorAll('#f-serp input')].map((i) => i.dataset.sr)")
-        check("里面：每种都订 N 根 + Bar Pro 每根 $（Ali 只有一种，不用一起改）", pg.is_visible("#f-allq") and srp == ["Bar Pro"], srp)
-        pg.fill('#f-bulk input[data-sr="Bar Pro"]', "28"); pg.fill("#f-allq", "5"); pg.wait_for_timeout(150)
+        check("「按系列一起改」在所有口味下面", order[-1] == "f-bulk" and order.count("line") == 4, order)
+        srp = pg.evaluate("[...document.querySelectorAll('#f-serp .po-sr b')].map((b) => b.textContent)")
+        check("里面：Bar Pro 一行「每种几根 + 每根 $」（Ali 只有一种，不用一起改）", srp == ["Bar Pro"] and pg.is_visible('#f-bulk input[data-srq="Bar Pro"]'), srp)
+        pg.fill('#f-bulk input[data-sr="Bar Pro"]', "28"); pg.fill('#f-bulk input[data-srq="Bar Pro"]', "5"); pg.wait_for_timeout(150)
         rows = pg.evaluate("[...document.querySelectorAll('#f-lines .line')].map((r) => [r.querySelector('[id^=f-qty-]').value, r.querySelector('[id^=f-ucost-]').value])")
-        check("Bar Pro 三种都变 $28，四种都 5 根；Ali 保持自己的成本", rows == [["5", "28"], ["5", "28"], ["5", "28"], ["5", "25"]], rows)
+        check("Bar Pro 三种都变 $28、5 根；Ali 保持自己的根数和成本", rows[:3] == [["5", "28"], ["5", "28"], ["5", "28"]] and rows[3][1] == "25" and rows[3][0] != "5", rows)
         pg.click('#f-ptabs [data-pt="Ali"]'); pg.click('[data-padd="XF-04"]'); pg.wait_for_timeout(100)
         check("改根数时价钱框不会被重画（填的 $28 还在）", pg.input_value('#f-bulk input[data-sr="Bar Pro"]') == "28")
         n0 = len(S(pg, "purchases")); save(pg)
         P = [x for x in S(pg, "purchases") if x["id"] != "p-1"]
         L = {l["sku"]: (l["qty"], l["unit_cost"]) for l in (P[0]["lines"] if P else [])}
-        check("存的订货单：Bar Pro 3×5 根 $28、Pink Lemon 6 根 $25", L == {"XF-01": (5, 28), "XF-02": (5, 28), "XF-03": (5, 28), "XF-04": (6, 25)}, L)
+        check("存的订货单：Bar Pro 3×5 根 $28、Pink Lemon 2 根 $25（按系列改不动 Ali）", L == {"XF-01": (5, 28), "XF-02": (5, 28), "XF-03": (5, 28), "XF-04": (2, 25)}, L)
 
         # 3. 代送费：现金+转账
         go(pg, "finance"); pg.click("#fin-fee"); pg.wait_for_selector("#f-paychips")

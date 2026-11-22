@@ -1,12 +1,15 @@
 /* 订货清单粘贴识别：把一段文字（微信消息、App 复制出来的清单……）认成 [{口味, 根数}]。
    - 每行、逗号/顿号分开的每一段 = 一种口味；「Pink Lemon 2 Banana 3」这种一行几种也能拆开
    - 根数：×2 / x2 / *2 / 2支 / 2根 / 2pcs / 末尾的数字；$36、36刀、11月14日 这类不算根数；没写根数按 1（标出来）
+   - 盒（2026-11-23）：2盒 / x2盒 / 2 box(es) / 2bx / 盒 x2 / 一盒、两盒、十盒 → × opts.box（默认 10 根一盒）；
+     没写单位的数字：opts.unit（"box" / "pc"）；没给就看这段文字——有写「盒」、没有写「根 / 支」的，按盒；不然按根。结果里 unit 告诉界面按什么算的
    - 系列：一行只写「Ali」「Bar Pro:」= 后面几行都是这个系列；一段里带系列名就用它
    - 口味：英文名逐词比（允许拼错一两个字母、Chups/Chupa 这种），中文名包含或差一个字也算；
      几个口味都对得上时取对上词最多的（Strawberry Kiwi Ice 不会被认成 Strawberry Kiwi）
    - 同名口味在几个系列都有、又没写系列：先看上文的系列，再看这段文字里别的口味大多是哪个系列，再看 opts.series；
      这样定的标 assumed，界面上提醒确认；还是定不了的放 unknown
-   parseOrder(text, items, opts) → { lines: [{ sku, qty, noQty, assumed, seg }], unknown: [原文片段] }
+   parseOrder(text, items, opts) → { lines: [{ sku, qty, noQty, assumed, seg, boxes }], unknown: [原文片段], unit: "box"|"pc", bare: 有没有没写单位的数字 }
+   （qty 一律是根数；boxes = 按盒写的那部分是几盒）
    items = [{ sku, series, variant, name }]（不要放「合伙人拿货」这种占位口味） */
 (function (root) {
   const CJK = /[㐀-鿿]/;
@@ -52,12 +55,20 @@
   const cmp = (a, b) => (a[0] - b[0]) || (a[1] - b[1]) || (a[2] - b[2]) || (a[4] - b[4]);
   const ok = (s) => s[3] && (s[0] === 1 || s[0] >= 0.5);
 
+  /* 中文数字：一盒、两根、十二盒、二十支 → 1 盒、2 根… */
+  const CN = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+  const cnNum = (t) => { if (t === "十") return 10; const m = /^([一二两三四五六七八九])?十([一二三四五六七八九])?$/.exec(t); if (m) return (m[1] ? CN[m[1]] : 1) * 10 + (m[2] ? CN[m[2]] : 0); return t.length === 1 ? CN[t] : null; };
+  const cnDigits = (s) => s.replace(/([一二两三四五六七八九十]{1,3})\s*(?=盒|根|支|个|條|条|只)/g, (m0, t) => { const n = cnNum(t); return n == null ? m0 : String(n); });
+  const BOX = "盒|boxes|box|bx", PC = "支|根|个|條|条|只|pcs|pc";
+  const unitOf = (u) => (!u ? null : new RegExp("^(?:" + BOX + ")$", "i").test(u) ? "box" : "pc");
   function qtyOf(raw) {
-    let s = raw.replace(/[$￥¥]\s*\d+(?:\.\d+)?/g, " ").replace(/\d+(?:\.\d+)?\s*(?:刀|元|块|澳币|aud)/gi, " ")
+    let s = cnDigits(raw).replace(/[$￥¥]\s*\d+(?:\.\d+)?/g, " ").replace(/\d+(?:\.\d+)?\s*(?:刀|元|块|澳币|aud)/gi, " ")
       .replace(/\d{1,2}\s*月\s*\d{1,2}\s*[日号]?/g, " ").replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, " ");
-    const pats = [/[x×*＊]\s*(\d+)/i, /(\d+)\s*(?:支|根|个|條|条|盒|只|pcs?\b)/i, /(\d+)\s*[x×*＊]/i, /(?:^|[^a-z0-9])(\d+)(?=[^a-z0-9]*$)/i, /^\s*(\d+)\b/];
-    for (const p of pats) { const m = s.match(p); if (m) return { qty: Number(m[1]), rest: s.replace(m[0], " ") }; }
-    return { qty: null, rest: s };
+    const U = "(" + BOX + "|" + PC + ")(?![a-z])", UO = "(?:" + U + ")?";
+    const pats = [[new RegExp("(" + BOX + ")\\s*[x×*＊]\\s*(\\d+)", "i"), 2, 1], [new RegExp("[x×*＊]\\s*(\\d+)\\s*" + UO, "i"), 1, 2], [new RegExp("(\\d+)\\s*" + U, "i"), 1, 2],
+      [/(\d+)\s*[x×*＊]/i, 1, 0], [/(?:^|[^a-z0-9])(\d+)(?=[^a-z0-9]*$)/i, 1, 0], [/^\s*(\d+)\b/, 1, 0]];
+    for (const [p, qi, ui] of pats) { const m = s.match(p); if (m) return { qty: Number(m[qi]), unit: ui ? unitOf(m[ui]) : null, rest: s.replace(m[0], " ") }; }
+    return { qty: null, unit: null, rest: s };
   }
 
   function parseOrder(text, items, opts) {
@@ -70,22 +81,22 @@
     for (const line of lines) {
       if (/合计|总计|共计|小计|总共|^\s*【.*】\s*$/.test(line)) continue;
       // 一行几段：逗号/顿号/分号；「名字 数字 名字 数字」在数字后面拆开
-      const pieces = line.split(/[,，、;；|]/).flatMap((p) => p.replace(/((?:[x×*＊]\s*)?\d+(?:\s*(?:支|根|个|條|条|盒|只|pcs?\b))?)\s+(?=(?![支根个條条盒只])(?!pcs?\b)[A-Za-z㐀-鿿])/gi, "$1\u0001").split("\u0001"));
+      const pieces = cnDigits(line).split(/[,，、;；|]/).flatMap((p) => p.replace(/((?:[x×*＊]\s*)?\d+(?:\s*(?:支|根|个|條|条|盒|只|pcs?\b|boxes\b|box\b|bx\b))?)\s+(?=(?![支根个條条盒只])(?!pcs?\b)(?!box(?:es)?\b)(?!bx\b)[A-Za-z㐀-鿿])/gi, "$1\u0001").split("\u0001"));
       for (const raw of pieces) {
         if (!raw.trim()) continue;
-        const { qty, rest } = qtyOf(raw);
+        const { qty, unit, rest } = qtyOf(raw);
         let toks = enToks(rest);
         const cj = cjkOf(rest);
         const sh = findSer(toks);
         let sr = null;
         if (sh) { sr = sh.sr; toks = toks.slice(0, sh.at).concat(toks.slice(sh.at + sh.n)); }
         if (!toks.length && !cj) { // 只有系列名 = 下面几行的系列；只有数字 = 下一段的根数
-          if (sr) ctx = sr; else if (qty != null) carry = qty;
+          if (sr) ctx = sr; else if (qty != null) carry = { qty, unit };
           continue;
         }
         if (sr) ctx = sr;
-        const q = qty != null ? qty : carry; carry = null;
-        segs.push({ seg: { toks, cjk: cj }, sr, ctx, qty: q, raw: raw.trim() });
+        const q = qty != null ? { qty, unit } : carry; carry = null;
+        segs.push({ seg: { toks, cjk: cj }, sr, ctx, qty: q ? q.qty : null, unit: q ? q.unit : null, raw: raw.trim() });
       }
     }
     // 在一组口味里找：分数够、第一名唯一（同一个口味名在几个系列并列算唯一）
@@ -105,6 +116,9 @@
     const first = segs.map((g) => { const sr = g.sr || g.ctx; return sr ? match(g.seg, inSer(sr)) : match(g.seg, items); });
     const cnt = {}; first.forEach((m) => { if (m && m !== "tie" && m.length === 1) cnt[m[0].series] = (cnt[m[0].series] || 0) + 1; });
     const major = (Object.entries(cnt).sort((a, b) => b[1] - a[1])[0] || [])[0] || null;
+    /* 没写单位的数字按什么算 */
+    const hasBox = segs.some((g) => g.unit === "box"), hasPc = segs.some((g) => g.unit === "pc"), bare = segs.some((g) => !g.unit);
+    const unit = opts.unit === "box" || opts.unit === "pc" ? opts.unit : hasBox && !hasPc ? "box" : "pc", per = Number(opts.box) || 10;
     const res = {}, order = [];
     segs.forEach((g, k) => {
       let m = first[k], assumed = false;
@@ -114,11 +128,11 @@
       let it = m[0];
       if (m.length > 1) { it = m.find((c) => c.series === (g.sr || g.ctx)) || m.find((c) => c.series === major) || m.find((c) => c.series === opts.series) || null; assumed = true; }
       if (!it) { unknown.push(g.raw); return; }
-      const noQty = g.qty == null, qty = noQty ? 1 : g.qty;
-      if (!res[it.sku]) { res[it.sku] = { sku: it.sku, qty: 0, noQty: false, assumed: false, seg: g.raw }; order.push(it.sku); }
-      res[it.sku].qty += qty; res[it.sku].noQty = res[it.sku].noQty || noQty; res[it.sku].assumed = res[it.sku].assumed || assumed;
+      const noQty = g.qty == null, n = noQty ? 1 : g.qty, byBox = (g.unit || unit) === "box", qty = byBox ? n * per : n;
+      if (!res[it.sku]) { res[it.sku] = { sku: it.sku, qty: 0, noQty: false, assumed: false, seg: g.raw, boxes: 0 }; order.push(it.sku); }
+      res[it.sku].qty += qty; if (byBox) res[it.sku].boxes += n; res[it.sku].noQty = res[it.sku].noQty || noQty; res[it.sku].assumed = res[it.sku].assumed || assumed;
     });
-    return { lines: order.map((k) => res[k]).filter((l) => l.qty > 0), unknown };
+    return { lines: order.map((k) => res[k]).filter((l) => l.qty > 0), unknown, unit, bare };
   }
 
   const api = { parseOrder };

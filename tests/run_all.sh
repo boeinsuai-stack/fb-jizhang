@@ -32,6 +32,7 @@ run python3 tests/test_place_fu.py
 run python3 tests/test_cost_book.py
 run python3 tests/test_restock.py
 run python3 tests/test_resv_form.py
+run python3 tests/test_po_tidy.py
 run python3 tests/test_fifo_gap.py
 run python3 tests/test_copy_flavours.py
 run node tests/orderparse_test.js
