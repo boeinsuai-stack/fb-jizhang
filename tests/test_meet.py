@@ -53,6 +53,7 @@ def close(pg): pg.click("#sheet-close"); pg.wait_for_timeout(250)
 def chips_ok(pg):  # 付款方式是一排小标签、有现金+转账、没有下拉框
     return pg.locator("#sheet #f-paychips input[name=f-payr]").count() == 5 and pg.locator('#sheet #f-paychips input[value="现金+转账"]').count() == 1 and pg.locator("#sheet select#f-pay").count() == 0
 def mix(pg, cash, other=None):
+    if pg.is_visible("#f-payshow"): pg.click("#f-payshow")  # 11-22 起预定的付款方式收起来了
     pg.click('#f-paychips label:has(input[value="现金+转账"])'); pg.wait_for_timeout(120)
     pg.fill("#f-paycash", str(cash))
     if other: pg.select_option("#f-payother", other)
@@ -92,7 +93,7 @@ with sync_playwright() as p:
         check("没有今天 / 明天 / 后天那一排；日期默认今天", pg.locator('input[name="f-mdr"]').count() == 0 and pg.input_value("#f-mdate") == TODAY)
         check("地点：以前用过的「Coles 停车场」点一下就行，还有「＋ 地点」", pg.locator('#f-pl input[value="Coles 停车场"]').count() == 1 and pg.is_visible("#f-pladd"))
         pg.locator("#f-cust").press_sequentially("Fay")
-        pg.fill("#f-mdate", DD(1)); pg.fill("#f-mtime", "16:30"); pg.click('#f-pl label:has(input[value="Coles 停车场"])'); save(pg)
+        pg.fill("#f-mdate", DD(1)); pg.click('#f-mmode [data-mm="set"]'); pg.fill("#f-mtime", "16:30"); pg.click('#f-pl label:has(input[value="Coles 停车场"])'); save(pg)
         new = [x for x in S(pg, "orders") if x["id"] not in before]
         check("存了：明天 16:30、Coles 停车场", len(new) == 1 and new[0].get("meet_date") == DD(1) and new[0].get("meet_time") == "16:30" and new[0].get("place") == "Coles 停车场", new and {k: new[0].get(k) for k in ("meet_date", "meet_time", "place")})
         go(pg, "customers"); C = cards(pg)

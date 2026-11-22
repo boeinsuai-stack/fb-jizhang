@@ -95,11 +95,11 @@ with sync_playwright() as p:
         go(pg, "inventory"); pg.evaluate("document.getElementById('rs-sec').open = true"); pg.wait_for_timeout(150)
         R = {cn: (t, d) for cn, t, d in rows(pg)}
         check("热芒果：卖得好（一直有货、每天 1 根）", R["热芒果"][0] == "卖得好", R["热芒果"])
-        check("葡萄冰：一单 10 根按 3 根算（8 周卖 24 + 3 = 27 根），一般", "卖 27 根" in R["葡萄冰"][1] and R["葡萄冰"][0] == "一般", R["葡萄冰"])
+        check("葡萄冰：按被买了几次算，一单 10 根也只算 1 次（24 + 1 = 25 次），一般", "被买 25 次" in R["葡萄冰"][1] and R["葡萄冰"][0] == "一般", R["葡萄冰"])
         check("慢薄荷：偏冷", R["慢薄荷"][0] == "偏冷", R["慢薄荷"])
         check("死猕猴桃：有货 40 天一根没卖 → 很冷", R["死猕猴桃"][0] == "很冷", R["死猕猴桃"])
         check("新桃子：到货 3 天，标「数据少」，最冷只算「一般」", "数据少" in R["新桃子"][1] and R["新桃子"][0] in ("卖得好", "一般"), R["新桃子"])
-        check("断货莓：只算有货的 6 天（卖 6 根），数据少 → 不当冷门", "有货 6 天、卖 6 根" in R["断货莓"][1] and R["断货莓"][0] in ("卖得好", "一般") and "数据少" in R["断货莓"][1], R["断货莓"])
+        check("断货莓：只算有货的 6 天（被买 6 次），数据少 → 不当冷门", "有货 6 天、被买 6 次" in R["断货莓"][1] and R["断货莓"][0] in ("卖得好", "一般") and "数据少" in R["断货莓"][1], R["断货莓"])
         check("没卖过青柠：没卖过", R["没卖过青柠"][0] == "没卖过", R["没卖过青柠"])
         order = [cn for cn, _, _ in rows(pg)]
         check("按档排：卖得好 → 一般 → 偏冷 → 很冷 → 没卖过", order.index("热芒果") < order.index("葡萄冰") < order.index("慢薄荷") < order.index("死猕猴桃") < order.index("没卖过青柠"), order)
@@ -137,6 +137,34 @@ with sync_playwright() as p:
         save(pg)
         po = S(pg, "purchases")
         check("存了订货单，100 根", len(po) == 1 and sum(l["qty"] for l in po[0]["lines"]) == 100, po)
+
+        # 客人问了、但没货
+        go(pg, "inventory"); pg.wait_for_timeout(200)
+        check("补货里没货的断货莓旁边有「有人问」；有货的死猕猴桃、没卖过的没有", pg.locator('#rs-list [data-ask="XF-07"]').count() == 1 and pg.locator('#rs-list [data-ask="XF-04"]').count() == 0 and pg.locator('#rs-list [data-ask="XF-06"]').count() == 0)
+        pg.evaluate("document.getElementById('rs-sec').open = true"); pg.wait_for_timeout(100)
+        pg.click('#rs-plan'); pg.wait_for_selector("#rs-rows .rs-prow")
+        lam0 = pg.evaluate("(() => { const r = [...document.querySelectorAll('#rs-rows .rs-prow small')].find((x) => x.textContent.startsWith('断货莓')); return r ? r.textContent : ''; })()")
+        close(pg)
+        pg.click('#rs-list [data-ask="XF-07"]'); pg.wait_for_timeout(400); pg.click('#rs-list [data-ask="XF-07"]'); pg.wait_for_timeout(400)
+        asks = [f for f in S(pg, "followups") if f.get("kind") == "ask"]
+        check("点两下：记两笔「有人问」（今天、断货莓、不进跟进）", len(asks) == 2 and all(a["sku"] == "XF-07" and a["date"] == TODAY and a["done"] is True for a in asks), asks)
+        check("按钮上写「有人问 2」", "有人问 2" in pg.inner_text('#rs-list [data-ask="XF-07"]'), pg.inner_text('#rs-list [data-ask="XF-07"]'))
+        R2 = {cn: (t, d) for cn, t, d in rows(pg)}
+        check("补货里写「没货时 2 人问」", "没货时 2 人问" in R2["断货莓"][1], R2["断货莓"])
+        pg.click('#rs-plan'); pg.wait_for_selector("#rs-rows .rs-prow")
+        lam1 = pg.evaluate("(() => { const r = [...document.querySelectorAll('#rs-rows .rs-prow small')].find((x) => x.textContent.startsWith('断货莓')); return r ? r.textContent : ''; })()")
+        import re as _re
+        n0 = int(_re.search(r"这批大概卖 (\d+) 根", lam0).group(1)); n1 = int(_re.search(r"这批大概卖 (\d+) 根", lam1).group(1))
+        check("补货单：有人问的「这批大概卖」变多", n1 > n0 and "没货时 2 人问" in lam1, (lam0, lam1))
+        close(pg)
+        pg.click('#inv-tabs [data-it="items"]'); pg.wait_for_timeout(200)
+        check("「管理香型」里没货的那一行也有「有人问 2」", "有人问 2" in pg.inner_text('#items [data-ask="XF-07"]'))
+        pg.click('.row-main[data-sku="XF-07"]'); pg.wait_for_selector('[data-ask-undo="XF-07"]')
+        check("展开写「最近 4 周没货时有 2 次有人问」", "最近 4 周没货时有 2 次有人问" in pg.inner_text("#items"))
+        pg.click('[data-ask-undo="XF-07"]'); pg.wait_for_timeout(400)
+        check("撤销上一次：剩 1 笔", len([f for f in S(pg, "followups") if f.get("kind") == "ask"]) == 1)
+        go(pg, "customers"); pg.wait_for_timeout(200)
+        check("「有人问」不出现在要联系的客户、客户名单里", pg.locator("#fu-list .fu2").count() == 0 and "断货莓" not in pg.inner_text("#c-list"), pg.inner_text("#c-list")[:100])
         ctx.close()
     br.close()
 print(f"\n{sum(results)}/{len(results)} 通过")

@@ -174,6 +174,18 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .rv-meet { font-size: .9rem; color: var(--fg); } .rv-meet.now { color: var(--accent); } .rv-meet.late { color: var(--warn); }
 .rv-nomeet { color: var(--muted); }
 .meet-row { display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; margin-bottom: 8px; } .meet-row input { width: 100%; min-width: 0; }
+/* 交货小框：左边「哪天 / 几点 / 在哪」，右边一行一件事 */
+.mb { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.mb-row { display: grid; grid-template-columns: 3.2em 1fr; gap: 10px; align-items: start; padding: 10px 12px; border-top: 1px solid var(--line); } .mb-row:first-child { border-top: 0; }
+.mb-k { font-size: .85rem; color: var(--muted); padding-top: 9px; }
+.mb-v { display: grid; gap: 8px; min-width: 0; } .mb-v .chips { margin: 0; }
+.mb-day { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } .mb-day input { width: 100%; min-width: 0; } .mb-day b { font-size: .9rem; color: var(--accent); white-space: nowrap; }
+#f-mset input { width: 9em; }
+#f-mnone { display: grid; gap: 6px; } .mb-hint { font-size: .8rem; color: var(--muted); }
+.call-row2 { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; font-size: .85rem; color: var(--muted); } .call-row2 input { width: 100%; min-width: 0; }
+.addrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .lumpchip { font-size: .85rem; }
+.fee-row { display: flex !important; align-items: center; justify-content: space-between; gap: 12px; } .fee-row label { margin: 0; } .fee-row input { width: 8.5em; text-align: right; }
+#f-payshow { justify-self: start; font-size: .88rem; }
 #f-plnew { margin-top: 8px; }
 .rv-who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tag-ho { font-size: .72rem; font-weight: 700; line-height: 1.3; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; }
@@ -623,7 +635,9 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 .rs-need small { font-family: var(--font-body); font-size: .72rem; font-weight: 400; color: var(--muted); margin-left: 2px; }
 .restock .empty { padding: 10px 0; }
 .rs-tier { padding: 10px 16px 4px; font-size: .78rem; font-weight: 700; color: var(--muted); }
-.rs-few { font-weight: 600; color: var(--warn); }
+.rs-few { font-weight: 600; color: var(--warn); } .rs-ask { font-weight: 600; color: var(--accent); }
+.askbtn { border: 1px dashed var(--line); background: none; border-radius: 999px; padding: 3px 9px; font: inherit; font-size: .74rem; color: var(--muted); cursor: pointer; white-space: nowrap; } .askbtn b { color: var(--accent); }
+.ask-note { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .rs-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .rs-top input { width: 4.2em; text-align: center; }
 .rs-plan { display: grid; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; } .rs-plan .rs-tier { padding: 8px 12px 2px; background: var(--hover); }
 .rs-prow { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); } .rs-prow.off { opacity: .5; } .rs-prow.fixed .rs-step b { color: var(--accent); }
@@ -1279,20 +1293,26 @@ details.restock > summary::-webkit-details-marker { display: none; }
   }
   const readCall = () => { const a = ($("f-cfrom") || {}).value || "", b = ($("f-cto") || {}).value || ""; return a || b ? a + "-" + b : null; };
   const callHtml = (w, label) => { const m = /^([^-]*)-(.*)$/.exec(w || "") || []; return '<div class="field"><span class="lbl">' + (label || "几点方便联系") + '</span><div class="call-row"><input id="f-cfrom" type="time" value="' + esc(m[1] || "") + '" aria-label="从几点"><span>到</span><input id="f-cto" type="time" value="' + esc(m[2] || "") + '" aria-label="到几点"></div></div>'; };
+  /* 交货（2026-11-22 Bowen：交货那块很乱——两个时间框没标签、又冒出「几点方便联系」）→ 一个小框，左边固定「哪天 / 几点 / 在哪」，一行一件事；
+     「几点」二选一：约好了（几点见）/ 还没定（他说几点到几点方便联系），同时只出现一个 */
+  function meetDayTxt(d) { const g = dayGap(today(), d), W = "日一二三四五六"; return g === 0 ? "今天" : g === 1 ? "明天" : g === 2 ? "后天" : g === -1 ? "昨天" : fmtD(d) + " 周" + W[new Date(d + "T12:00:00").getDay()]; }
   function meetHtml(o, show) {
     const d = (o && o.meet_date) || today(), pl = (o && o.place) || "", L = placeList(); if (pl && !L.includes(pl)) L.unshift(pl);
-    return '<div class="field" id="f-meet"' + (show ? "" : " hidden") + '><span class="lbl">交货</span>' +
-      '<div class="meet-row"><input id="f-mdate" type="date" value="' + esc(d) + '" aria-label="哪天交货">' +
-      '<input id="f-mtime" type="time" value="' + esc((o && o.meet_time) || "") + '" aria-label="几点（可不填）"></div>' +
-      '<div class="chips" id="f-pl" role="radiogroup" aria-label="在哪见面">' + L.map((x) => '<label class="chip"><input type="radio" name="f-plr" value="' + esc(x) + '"' + (x === pl ? " checked" : "") + "> " + esc(x) + "</label>").join("") +
-      '<button type="button" class="chip" id="f-pladd">＋ 地点</button></div>' +
-      '<input id="f-plnew" placeholder="新的见面地点，比如 Cockburn Coles" aria-label="新的见面地点" hidden>' +
-      callHtml((o && o.call_win) || "", "几点方便联系（他说的，时间没定时写这个）").replace('<div class="field">', '<div class="call-in">') + "</div>";
+    const set = !!(o && o.meet_time), m = /^([^-]*)-(.*)$/.exec((o && o.call_win) || "") || [];
+    return '<div class="field" id="f-meet"' + (show ? "" : " hidden") + '><span class="lbl">交货</span><div class="mb">' +
+      '<div class="mb-row"><span class="mb-k">哪天</span><div class="mb-v mb-day"><input id="f-mdate" type="date" value="' + esc(d) + '" aria-label="哪天交货"><b id="f-mday">' + meetDayTxt(d) + "</b></div></div>" +
+      '<div class="mb-row"><span class="mb-k">几点</span><div class="mb-v"><div class="chips seg" id="f-mmode" role="group" aria-label="几点"><button type="button" class="chip" data-mm="set" aria-pressed="' + set + '">约好了</button><button type="button" class="chip" data-mm="none" aria-pressed="' + !set + '">还没定</button></div>' +
+        '<div id="f-mset"' + (set ? "" : " hidden") + '><input id="f-mtime" type="time" value="' + esc((o && o.meet_time) || "") + '" aria-label="几点见"></div>' +
+        '<div id="f-mnone"' + (set ? " hidden" : "") + '><span class="mb-hint">他说几点到几点方便联系（可不填）</span><div class="call-row2"><input id="f-cfrom" type="time" value="' + esc(m[1] || "") + '" aria-label="从几点"><span>到</span><input id="f-cto" type="time" value="' + esc(m[2] || "") + '" aria-label="到几点"></div></div></div></div>' +
+      '<div class="mb-row"><span class="mb-k">在哪</span><div class="mb-v"><div class="chips" id="f-pl" role="radiogroup" aria-label="在哪见面">' + L.map((x) => '<label class="chip"><input type="radio" name="f-plr" value="' + esc(x) + '"' + (x === pl ? " checked" : "") + "> " + esc(x) + "</label>").join("") +
+        '<button type="button" class="chip" id="f-pladd">＋ 地点</button></div><input id="f-plnew" placeholder="新的见面地点，比如 Cockburn Coles" aria-label="新的见面地点" hidden></div></div>' +
+      "</div></div>";
   }
+  const meetSet = () => !!document.querySelector('#f-mmode [data-mm="set"][aria-pressed="true"]');
   function readMeet() {
     if (!$("f-meet") || $("f-meet").hidden) return { meet_date: null, meet_time: null, place: null, call_win: null };
-    const nw = $("f-plnew").hidden ? "" : $("f-plnew").value.trim();
-    return { meet_date: $("f-mdate").value || today(), meet_time: $("f-mtime").value || null, place: nw || (document.querySelector('input[name="f-plr"]:checked') || {}).value || null, call_win: readCall() };
+    const nw = $("f-plnew").hidden ? "" : $("f-plnew").value.trim(), set = meetSet();
+    return { meet_date: $("f-mdate").value || today(), meet_time: set ? $("f-mtime").value || null : null, place: nw || (document.querySelector('input[name="f-plr"]:checked') || {}).value || null, call_win: set ? null : readCall() };
   }
   const custByName = (n) => { const k = normName(n); return k ? customerBook().find((c) => normName(c.name) === k) || null : null; };
   /* 写了客人名字：他一般在哪见面、几点方便联系自动带上（自己点过地点就不动） */
@@ -1323,6 +1343,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
   }
   function wireMeet() {
     const box = $("f-pl"); if (!box) return; let was = (document.querySelector('input[name="f-plr"]:checked') || {}).value;
+    $("f-mdate").addEventListener("change", () => { $("f-mday").textContent = $("f-mdate").value ? meetDayTxt($("f-mdate").value) : ""; });
+    $("f-mmode").addEventListener("click", (e) => { const b = e.target.closest("[data-mm]"); if (!b) return;
+      $("f-mmode").querySelectorAll("[data-mm]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      const set = b.dataset.mm === "set"; $("f-mset").hidden = !set; $("f-mnone").hidden = set; if (set) $("f-mtime").focus(); });
     box.addEventListener("click", (e) => {
       if (box.__was !== undefined) { was = box.__was; box.__was = undefined; }
       if (e.target.closest("#f-pladd")) { const n = $("f-plnew"); n.hidden = false; n.focus(); box.querySelectorAll('input[name="f-plr"]').forEach((r) => { r.checked = false; }); was = null; return; }
@@ -1550,9 +1574,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
   }
 
   /* ---------- price section shared by sale, edit and settle forms: per-stick prices, or one whole-order price (e.g. a full box) ---------- */
+  const lumpWrapHtml = (on, val) => '<div class="field" id="f-lumpwrap"' + (on ? "" : " hidden") + '><label for="f-lump">这单货款总价 $（不含配送费）</label><input id="f-lump" type="number" min="0" step="0.01" inputmode="decimal" value="' + (val == null ? "" : esc(val)) + '"></div>';
   const lumpHtml = (on, val) =>
-    '<label class="check"><input type="checkbox" id="f-lumpon"' + (on ? " checked" : "") + '><span>按整单总价算（比如一整盒），不用填单价</span></label>' +
-    '<div class="field" id="f-lumpwrap"' + (on ? "" : " hidden") + '><label for="f-lump">这单货款总价 $（不含配送费）</label><input id="f-lump" type="number" min="0" step="0.01" inputmode="decimal" value="' + (val == null ? "" : esc(val)) + '"></div>';
+    '<label class="check"><input type="checkbox" id="f-lumpon"' + (on ? " checked" : "") + '><span>按整单总价算（比如一整盒），不用填单价</span></label>' + lumpWrapHtml(on, val);
   const lumpOn = () => !!($("f-lumpon") && $("f-lumpon").checked);
   function lumpSync() {
     const on = lumpOn(); if ($("f-lumpwrap")) $("f-lumpwrap").hidden = !on;
@@ -1758,11 +1782,13 @@ details.restock > summary::-webkit-details-marker { display: none; }
       (edit ? '<input type="checkbox" id="f-resv" checked hidden>' : '<label class="check"><input type="checkbox" id="f-resv"' + (reserve ? " checked" : "") + '><span>只是预定（还没付款，之后再结算）</span></label>') +
       '<div class="lines-head"><span>香型</span><span>数量</span><span>单价 $</span><span></span></div>' +
       '<div id="f-lines"></div>' +
-      '<div><button type="button" class="btn ghost small" id="f-addline">+ 再加一种香型</button></div>' +
-      lumpHtml(!!edit && edit.lump_total != null, edit ? edit.lump_total : null) +
-      /* 付款方式：一排小标签，点一下（以前是下拉框，iPhone 上要 点开 → 滚轮 → 完成）；再点一下已选的 = 取消 */
-      '<div class="field"><span class="lbl">付款方式</span><div class="chips" id="f-paychips" role="radiogroup" aria-label="付款方式">' + PAY.concat([MIX]).map((x) => '<label class="chip"><input type="radio" name="f-payr" value="' + esc(x) + '"' + (edit && edit.payment === x ? " checked" : "") + "> " + esc(x) + "</label>").join("") + "</div></div>" +
-      '<div class="field"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="' + esc(edit && edit.delivery_fee ? edit.delivery_fee : "") + '"></div>' +
+      /* 「按整单总价」做成加一行旁边的小开关（以前单独一整行） */
+      '<div class="addrow"><button type="button" class="btn ghost small" id="f-addline">+ 再加一种香型</button><label class="chip lumpchip"><input type="checkbox" id="f-lumpon"' + (edit && edit.lump_total != null ? " checked" : "") + '> 按整单总价</label></div>' +
+      lumpWrapHtml(!!edit && edit.lump_total != null, edit ? edit.lump_total : null) +
+      /* 付款方式：一排小标签，点一下（以前是下拉框，iPhone 上要 点开 → 滚轮 → 完成）；再点一下已选的 = 取消。预定时收起来（结算时才选），已经付了点一下再出来 */
+      '<button type="button" class="linkbtn" id="f-payshow" hidden>付款方式（结算时再选；已经付了点这里）</button>' +
+      '<div class="field" id="f-payf"><span class="lbl">付款方式</span><div class="chips" id="f-paychips" role="radiogroup" aria-label="付款方式">' + PAY.concat([MIX]).map((x) => '<label class="chip"><input type="radio" name="f-payr" value="' + esc(x) + '"' + (edit && edit.payment === x ? " checked" : "") + "> " + esc(x) + "</label>").join("") + "</div></div>" +
+      '<div class="field fee-row"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0（自取）" value="' + esc(edit && edit.delivery_fee ? edit.delivery_fee : "") + '"></div>' +
       mixRowHtml(edit || null) +
       /* 2026-11-18 Bowen：少给 / 多给是交货时临时发生的，记单的时候不知道 → 新记的单不放这个（编辑预定、结算、改已卖出的单才有）；
          上次少给 / 多给的提醒照旧。备注直接放出来；预定已经有交货时间，「更多」（日期、下次跟进）只在记卖出时有 */
@@ -1880,7 +1906,17 @@ details.restock > summary::-webkit-details-marker { display: none; }
       wirePicker(avail, D, (k) => { setDefaultPrice(k); recalc(); });
       wireCust(edit ? edit.id : null);
       sheetOn("input", recalc); sheetOn("change", recalc);
-      $("f-resv").addEventListener("change", () => { $("sheet-title").textContent = $("f-resv").checked ? "记一笔预定" : "记一笔卖出"; $("f-meet").hidden = !$("f-resv").checked; $("f-more").hidden = $("f-resv").checked; bal.paint(); recalc(); });
+      /* 预定：客户、交货挪到口味下面（预定最要紧的是谁、什么时候、在哪）；付款方式收起来。记卖出照旧 */
+      let payShown = false;
+      const layout = () => {
+        const r = $("f-resv").checked, cf = $("f-cust").closest(".field"), parts = [cf, $("f-cust-hint"), $("f-meet")];
+        const anchor = r ? $("f-lumpwrap") : $("f-mixwrap"); let at = anchor; for (const el of parts) { at.after(el); at = el; }
+        const chosen = !!document.querySelector('input[name="f-payr"]:checked');
+        $("f-payf").hidden = r && !chosen && !payShown; $("f-payshow").hidden = !$("f-payf").hidden;
+      };
+      $("f-payshow").addEventListener("click", () => { payShown = true; layout(); });
+      layout();
+      $("f-resv").addEventListener("change", () => { $("sheet-title").textContent = $("f-resv").checked ? "记一笔预定" : "记一笔卖出"; $("f-meet").hidden = !$("f-resv").checked; $("f-more").hidden = $("f-resv").checked; layout(); bal.paint(); recalc(); });
       wireMeet(); wireMeetCust();
       /* 再点一下已选的付款方式 = 取消（预定可以先不选） */
       let payWas = curPay();
@@ -2288,34 +2324,45 @@ details.restock > summary::-webkit-details-marker { display: none; }
      用真实数据回测过（见 CLAUDE.md）：一款一周只卖几根，「这周卖得好」大多是噪音 → 看最近 8 周、只算有货的日子、一单超过 3 根按 3 根（大单不带偏）、
      数据少的往同系列平均拉（相当于先当它卖了 14 天平均速度）。分档按「一盒 10 根要卖几周」：≤1.5 卖得好 · ≤3 一般 · ≤6 偏冷（最多补一盒）· 更久且有货满 3 周 很冷（不补）；没进过的只标出来
      分盒子：这批（N 盒 + 手上的）按各口味的速度份额估「这批里大概卖几根」，一盒一盒给「多这一盒能多卖出最多」的口味（泊松分布的期望） ---------- */
-  const RS_WIN = 56, RS_PRIOR = 14, RS_FEW = 14, RS_BOX = 10, RS_N = 20;
+  const RS_WIN = 56, RS_PRIOR = 14, RS_FEW = 14, RS_BOX = 10, RS_N = 20, ASK_DAYS = 28;
+  /* 客人问了、但没货（2026-11-22 Bowen 同意加）：存在 followups，kind "ask"、done true（不进跟进列表）；断货时卖出记录是 0，这是唯一看得到需求的地方 */
+  function asksOf(days) {
+    const since = addDays(today(), -((days || ASK_DAYS) - 1)), m = {};
+    for (const f of S.followups) if (f.kind === "ask" && f.sku && (f.date || "") >= since) (m[f.sku] = m[f.sku] || []).push(f);
+    for (const k in m) m[k].sort((a, b) => (a.at || "").localeCompare(b.at || ""));
+    return m;
+  }
   const RS_TIERS = ["卖得好", "一般", "偏冷", "很冷", "没卖过"];
   function rsModel() {
     const td = today(), since = addDays(td, -(RS_WIN - 1)), ev = {}, ever = new Set();
     for (const m of S.moves) {
       if (!m.sku || !m.date) continue; const q = Number(m.qty) || 0, e = ev[m.sku] || (ev[m.sku] = []);
-      if (m.type === "in" || m.type === "adjust") { e.push([m.date, q, 0, 0]); if (q > 0) ever.add(m.sku); }
-      else if (m.type === "out") e.push([m.date, -q, m.order_id ? Math.min(q, 3) : 0, m.order_id ? 1 : 0]);
+      if (m.type === "in" || m.type === "adjust") { e.push([m.date, q, 0, 0, null]); if (q > 0) ever.add(m.sku); }
+      else if (m.type === "out") e.push([m.date, -q, m.order_id ? Math.min(q, 3) : 0, m.order_id ? 1 : 0, m.order_id || null]);
     }
     const R = {};
     for (const i of S.items) {
       if (isGeneric(i) || i.status === "停售") continue;
       const es = (ev[i.sku] || []).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-      let st = 0, k = 0, sold = 0, ins = 0;
+      let st = 0, k = 0, sold = 0, ins = 0; const ords = new Set();
       while (k < es.length && es[k][0] < since) st += es[k++][1];
       for (let d = since; d <= td; d = addDays(d, 1)) {
         let inc = 0, got = 0, sale = 0;
-        while (k < es.length && es[k][0] === d) { const e = es[k++]; inc += e[1]; if (e[1] > 0) got = 1; sold += e[2]; sale += e[3]; }
+        while (k < es.length && es[k][0] === d) { const e = es[k++]; inc += e[1]; if (e[1] > 0) got = 1; sold += e[2]; sale += e[3]; if (e[4]) ords.add(e[4]); }
         if (st > 0 || got || sale) ins++; // 这一天有货（断货的日子不算）
         st += inc;
       }
-      R[i.sku] = { i, sold, ins, never: !ever.has(i.sku) };
+      R[i.sku] = { i, sold, ins, n: ords.size, never: !ever.has(i.sku) };
     }
-    const ser = {}; for (const r of Object.values(R)) { const a = ser[seriesOf(r.i)] || (ser[seriesOf(r.i)] = [0, 0]); a[0] += r.sold; a[1] += r.ins; }
+    /* 热不热按「被买了几次」（几单，一单买 10 根也只算 1 次，2026-11-22 回测：根数会被一个大单带偏）；根数只用来算补几盒：系列里平均一次买几根（一单最多算 3） */
+    const AS = asksOf(), ser = {};
+    for (const r of Object.values(R)) { const a = ser[seriesOf(r.i)] || (ser[seriesOf(r.i)] = [0, 0, 0]); a[0] += r.n; a[1] += r.ins; a[2] += r.sold; }
     for (const r of Object.values(R)) {
-      const a = ser[seriesOf(r.i)], mean = a[1] ? a[0] / a[1] : 0;
-      r.rate = (r.sold + RS_PRIOR * mean) / (r.ins + RS_PRIOR); r.wk = r.rate > 0 ? RS_BOX / (r.rate * 7) : 99; r.few = r.ins < RS_FEW;
-      r.tier = r.never ? "没卖过" : r.wk <= 1.5 ? "卖得好" : r.wk <= 3 || r.few ? "一般" : r.wk <= 6 || r.ins < 21 ? "偏冷" : "很冷"; // 数据少的不算冷门
+      const a = ser[seriesOf(r.i)], mean = a[1] ? a[0] / a[1] : 0, per = a[0] ? a[2] / a[0] : 1;
+      r.asks = (AS[r.i.sku] || []).length;
+      r.orate = (r.n + RS_PRIOR * mean) / (r.ins + RS_PRIOR); r.per = per; r.rate = r.orate * per;
+      r.wk = r.rate > 0 ? RS_BOX / (r.rate * 7) : 99; r.few = r.ins < RS_FEW;
+      r.tier = r.never ? "没卖过" : r.wk <= 1.5 ? "卖得好" : r.wk <= 3 || r.few || r.asks >= 2 ? "一般" : r.wk <= 6 || r.ins < 21 ? "偏冷" : "很冷"; // 数据少、最近有人问的不算冷门
     }
     return R;
   }
@@ -2332,7 +2379,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const box = Object.assign({}, fixed), lam = {}, used = Object.values(fixed).reduce((a, b) => a + b, 0);
     let days = rsDays(R, ser, n, avail);
     const part = skus.filter((s) => R[s] && (fixed[s] != null || (R[s].tier !== "没卖过" && R[s].tier !== "很冷")));
-    const setLam = () => { for (const s of part) lam[s] = R[s].rate * days; }; setLam();
+    /* 最近 4 周没货时有人问：当作这些天里还会再来这么多人（按天数折算） */
+    const setLam = () => { for (const s of part) lam[s] = R[s].rate * days + (R[s].asks || 0) * (days / ASK_DAYS) * R[s].per; }; setLam();
     const el = part.filter((s) => fixed[s] == null);
     const gain = (s) => { const b = box[s] || 0; if (R[s].tier === "偏冷" && b >= 1) return -1; const a = (avail[s] || 0) + RS_BOX * b; return poisMin(lam[s], a + RS_BOX) - poisMin(lam[s], a); };
     /* 多一盒在这些天里大概多卖不到 2 根 = 这批货（供货商这次口味少）要卖更久：天数往后延再分，多出来的按速度摊开，不堆在一款上 */
@@ -2356,16 +2404,18 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const cnt = (t) => rows.filter((r) => r.tier === t).length;
     $("rs-sum").innerHTML = "补货 <small>" + esc(rsSer) + " 卖得好 " + cnt("卖得好") + " 款 · 一般 " + cnt("一般") + " 款" + (cnt("很冷") ? " · 很冷 " + cnt("很冷") + " 款" : "") + "</small>";
     $("rs-ser").innerHTML = sers.map((x) => '<button class="chip" type="button" data-rs-ser="' + esc(x) + '" aria-pressed="' + (x === rsSer) + '">' + esc(x) + "</button>").join("");
-    $("rs-basis").textContent = "按最近 8 周有货的日子算卖得多快（断货的日子不算，一单超过 3 根按 3 根）。一盒要卖几周：1.5 周内 卖得好 · 3 周内 一般 · 6 周内 偏冷 · 更久 很冷（不补）。";
+    $("rs-basis").textContent = "按有货时多久被买一次算（一单买再多也算一次）。一盒卖完：1.5 周内卖得好 · 3 周内一般 · 6 周内偏冷 · 更久很冷不补。";
     let last = "";
     $("rs-list").innerHTML = rows.map((r) => { const h = r.tier !== last ? '<div class="rs-tier">' + r.tier + "</div>" : ""; last = r.tier; const a = A[r.i.sku] || 0;
       return h + '<div class="rs-row"><div class="rs-what"><span class="name">' + esc(enOf(r.i)) + '</span><span class="cn">' + esc(r.i.name) + "</span>" +
-        '<span class="dates">' + rsTxt(r) + (r.never ? "" : " · 8 周里有货 " + r.ins + " 天、卖 " + r.sold + " 根") + (r.few && !r.never ? ' · <b class="rs-few">数据少</b>' : "") + "</span></div>" +
-        '<span class="rs-side"><span class="pill' + (a > 0 ? "" : " bad") + '">' + (a > 0 ? "剩 " + a : "没货") + "</span></span></div>"; }).join("");
+        '<span class="dates">' + rsTxt(r) + (r.never ? "" : " · 8 周里有货 " + r.ins + " 天、被买 " + r.n + " 次") + (r.few && !r.never ? ' · <b class="rs-few">数据少</b>' : "") + (r.asks ? ' · <b class="rs-ask">没货时 ' + r.asks + " 人问</b>" : "") + "</span></div>" +
+        '<span class="rs-side"><span class="pill' + (a > 0 ? "" : " bad") + '">' + (a > 0 ? "剩 " + a : "没货") + "</span>" +
+          (a <= 0 && !r.never ? '<button class="askbtn" type="button" data-ask="' + esc(r.i.sku) + '" aria-label="有客人问 ' + esc(enOf(r.i)) + '，记一次">有人问' + (r.asks ? " <b>" + r.asks + "</b>" : "") + "</button>" : "") + "</span></div>"; }).join("");
   }
   $("rs-sec").addEventListener("click", (e) => {
     const c = e.target.closest("[data-rs-ser]"); if (c) { rsSer = c.dataset.rsSer; try { localStorage.setItem("mk-rs-ser", rsSer); } catch (_) {} renderRestock(); }
     else if (e.target.closest("#rs-plan")) restockSheet(rsSer);
+    else { const ak = e.target.closest("[data-ask]"); if (ak) askAdd(ak.dataset.ask); }
   });
   /* 补货单：这次补几盒、供货商有哪些（可以粘贴他的清单）→ 自动分盒子，每行能 + / −（改过的不再动），「做成订货单」带进订货单 */
   function restockSheet(ser) {
@@ -2390,7 +2440,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
           plan = rsAlloc(R, ser, rows.map((r) => r.i.sku).filter((s) => have.has(s)), n, A, fixed);
           let last = "";
           $("rs-rows").innerHTML = rows.map((r) => { const s = r.i.sku, on = have.has(s), b = plan.box[s] || 0, h = r.tier !== last ? '<div class="rs-tier">' + r.tier + "</div>" : ""; last = r.tier;
-            return h + '<div class="rs-prow' + (on ? "" : " off") + (fixed[s] != null ? " fixed" : "") + '"><label class="rs-have"><input type="checkbox" data-have="' + esc(s) + '"' + (on ? " checked" : "") + '><span><b>' + esc(enOf(r.i)) + "</b><small>" + esc(r.i.name) + " · " + (A[s] ? "剩 " + A[s] : "没货") + (on && plan.lam[s] != null ? " · 这批大概卖 " + Math.round(plan.lam[s]) + " 根" : r.never ? " · 没卖过" : r.tier === "很冷" ? " · 很冷，不补" : "") + "</small></span></label>" +
+            return h + '<div class="rs-prow' + (on ? "" : " off") + (fixed[s] != null ? " fixed" : "") + '"><label class="rs-have"><input type="checkbox" data-have="' + esc(s) + '"' + (on ? " checked" : "") + '><span><b>' + esc(enOf(r.i)) + "</b><small>" + esc(r.i.name) + " · " + (A[s] ? "剩 " + A[s] : "没货") + (on && plan.lam[s] != null ? " · 这批大概卖 " + Math.round(plan.lam[s]) + " 根" : r.never ? " · 没卖过" : r.tier === "很冷" ? " · 很冷，不补" : "") + (r.asks ? " · 没货时 " + r.asks + " 人问" : "") + "</small></span></label>" +
               '<span class="rs-step"><button type="button" class="btn small" data-bx="-1" data-s="' + esc(s) + '"' + (on && b ? "" : " disabled") + ' aria-label="少一盒">−</button><b>' + b + '</b><button type="button" class="btn small" data-bx="1" data-s="' + esc(s) + '"' + (on ? "" : " disabled") + ' aria-label="多一盒">＋</button></span></div>'; }).join("");
           const tot = Object.values(plan.box).reduce((a, b) => a + b, 0);
           $("rs-total").innerHTML = "已分 <b>" + tot + "</b> / " + n + " 盒 · " + tot * RS_BOX + " 根 · 按这批大概卖 " + Math.round(plan.days) + " 天算" + (tot !== n ? ' <span class="warn">' + (tot < n ? "还差 " + (n - tot) + " 盒（勾上的只剩偏冷的，自己加）" : "多了 " + (tot - n) + " 盒") + "</span>" : "");
@@ -2491,20 +2541,22 @@ details.restock > summary::-webkit-details-marker { display: none; }
       });
       const order = SERIES.concat([...new Set(list.map(seriesOf))].filter((x) => !SERIES.includes(x)));
       const groups = order.map((sr) => [sr, list.filter((i) => seriesOf(i) === sr).sort((a, b) => (((D.st[b.sku] || 0) > 0) - ((D.st[a.sku] || 0) > 0)) || bySku(a, b))]).filter((g) => g[1].length);
+      const AK = asksOf();
       const rowHtml = (i) => {
         const q = D.st[i.sku] || 0;
         const pill = i.status === "停售" ? ["停售", "na"] : q <= 0 ? ["无库存", "na"] : q <= 1 ? ["剩 1 根", "warn"] : ["有货", ""];
         const open = openSku === i.sku;
         const hist = S.moves.filter((m) => m.sku === i.sku).sort(moveSort);
         const photos = Array.isArray(i.photo_links) ? i.photo_links : (i.photo_links ? [i.photo_links] : []);
-        const ac = avgCost(i.sku);
+        const ac = avgCost(i.sku), ak = (AK[i.sku] || []).length, canAsk = q <= 0 && i.status !== "停售";
         return '<div class="row' + (i.status === "停售" ? " sold" : "") + '">' +
           '<div class="row-top">' +
             '<button class="row-main" type="button" data-sku="' + esc(i.sku) + '" aria-expanded="' + open + '">' +
               '<span class="name">' + esc(enOf(i)) + "</span>" + (i.variant ? '<span class="cn">' + esc(i.name) + "</span>" : "") +
               '<span class="dates">录入 ' + fmtD(i.created_at) + " · 进货 " + fmtD(D.lastIn[i.sku]) + " · 卖出 " + fmtD(D.lastOut[i.sku]) + (TR[i.sku] ? ' · <b class="transit">在途 ' + TR[i.sku] + " 根</b>" : "") + (RV[i.sku] ? ' · <b class="resv">预定 ' + RV[i.sku] + " 根</b>" : "") + "</span>" +
             "</button>" +
-            '<span class="qtybox"><span class="qty">' + q + "<small>根</small></span>" + '<span class="pill ' + pill[1] + '">' + pill[0] + "</span></span>" +
+            '<span class="qtybox"><span class="qty">' + q + "<small>根</small></span>" + '<span class="pill ' + pill[1] + '">' + pill[0] + "</span>" +
+              (canAsk ? '<button class="askbtn" type="button" data-ask="' + esc(i.sku) + '" aria-label="有客人问 ' + esc(enOf(i)) + '，记一次">有人问' + (ak ? " <b>" + ak + "</b>" : "") + "</button>" : "") + "</span>" +
             '<span class="quick">' +
               '<button class="qbtn plus" type="button" data-act="in" data-sku="' + esc(i.sku) + '" aria-label="' + esc(enOf(i)) + ' 进货" title="进货">＋</button>' +
               '<button class="qbtn" type="button" data-act="sale" data-sku="' + esc(i.sku) + '" aria-label="' + esc(enOf(i)) + ' 卖出" title="卖出"' + (i.status === "停售" ? " disabled" : "") + ">−</button>" +
@@ -2518,6 +2570,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
               photos.filter((u) => /^https:\/\//.test(u)).map((u, k) => '<a href="' + esc(u) + '" target="_blank" rel="noopener">照片' + (photos.length > 1 ? k + 1 : "") + "</a>").join("") +
             "</div>" +
             (i.notes ? '<div class="notes">' + esc(i.notes) + "</div>" : "") +
+            (ak ? '<div class="notes ask-note">最近 4 周没货时有 ' + ak + " 次有人问（最近一次 " + fmtD(AK[i.sku][ak - 1].date) + '）<button class="linkbtn" type="button" data-ask-undo="' + esc(i.sku) + '">撤销上一次</button></div>' : "") +
             '<div class="row-actions">' +
               (q > 0 ? '<button class="btn small primary" type="button" data-act="sale" data-sku="' + esc(i.sku) + '">卖出</button>' : "") +
               '<button class="btn small" type="button" data-act="reserve" data-sku="' + esc(i.sku) + '">预定</button>' +
@@ -2548,7 +2601,19 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }).join("") + (moreN > 0 ? '<li class="more"><button class="btn small" type="button" data-more-moves>看更多（还有 ' + moreN + " 条）</button></li>" : "") : '<li><span class="mv-text">还没有记录。</span></li>';
   }
 
+  /* 有人问（没货）：点一下记一次；展开里能撤销上一次 */
+  async function askAdd(sku) {
+    try { needDb(); await db.collection("followups").doc(rid("ask")).set({ kind: "ask", sku, name: nm(sku), date: today(), at: new Date().toISOString(), done: true });
+      toast("记了：有人问 " + nm(sku) + "（最近 4 周第 " + ((asksOf()[sku] || []).length) + " 次）。补货单会把它往前排。"); } catch (e) { toast(e.userMsg || errText(e)); }
+  }
+  async function askUndo(sku) {
+    const L = asksOf()[sku] || []; if (!L.length) return;
+    try { needDb(); await db.doc("followups/" + L[L.length - 1].id).delete(); toast("撤销了一次「有人问 " + nm(sku) + "」。"); } catch (e) { toast(e.userMsg || errText(e)); }
+  }
   $("items").addEventListener("click", (e) => {
+    const ak = e.target.closest("[data-ask]"), au = e.target.closest("[data-ask-undo]");
+    if (ak) { e.stopPropagation(); askAdd(ak.dataset.ask); return; }
+    if (au) { e.stopPropagation(); askUndo(au.dataset.askUndo); return; }
     const act = e.target.closest("[data-act]");
     if (act) {
       const sku = act.dataset.sku;
@@ -5089,7 +5154,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
         return rows; })(), [16, 6, 14, 20, 24, 8, 8, 10, 11, 30]],
       ["跟进", (() => {
         const rows = [["客户", "状态", "想要", "跟进什么", "哪天跟进", "已发信息", "记录时间"]];
-        for (const f of S.followups.slice().sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))) rows.push([f.customer || "", f.done ? "不用跟了/已成交" : "要跟进", wantsText(f.wants), f.note || "", f.date || "", f.contacted_at || "", f.created_at || ""]);
+        for (const f of S.followups.slice().sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))) if (f.kind !== "ask") rows.push([f.customer || "", f.done ? "不用跟了/已成交" : "要跟进", wantsText(f.wants), f.note || "", f.date || "", f.contacted_at || "", f.created_at || ""]);
         for (const o of S.orders) if (o.follow_up) rows.push([o.customer || "", o.follow_up.done ? "不用跟了/已成交" : "要跟进", "", o.follow_up.note || "", o.follow_up.date || "", o.follow_up.contacted_at || "", o.at || ""]);
         return rows; })(), [16, 12, 30, 30, 11, 11, 24]],
       ["每日利润", daily, [11, 8, 9, 12, 12, 11, 11, 10, 11, 10, 18, 14]],
@@ -5128,7 +5193,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const map = {};
     for (const o of S.orders) { const n = String(o.customer || "").trim(); if (!n) continue; const id = custId(n); (map[id] || (map[id] = { id, name: n, orders: [] })).orders.push(o); }
     for (const p of S.customers) if (!map[p.id] && p.name) map[p.id] = { id: p.id, name: p.name, orders: [] };
-    for (const f of S.followups) { const n = String(f.customer || "").trim(); if (n && !map[custId(n)]) map[custId(n)] = { id: custId(n), name: n, orders: [] }; }
+    for (const f of S.followups) { const n = f.kind === "ask" ? "" : String(f.customer || "").trim(); if (n && !map[custId(n)]) map[custId(n)] = { id: custId(n), name: n, orders: [] }; }
     const FUS = openFUs();
     return Object.values(map).map((c) => {
       const p = P[c.id] || {}, os = c.orders.slice().sort(moveSort), paid = os.filter((o) => !isReserved(o)), fl = {};
@@ -5140,7 +5205,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       return { id: c.id, name: p.name || c.name, p, orders: os, paid, qty, spent: r2(spent), last: os[0] ? os[0].date : "", box, autoVip, vip: p.vip === true || (p.vip !== false && autoVip), place: p.place || "", call: p.call || "",
         suburb: p.suburb || (os.find((o) => o.suburb) || {}).suburb || "", source: first ? first.source : "",
         flavours: Object.entries(fl).sort((a, b) => b[1] - a[1]).slice(0, 3), fu: FUS.find((x) => x.customer && custId(x.customer) === c.id) || null, resv: os.filter(isReserved),
-        enq: S.followups.filter((x) => x.customer && custId(x.customer) === c.id).sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")) };
+        enq: S.followups.filter((x) => x.kind !== "ask" && x.customer && custId(x.customer) === c.id).sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")) };
     });
   }
   function renderCustomers() {

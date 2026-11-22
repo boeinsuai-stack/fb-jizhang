@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-21 线上 fb-app-v31，分支 feat-cost-book → feat-restock2 是 v32）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-21 线上 fb-app-v31，分支 feat-cost-book → feat-restock2 → feat-ask-form 是 v32）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -323,13 +323,25 @@
   5 周数据前后两半排名相关是负的（Ali −0.22、Bar Pro −0.49）→「这周卖得好」大多是噪音，重压热门不可靠；所以往系列平均拉得狠（RS_PRIOR 14 天）、看 8 周
   - 11-14 Ali 200 根那次：算法分法跟 Bowen 实际的很接近；彩虹糖他给 3 盒、到货 4 天卖 9 根，算法只给 1 盒（它一半销量是一单 8 根被压成 3）→ 补货单是起点，他 + / − 改
   - 之前 8 周 Ali 大部分口味只有十几天有货 = 断货是常态
-- `rsModel()`：最近 RS_WIN 56 天、只算有货的日子（那天开始有货 / 到货 / 有卖出）、订单卖出一条流水最多算 3 根（大单不带偏）、合伙人拿走的不算；
-  rate =（卖出 + 14 × 系列平均）÷（有货天数 + 14）；一盒几周 = 10 ÷ (rate × 7)：≤1.5 卖得好 · ≤3 一般 · ≤6 偏冷 · 更久且有货满 21 天 很冷；有货不满 14 天 =「数据少」且最冷只算一般；从没进过 = 没卖过
+- `rsModel()`：最近 RS_WIN 56 天、只算有货的日子（那天开始有货 / 到货 / 有卖出）、合伙人拿走的不算；
+  **热不热按「被买了几次」（几单，一单买 10 根也只算 1 次；feat-ask-form 起，以前按根数封顶 3）**：orate =（几单 + 14 × 系列平均）÷（有货天数 + 14）；
+  换成根数 rate = orate × 系列平均一次买几根（一单最多算 3）；一盒几周 = 10 ÷ (rate × 7)：≤1.5 卖得好 · ≤3 一般 · ≤6 偏冷 · 更久且有货满 21 天 很冷；有货不满 14 天 =「数据少」且最冷只算一般；从没进过 = 没卖过
 - `rsAlloc()`：这批大概卖几天 = (N 盒 + 系列手上的) ÷ 系列每天卖多少，夹在 7–21（rsDays）；每款 λ = rate × 天数（跟供货商有几款无关）；
   一盒一盒给「多这一盒在这些天里多卖出最多」的（泊松期望 poisMin）；偏冷最多 1 盒；很冷、没卖过不分；多一盒多卖不到 2 根 = 这批要卖更久 → 天数 ×1.15 再分（不堆在一款上）；盒子一定分满
 - 库存页「补货」：系列标签、按档列出（一盒约几周卖完 · 8 周有货几天卖几根 · 数据少 · 剩几根）、「做补货单」→ `restockSheet(ser)`：补几盒（默认 20）、勾掉供货商没有的、
   粘贴供货商清单（FBParse.parseOrder，只留认出的，没认出的列出来）、每行 − / ＋（fixed，改过的不再动）、重新分、复制清单、「做成订货单」→ `poForm(null, {series, lines:[[sku, 根]]})`
-- 测试 `tests/test_restock.py` 46/46（编的数据，旧/新结构）；JS 跟 Python 原型在真实数据上 52 款逐款对过（有货天数、卖出根数一致）
+- **有人问（没货）**（feat-ask-form）：存在 followups，`{kind:"ask", sku, name, date, at, done:true}`（done 所以不进跟进列表；导出、客户名单、客户的跟进历史都跳过 kind ask）。
+  `asksOf()` 最近 28 天；补货里没货的口味（不算没卖过的）、「管理香型」里没货的那一行有「有人问 N」按钮，点一下记一次；展开那一行「撤销上一次」。
+  补货：最近 4 周有 2 次以上有人问的最冷只算一般；分盒子时 λ 加上 问的次数 ×（天数 ÷ 28）× 一次几根
+- 测试 `tests/test_restock.py` 64/64（编的数据，旧/新结构）；JS 跟 Python 原型在真实数据上 52 款逐款对过（有货天数、卖出根数一致，按根数那一版）
+
+## 预定表单整理（feat-ask-form，2026-11-22）
+- Bowen：预定页交货那块的时间、联系很乱（两个时间框没标签、又冒出「几点方便联系」），整个表单太长
+- 交货 `meetHtml`：一个小框，左边固定「哪天 / 几点 / 在哪」。哪天 = 日期框 + 旁边「今天 / 明天 / 后天 / X月Y日 周Z」（meetDayTxt）；
+  几点 = 二选一 `#f-mmode`：约好了（`#f-mset` 几点见）/ 还没定（`#f-mnone` 他说几点到几点方便联系，f-cfrom/f-cto），同时只出现一个；readMeet 按选的那个存（另一个存 null）
+- saleForm 预定时（layout()）：客户 + 提示 + 交货挪到口味下面（DOM 挪动，记卖出时放回配送费下面）；付款方式 `#f-payf` 收起来，`#f-payshow`「付款方式（结算时再选；已经付了点这里）」；已经选了付款方式的照样显示
+- 「按整单总价」= 加一行旁边的小开关 `.addrow .lumpchip`（lumpWrapHtml；别的表还用 lumpHtml 整行）；配送费 `.fee-row` 一行（placeholder「0（自取）」）
+- 测试 `tests/test_resv_form.py` 36/36；test_meet / test_place_fu / test_cust_bal 填时间前先点「约好了」、预定选付款前先点 #f-payshow
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超

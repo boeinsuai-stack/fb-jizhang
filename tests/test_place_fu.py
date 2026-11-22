@@ -162,7 +162,7 @@ with sync_playwright() as p:
 
         # 新客人 + 新地点：进地点库、客人打上标签
         def newpl():
-            pg.click("#f-pladd"); pg.fill("#f-plnew", "Murdoch 站"); pg.fill("#f-mtime", "15:30")
+            pg.click("#f-pladd"); pg.fill("#f-plnew", "Murdoch 站"); pg.click('#f-mmode [data-mm="set"]'); pg.fill("#f-mtime", "15:30")
         resv(pg, "Ivy", newpl); save(pg)
         check("新地点进地点库（还没写地址）", [x["name"] for x in S(pg, "places")] == ["Coles 停车场", "Murdoch 站"], S(pg, "places"))
         check("新客人 Ivy 自动打上「Murdoch 站」", cust(pg, "Ivy").get("place") == "Murdoch 站", cust(pg, "Ivy"))

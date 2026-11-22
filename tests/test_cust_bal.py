@@ -115,7 +115,7 @@ with sync_playwright() as p:
         check("结算预定（选付款方式那一页）也能记少给 / 多给", pg.inner_text("#sheet-title").startswith("结算"))
         pg.click('#sheet label.chip:has(input[value="现金"])'); diff(pg, "-1", 20, "没有零钱"); save(pg)
         check("结算预定时记「客人多给了 $20」：Ben 欠 −20（你欠他）", order(pg, r1)["status"] == "paid" and bal(pg, "Ben") == -20, (order(pg, r1).get("bal"), bal(pg, "Ben")))
-        r2 = sale(pg, "ben", resv=True, keep_open=True, fn=lambda pg: pg.click('#f-paychips label:has(input[value="现金"])')); pg.wait_for_timeout(150)
+        r2 = sale(pg, "ben", resv=True, keep_open=True, fn=lambda pg: (pg.click('#f-payshow') if pg.is_visible('#f-payshow') else None, pg.click('#f-paychips label:has(input[value="现金"])'))); pg.wait_for_timeout(150)
         r = txt(pg, "#f-balold")
         check("下一个预定：提醒「上次多给了你 $20」，不能当场抵（还没付钱）；新记的预定不放记少给多给", "上次多给了你 $20" in r and "结算的时候" in r and pg.locator("#f-baltake").count() == 0 and pg.is_hidden("#f-diff-open"), r)
         save(pg); r2 = sorted(ids(pg) - {o["id"] for o in pg.evaluate("window.__GM.S.orders") if o.get("status") == "paid" or o["id"] == r1})[0]
@@ -146,7 +146,7 @@ with sync_playwright() as p:
         pg.click("#sheet-close"); pg.wait_for_timeout(250)
 
         # 4b. 预定上记：点预定的「编辑」就能记少给 / 多给
-        r4 = sale(pg, "Dan", resv=True, fn=lambda pg: pg.click('#f-paychips label:has(input[value="现金"])'))
+        r4 = sale(pg, "Dan", resv=True, fn=lambda pg: (pg.click('#f-payshow') if pg.is_visible('#f-payshow') else None, pg.click('#f-paychips label:has(input[value="现金"])')))
         go(pg, "customers"); pg.evaluate(f"""() => document.querySelector('[data-settle="{r4}"]').closest('details').querySelector('[data-edit-order]').click()"""); pg.wait_for_timeout(400)
         check("预定点「编辑」：看得到「客人少给 / 多给了钱？」", pg.is_visible("#f-diff-open"))
         diff(pg, "1", 10, "配送费没给"); pg.wait_for_timeout(150)
