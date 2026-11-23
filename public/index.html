@@ -179,7 +179,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .mb-row { display: grid; grid-template-columns: 3.2em 1fr; gap: 10px; align-items: start; padding: 10px 12px; border-top: 1px solid var(--line); } .mb-row:first-child { border-top: 0; }
 .mb-k { font-size: .85rem; color: var(--muted); padding-top: 9px; }
 .mb-v { display: grid; gap: 8px; min-width: 0; } .mb-v .chips { margin: 0; }
-.mb-day { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } .mb-day input { width: 100%; min-width: 0; } .mb-day b { font-size: .9rem; color: var(--accent); white-space: nowrap; }
+#f-mdate { width: 100%; min-width: 0; } #f-mdate[hidden] { display: none; }
 #f-mset input { width: 9em; }
 #f-mnone { display: grid; gap: 6px; } .mb-hint { font-size: .8rem; color: var(--muted); }
 .call-row2 { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; font-size: .85rem; color: var(--muted); } .call-row2 input { width: 100%; min-width: 0; }
@@ -754,7 +754,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
 #ptx-sec .t-n { background: var(--warn); }
 #ptx-sec.give .tile.on .t-main { border-color: var(--ser-bp); background: var(--hover); }
 #ptx-sec.give .t-n { background: var(--ser-bp); color: var(--surface); }
-#ptx-side { margin-top: 8px; } .sw-h { margin: 14px 0 6px; font-size: .95rem; }
+#ptx-side { margin-top: 8px; }
+.pp-h, .pp-r { display: grid; grid-template-columns: minmax(0, 1fr) 92px 92px; gap: 8px; align-items: center; } .pp-h { font-size: .82rem; color: var(--muted); margin: 6px 0 2px; } .pp-h span { text-align: center; }
+.pp-r { padding: 8px 0; border-bottom: 1px solid var(--line); } .pp-r b small { display: block; font-weight: 400; font-size: .78rem; color: var(--muted); } .pp-r input { width: 100%; min-width: 0; text-align: center; } .sw-h { margin: 14px 0 6px; font-size: .95rem; }
 .cartbar.partner { border-top: 2px solid var(--warn); }
 .cartbar.partner #cb-go { background: var(--warn); border-color: var(--warn); color: var(--surface); }
 .cartbar.partner.give { border-top-color: var(--ser-bp); }
@@ -788,7 +790,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
 .fu2 > summary { list-style: none; cursor: pointer; display: grid; gap: 2px; padding: 11px 16px; } .fu2 > summary::-webkit-details-marker { display: none; }
 .fu-l1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .fu-l1 b { font-weight: 600; }
 .fu-when { font-size: .82rem; font-weight: 600; color: var(--muted); min-width: 3.6em; font-variant-numeric: tabular-nums; } .fu-when.late { color: var(--warn); } .fu-when.now { color: var(--accent); }
-.fu-why { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .fu2[open] .fu-why { white-space: normal; }
+.fu-why { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; } .fu2[open] .fu-why { display: block; } /* 最多两行（2026-11-24：一行时日期被截掉） */
 .fu-call { color: var(--accent); }
 .fu-body { display: grid; gap: 4px; padding: 0 16px 14px; } .fu-body .l-actions { margin-top: 6px; }
 .fu2[open] > summary { padding-bottom: 6px; }
@@ -1203,7 +1205,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   const FOLDER_ID = "";
   const FOLDER_URL = "https://drive.google.com/drive/folders/" + FOLDER_ID;
 
-  const S = { items: [], moves: [], orders: [], expenses: [], purchases: [], settles: [], transfers: [], customers: [], followups: [], places: [], sync: null, loaded: 0 };
+  const S = { items: [], moves: [], orders: [], expenses: [], purchases: [], settles: [], transfers: [], customers: [], followups: [], places: [], pprice: [], sync: null, loaded: 0 };
   const STANDALONE = false;
   let db = null, rawDb = null, mcp = null, mcpChecked = false, assets = null, meId = null;
   let movesN = 10;
@@ -1328,7 +1330,11 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const d = (o && o.meet_date) || today(), pl = (o && o.place) || "", L = placeList(); if (pl && !L.includes(pl)) L.unshift(pl);
     const set = !!(o && o.meet_time), m = /^([^-]*)-(.*)$/.exec((o && o.call_win) || "") || [];
     return '<div class="field" id="f-meet"' + (show ? "" : " hidden") + '><span class="lbl">交货</span><div class="mb">' +
-      '<div class="mb-row"><span class="mb-k">哪天</span><div class="mb-v mb-day"><input id="f-mdate" type="date" value="' + esc(d) + '" aria-label="哪天交货"><b id="f-mday">' + meetDayTxt(d) + "</b></div></div>" +
+      /* 哪天（2026-11-24 Bowen：日期框旁边的绿字「今天」挤在一起不好看）→ 一排标签 今天（默认）/ 明天 / 选日期；选日期才出日期框。#f-mdate 照旧是存的那个值 */
+      (() => { const g = dayGap(today(), d), md = g === 0 ? "0" : g === 1 ? "1" : "pick";
+        return '<div class="mb-row"><span class="mb-k">哪天</span><div class="mb-v"><div class="chips seg" id="f-mdays" role="group" aria-label="哪天交货">' +
+          [["0", "今天"], ["1", "明天"], ["pick", "选日期"]].map(([k, l]) => '<button type="button" class="chip" data-md="' + k + '" aria-pressed="' + (k === md) + '">' + l + "</button>").join("") + "</div>" +
+          '<input id="f-mdate" type="date" value="' + esc(d) + '" aria-label="选哪天交货"' + (md === "pick" ? "" : " hidden") + "></div></div>"; })() +
       '<div class="mb-row"><span class="mb-k">几点</span><div class="mb-v"><div class="chips seg" id="f-mmode" role="group" aria-label="几点"><button type="button" class="chip" data-mm="set" aria-pressed="' + set + '">约好了</button><button type="button" class="chip" data-mm="none" aria-pressed="' + !set + '">还没定</button></div>' +
         '<div id="f-mset"' + (set ? "" : " hidden") + '><input id="f-mtime" type="time" value="' + esc((o && o.meet_time) || "") + '" aria-label="几点见"></div>' +
         '<div id="f-mnone"' + (set ? " hidden" : "") + '><span class="mb-hint">他说几点到几点方便联系（可不填）</span><div class="call-row2"><input id="f-cfrom" type="time" value="' + esc(m[1] || "") + '" aria-label="从几点"><span>到</span><input id="f-cto" type="time" value="' + esc(m[2] || "") + '" aria-label="到几点"></div></div></div></div>' +
@@ -1371,7 +1377,11 @@ details.restock > summary::-webkit-details-marker { display: none; }
   }
   function wireMeet() {
     const box = $("f-pl"); if (!box) return; let was = (document.querySelector('input[name="f-plr"]:checked') || {}).value;
-    $("f-mdate").addEventListener("change", () => { $("f-mday").textContent = $("f-mdate").value ? meetDayTxt($("f-mdate").value) : ""; });
+    $("f-mdays").addEventListener("click", (e) => { const b = e.target.closest("[data-md]"); if (!b) return;
+      $("f-mdays").querySelectorAll("[data-md]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      const k = b.dataset.md, inp = $("f-mdate");
+      if (k === "pick") { inp.hidden = false; try { inp.showPicker(); } catch (_) { inp.focus(); } return; }
+      inp.hidden = true; inp.value = k === "1" ? ymd(new Date(Date.now() + 864e5)) : today(); });
     $("f-mmode").addEventListener("click", (e) => { const b = e.target.closest("[data-mm]"); if (!b) return;
       $("f-mmode").querySelectorAll("[data-mm]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
       const set = b.dataset.mm === "set"; $("f-mset").hidden = !set; $("f-mnone").hidden = set; if (set) $("f-mtime").focus(); });
@@ -1591,7 +1601,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     { const spl = split !== undefined ? split : pickSplitLeft(o0), parts = [];
       for (const x of picks) for (const [w, n] of Object.entries(splitPick(spl, name, x.l.sku, x.qty))) parts.push({ l: x.l, qty: n, who: w === "合伙人" && !name ? null : w });
       picks.length = 0; picks.push(...parts); }
-    const priced = picks.map((x) => { const c = numOrNull((itemBy(x.l.sku) || {}).cost_aud); return c == null ? null : r2(c * x.qty); });
+    const priced = picks.map((x) => { const c = pickUnit(x.l.sku, x.who || name); return c == null ? null : r2(c * x.qty); }); // 对账单里填了跟他的价就用（2026-11-24）
     const total = priced.every((c) => c != null) ? r2(priced.reduce((a, c) => a + c, 0)) : null;
     const exPrev = S.expenses.find((x) => x.batch_id === bid), eid = total ? (exPrev ? exPrev.id : bid + "-cost") : null;
     const used = new Set(), mid = (sku) => { let id = bid + "-" + sku; if (used.has(id) || S.moves.some((m) => m.id === id)) id += "-" + Date.now().toString(36) + used.size; used.add(id); return id; };
@@ -3967,7 +3977,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const o = S.orders.find((x) => x.id === oid), per = {}, spl = pickSplitLeft(o);
       for (const [sku, q] of Object.entries(need)) for (const [w, n] of Object.entries(splitPick(spl, o.pick_from, sku, q))) (per[w] = per[w] || {})[sku] = n;
       for (const [w, need2] of Object.entries(per)) {
-        const moves = Object.entries(need2).map(([sku, q]) => { const c = numOrNull((itemBy(sku) || {}).cost_aud); return { id: null, sku, name: nm(sku), qty: q, cost: c == null ? null : r2(c * q) }; });
+        const moves = Object.entries(need2).map(([sku, q]) => { const c = pickUnit(sku, w); return { id: null, sku, name: nm(sku), qty: q, cost: c == null ? null : r2(c * q) }; });
         const qty = {}; for (const m of moves) { const sr = seriesOf(itemBy(m.sku)); qty[sr] = (qty[sr] || 0) + m.qty; }
         (RW[oid] = RW[oid] || {})[w] = moves.reduce((a, m) => a + m.qty, 0);
         groups.push({ oid, o, who: w, date: o.date, at: o.at, moves, qty, cost: r2(moves.reduce((a, m) => a + (m.cost || 0), 0)), known: moves.every((m) => m.cost != null), sid: null, pending: true });
@@ -4110,7 +4120,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
         q.lines.map((l) => '<li class="lg-l"><span>' + esc(l.k) + "</span><b>×" + l.q + "</b></li>").join("")).join("") + "</ul>") : "") +
       (x.unk ? '<p class="hint">＋ 有的货拿货价还没填，金额可能偏少。</p>' : "") +
       '<div class="actions"><button class="btn small" type="button" data-lg="copy">复制发给' + W + '</button><button class="btn small ghost" type="button" data-lg="xfer">记往来</button>' +
-      (openXfers(w).length ? '<button class="btn small ghost" type="button" data-lg="xprice">改单价</button>' : "") + "</div>";
+      '<button class="btn small ghost" type="button" data-lg="pprice">价格</button>' +
+      (openXfers(w).length ? '<button class="btn small ghost" type="button" data-lg="xprice">一笔一笔改单价</button>' : "") + "</div>";
     openSheet(w + " · 对账单", html, async () => { setTimeout(() => partnerSettleForm(w), 0); return ""; }, () => {
       $("sheet-save").textContent = "结账";
       sheetOn("click", (e) => { const b = e.target.closest("[data-lg]"); if (!b) return; const a = b.dataset.lg;
@@ -4119,11 +4130,76 @@ details.restock > summary::-webkit-details-marker { display: none; }
           arm(b, "确认已拿到？", async () => { try { needDb(); await recordPrePick(g, today()); toast("已记成你拿 " + w + " 的货，算进你欠 " + w + " 的账。"); closeSheet(); setTimeout(() => ledgerSheet(w), 300); } catch (e2) { toast(e2.userMsg || errText(e2)); } }); }
         else if (a === "xfer") { closeSheet(); xferForm(w); }
         else if (a === "xprice") { closeSheet(); xferPriceForm(w); }
+        else if (a === "pprice") { closeSheet(); partnerPriceForm(w); }
         else if (a === "po-pay") { closeSheet(); poPayForm(b.dataset.id); } });
     });
   }
   /* 改往来单价（只改还没结账的）：调出 = 他拿走的，只影响谁欠谁；调入 = 他给我的，那几根的进价跟着改（库存成本、利润按新价算）。
      随客户订单拿的货不在这里改（库存页「系列价格」） */
+  /* 对账单「价格」（2026-11-24 Bowen：在核对那边加一栏，每个系列「他给我 / 我给他」统一按什么价，自己改；最简单）
+     存 meta/pprice；往来、换货、随单拿、预定还没拿的默认都用它（tradeUnit / pickUnit）。勾「没结账的也重算」：没结的往来单价 + 调入流水 cost、没结的随单拿流水 cost + 那单的拿货支出都按新价 */
+  function partnerPriceForm(w) {
+    const sers = allSeries(), p0 = ppOf(w) || {}, L = lastBuy(), gs = partnerItems(w), xs = openXfers(w);
+    const html = '<p class="hint">跟 ' + esc(w) + " 每根按什么价。往来、换货、随单找他拿的、预定还没拿的都按这个；空着 = 按你的进货价（框里浅色的数）。</p>" +
+      '<div class="pp-h"><span></span><span>他给我</span><span>我给他</span></div>' +
+      sers.map((sr) => '<div class="pp-r"><b>' + esc(sr) + (L[sr] ? "<small>进货价 " + money(L[sr].u) + "</small>" : "") + "</b>" +
+        ["in", "out"].map((d) => '<input type="number" min="0" step="0.01" inputmode="decimal" data-pp="' + d + '" data-sr="' + esc(sr) + '" value="' + esc(p0[d] && p0[d][sr] != null ? p0[d][sr] : "") + '" placeholder="' + esc(L[sr] ? String(L[sr].u) : "未设") + '" aria-label="' + esc(sr + (d === "in" ? " 他给我" : " 我给他") + " 每根") + '">').join("") + "</div>").join("") +
+      (gs.length || xs.length ? '<label class="check"><input type="checkbox" id="f-pp-re" checked> 没结账的也按新价重算（' + [xs.length ? xs.length + " 笔往来" : "", gs.length ? gs.length + " 笔随单拿的" : ""].filter(Boolean).join("、") + "）</label>" : "") +
+      '<p class="callout xsum" id="f-xsum">–</p>' +
+      (xs.length ? '<button type="button" class="linkbtn" id="f-pp-lines">一笔一笔改单价 ›</button>' : "");
+    const read = () => { const r = { in: {}, out: {} };
+      document.querySelectorAll("#sheet [data-pp]").forEach((e) => { const v = numOrNull(e.value); if (v == null) return; if (v < 0) throw userError("价格不能是负数。"); r[e.dataset.pp][e.dataset.sr] = r2(v); }); return r; };
+    const re = () => !!($("f-pp-re") && $("f-pp-re").checked);
+    /* 按新价算出来的没结账的（只动填了价的系列） */
+    const apply = (P) => {
+      const pu = (sku, d) => { const v = P[d][seriesOf(itemBy(sku))]; return v == null ? null : v; };
+      const gs1 = gs.map((g) => { const moves = g.moves.map((m) => { const u = pu(m.sku, "in"); return u == null ? m : Object.assign({}, m, { cost: r2(u * (Number(m.qty) || 0)) }); });
+        return Object.assign({}, g, { moves, cost: r2(moves.reduce((a, m) => a + (Number(m.cost) || 0), 0)), known: moves.every((m) => m.cost != null) }); });
+      const xs1 = xs.map((t) => Object.assign({}, t, { out: (t.out || []).map((l) => { const u = pu(l.sku, "out"); return u == null ? l : Object.assign({}, l, { unit: u }); }),
+        in: (t.in || []).map((l) => { const u = pu(l.sku, "in"); return u == null ? l : Object.assign({}, l, { unit: u }); }) }));
+      return { gs1, xs1 };
+    };
+    function recalc() {
+      let P; try { P = read(); } catch (e) { $("f-xsum").textContent = e.userMsg || "价格不能是负数。"; return; }
+      const n0 = ledgerNet(w), say = (n) => esc(owedTxt(w, n)) + (Math.abs(n) >= 0.005 ? " " + money(Math.abs(n)) : "");
+      if (!re()) { $("f-xsum").innerHTML = "只管以后记的；没结账的照旧：现在" + say(n0); return; }
+      const { gs1, xs1 } = apply(P), x1 = ledgerFrom(gs1, xs1, openPOs(w), [])[w], n1 = x1 ? x1.net : 0;
+      $("f-xsum").innerHTML = "现在" + say(n0) + (Math.abs(n1 - n0) >= 0.005 ? " → 改完 <b>" + say(n1) + "</b>" : "（改完不变）");
+    }
+    openSheet(w + " · 价格", html, async () => {
+      needDb();
+      const P = read(), has = Object.keys(P.in).length + Object.keys(P.out).length;
+      const list = S.pprice.filter((x) => x.who !== w).concat(has ? [{ who: w, in: P.in, out: P.out }] : []);
+      await db.doc("meta/pprice").set({ list, at: new Date().toISOString() }); S.pprice = list;
+      let nx = 0, ng = 0;
+      if (re()) {
+        const { gs1, xs1 } = apply(P), jobs = [];
+        xs1.forEach((t1, k) => { const t = xs[k], ch = (a, b) => a.some((l, i) => numOrNull(l.unit) !== numOrNull(b[i].unit));
+          if (!ch(t.out || [], t1.out) && !ch(t.in || [], t1.in)) return; nx++;
+          jobs.push(db.doc("transfers/" + t.id).update({ out: t1.out, in: t1.in }));
+          t1.in.forEach((l, i) => { if (numOrNull(l.unit) === numOrNull((t.in || [])[i].unit)) return; const m = S.moves.find((z) => z.transfer_id === t.id && z.type === "in" && z.sku === l.sku);
+            if (m) jobs.push(db.doc("movements/" + m.id).update({ cost: r2((Number(l.qty) || 0) * l.unit) })); }); });
+        const newCost = {};
+        gs1.forEach((g1, k) => { let touched = false; g1.moves.forEach((m, i) => { const old = gs[k].moves[i]; if (m.cost !== old.cost && m.id) { newCost[m.id] = m.cost; touched = true; jobs.push(db.doc("movements/" + m.id).update({ cost: m.cost })); } }); if (touched) ng++; });
+        /* 拿货支出按整单（一单可能分几个人拿）重算 */
+        for (const oid of [...new Set(gs.filter((g, k) => gs1[k].moves.some((m, i) => m.cost !== g.moves[i].cost)).map((g) => g.oid))]) {
+          const bid = oid + "-pick", ms = S.moves.filter((m) => m.batch_id === bid && m.type === "in"), costs = ms.map((m) => (m.id in newCost ? newCost[m.id] : m.cost));
+          if (!costs.every((c) => c != null)) continue;
+          const total = r2(costs.reduce((a, c) => a + Number(c), 0)), ex = S.expenses.find((x) => x.batch_id === bid), g0 = gs.find((g) => g.oid === oid);
+          if (ex) jobs.push(db.doc("expenses/" + ex.id).update({ amount: total }));
+          else jobs.push(db.collection("expenses").doc(bid + "-cost").set({ date: g0.date, at: g0.at || new Date().toISOString(), amount: total, category: "进货成本", note: "合伙人拿货 " + qtyText(g0.qty), batch_id: bid }));
+        }
+        await Promise.all(jobs);
+      }
+      setTimeout(() => ledgerSheet(w), 300);
+      return "跟 " + w + " 的价格存好了" + (nx || ng ? "，没结账的 " + [nx ? nx + " 笔往来" : "", ng ? ng + " 笔随单拿的" : ""].filter(Boolean).join("、") + " 按新价重算了" : "") + "。";
+    }, () => {
+      $("sheet-save").textContent = "保存价格";
+      sheetOn("input", recalc); sheetOn("change", recalc);
+      if ($("f-pp-lines")) $("f-pp-lines").addEventListener("click", () => xferPriceForm(w));
+      recalc();
+    }, { focus: false });
+  }
   function xferPriceForm(w) {
     const byT = (a, b) => (a.date || "").localeCompare(b.date || "") || (a.at || "").localeCompare(b.at || "");
     const xs = openXfers(w).slice().sort(byT);
@@ -4406,12 +4482,14 @@ details.restock > summary::-webkit-details-marker { display: none; }
         '<button type="button" class="btn ghost small" data-rm="' + k + '" aria-label="删掉这一行">删掉</button>';
       $(side === "o" ? "f-lines-o" : "f-lines-i").append(row);
     };
-    const defUnit = (k) => { const sku = $("f-sku-" + k).value, it = itemBy(sku), u = $("f-unit-" + k); if (!it || u.value !== "") return;
-      const v = tradeUnit(sku); if (v !== "") u.value = v; }; // 两边都按我的进货价（2026-11-24）
+    const defUnit = (k) => { const sku = $("f-sku-" + k).value, it = itemBy(sku), u = $("f-unit-" + k); if (!it || (u.value !== "" && u.value !== u.dataset.auto)) return;
+      const row = u.closest(".xline"), v = tradeUnit(sku, who(), row && row.dataset.side === "i" ? "in" : "out"); if (v !== "") { u.value = v; u.dataset.auto = String(v); } }; // 跟他的价 / 我的进货价（2026-11-24）
+    let lastW = who0 || "";
     const read = (side) => { const m = {}; document.querySelectorAll('#f-lines-' + side + ' .xline').forEach((row) => { const k = row.dataset.line, sku = $("f-sku-" + k).value; if (!sku) return; const q = Number($("f-qty-" + k).value), u = numOrNull($("f-unit-" + k).value);
       if (m[sku]) { m[sku].qty += q; } else m[sku] = { sku, name: (itemBy(sku) || {}).name || sku, qty: q, unit: u }; }); return Object.values(m); };
     const bal = (w, extra) => { const x = ledgerFrom(partnerItems(w), openXfers(w).concat(extra ? [extra] : []), openPOs(w), [])[w]; return x ? r2(-x.net) : 0; };
     function recalc() {
+      if (who() !== lastW) { lastW = who(); tradeRefill(lastW, [...document.querySelectorAll(".xline")].map((row) => { const k = row.dataset.line; return { inp: $("f-unit-" + k), sku: $("f-sku-" + k).value, dir: row.dataset.side === "i" ? "in" : "out" }; }).filter((r) => r.sku)); }
       const k = kind(), wRaw = who() || "合伙人", w = esc(wRaw);
       document.querySelectorAll(".xw").forEach((e) => { e.textContent = wRaw; });
       $("f-xout").hidden = k === "give"; $("f-xin").hidden = k === "take"; $("f-xpaidbox").hidden = k !== "take";
@@ -4853,11 +4931,26 @@ details.restock > summary::-webkit-details-marker { display: none; }
     }
     return (LASTBUY = r);
   }
-  const tradeUnit = (sku) => { const it = itemBy(sku), b = lastBuy()[seriesOf(it)]; if (b) return b.u; const v = numOrNull(it && it.cost_aud); if (v != null) return r2(v); const UC = stockUnitCosts(); return UC[sku] != null ? r2(UC[sku]) : ""; };
-  const giveUnit = tradeUnit, ptUnit = tradeUnit;
-  /* 表单里写一行：默认按你的进货价 Bar Pro $34（11月22日 进货）· Ali $33（11月20日） */
-  const tradeHint = (skus) => { const sers = [...new Set(skus.map((k) => seriesOf(itemBy(k))))], L = lastBuy();
-    return '<p class="hint" id="f-trhint">单价默认按你的进货价（两边一样）：' + sers.map((sr) => esc(sr) + " " + (L[sr] ? money(L[sr].u) + "（" + fmtD(L[sr].date) + " 进货）" : "没进过货，按系列价格")).join(" · ") + "</p>"; };
+  /* 跟每个合伙人的价格（同日 Bowen：对账那边每个系列「他给我 / 我给他」统一按什么价，自己改；这是最简单的）
+     meta/pprice = { list: [{ who, in: {系列: 每根$}, out: {系列: 每根$} }] }：in = 他给我（我拿他的、随单拿的、换货他给的、预定还没拿的），out = 我给他。
+     填了就用；没填 → 往来 / 换货按我的进货价（上面），随单拿的照旧按系列价格 */
+  const ppOf = (w) => (w && S.pprice.find((x) => x.who === w)) || null;
+  const pPrice = (w, sku, dir) => { const p = ppOf(w), m = p && p[dir]; return m ? numOrNull(m[seriesOf(itemBy(sku))]) : null; };
+  const tradeUnit = (sku, w, dir) => { const pv = dir ? pPrice(w, sku, dir) : null; if (pv != null) return r2(pv);
+    const it = itemBy(sku), b = lastBuy()[seriesOf(it)]; if (b) return b.u; const v = numOrNull(it && it.cost_aud); if (v != null) return r2(v); const UC = stockUnitCosts(); return UC[sku] != null ? r2(UC[sku]) : ""; };
+  const pickUnit = (sku, w) => { const pv = pPrice(w, sku, "in"); return pv != null ? pv : numOrNull((itemBy(sku) || {}).cost_aud); }; // 随单拿 / 预定要拿的
+  const giveUnit = (sku) => tradeUnit(sku), ptUnit = (sku) => tradeUnit(sku);
+  /* 表单换了合伙人：没手动改过的单价换成这个人的价；底下那行提示跟着换 */
+  function tradeRefill(w, rows) { // rows: [{ inp, sku, dir }]
+    for (const r of rows) { if (!r.inp) continue; const nv = String(tradeUnit(r.sku, w, r.dir)); if (r.inp.dataset.auto === undefined ? r.inp.value === "" : r.inp.value === r.inp.dataset.auto) { r.inp.value = nv; r.inp.dataset.auto = nv; } }
+    const h = $("f-trhint"); if (h) h.outerHTML = tradeHint(rows.map((r) => [r.sku, r.dir]), w);
+  }
+  /* 表单里写一行单价从哪来：「合伙人甲的价格：Bar Pro 他给我 $34」或「你的进货价：Bar Pro $34（11月22日 进货）」 */
+  const tradeHint = (pairs, w) => { // pairs: [[sku, dir]]
+    const seen = new Set(), own = [], mine = [], L = lastBuy();
+    for (const [sku, dir] of pairs) { const sr = seriesOf(itemBy(sku)), key = sr + "|" + dir; if (seen.has(key)) continue; seen.add(key);
+      const pv = pPrice(w, sku, dir); if (pv != null) own.push(esc(sr) + " " + (dir === "in" ? "他给我" : "我给他") + " " + money(pv)); else if (!mine.some((x) => x.sr === sr)) mine.push({ sr, t: esc(sr) + " " + (L[sr] ? money(L[sr].u) + "（" + fmtD(L[sr].date) + " 进货）" : "没进过货，按系列价格") }); }
+    return '<p class="hint" id="f-trhint">' + [own.length ? "按对账单里跟 " + esc(w) + " 的价格：" + own.join(" · ") : "", mine.length ? "单价默认按你的进货价（两边一样）：" + mine.map((x) => x.t).join(" · ") : ""].filter(Boolean).join("<br>") + "</p>"; };
   const ptSerpBox = (lines) => { const sers = [...new Set(lines.map((l) => seriesOf(itemBy(l.sku))))]; return '<div class="serp" id="f-serp">' + serpHtml(sers, {}) + "</div>"; };
   const wirePtSerp = (lines) => $("f-serp").addEventListener("input", (e) => {
     const sr = e.target.dataset && e.target.dataset.sr; if (!sr) return;
@@ -4956,16 +5049,18 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const names = partnerNames(), qtyAll = lines.reduce((a, l) => a + l.qty, 0);
     const html =
       '<div class="field"><label for="f-xwho">跟谁拿的</label><input id="f-xwho" list="f-pnames" autocomplete="off" placeholder="例如 小王" value="' + esc(names[0] || "") + '"><datalist id="f-pnames">' + names.map((x) => '<option value="' + esc(x) + '">').join("") + "</datalist></div>" +
-      '<div class="pt-lines">' + lines.map((l, k) => '<div class="pt-line"><span class="pt-name">' + esc(nm(l.sku)) + '</span><span class="pt-q">×' + l.qty + '</span><label class="pt-u"><span>$</span><input id="f-unit-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + giveUnit(l.sku) + '" aria-label="' + esc(nm(l.sku)) + ' 每根多少钱"></label></div>').join("") + "</div>" +
+      '<div class="pt-lines">' + lines.map((l, k) => '<div class="pt-line"><span class="pt-name">' + esc(nm(l.sku)) + '</span><span class="pt-q">×' + l.qty + '</span><label class="pt-u"><span>$</span><input id="f-unit-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + tradeUnit(l.sku, names[0], "in") + '" data-auto="' + tradeUnit(l.sku, names[0], "in") + '" aria-label="' + esc(nm(l.sku)) + ' 每根多少钱"></label></div>').join("") + "</div>" +
       ptSerpBox(lines) +
-      tradeHint(lines.map((l) => l.sku)) +
+      tradeHint(lines.map((l) => [l.sku, "in"]), names[0] || "") +
       '<label class="check"><input type="checkbox" id="f-xpaid"> <span>我当场付了钱</span></label>' +
       '<div id="f-xpaywrap" hidden>' + payPick(null) + "</div>" +
       '<p class="callout xsum" id="f-xsum">–</p>' +
       '<details class="more"><summary>更多：日期、备注</summary><div class="more-body"><div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
       '<div class="field"><label for="f-note">备注</label><input id="f-note" placeholder="例如 下周一起结"></div></div></details>';
     const read = () => lines.map((l, k) => ({ sku: l.sku, name: (itemBy(l.sku) || {}).name || l.sku, qty: l.qty, unit: numOrNull($("f-unit-" + k).value) }));
+    let lastW = names[0] || "";
     function recalc() {
+      { const w0 = $("f-xwho").value.trim(); if (w0 !== lastW) { lastW = w0; tradeRefill(w0, lines.map((l, k) => ({ inp: $("f-unit-" + k), sku: l.sku, dir: "in" }))); } }
       const w = $("f-xwho").value.trim(), W = esc(w || "合伙人"), v = xLineVal(read()), paid = $("f-xpaid").checked;
       $("f-xpaywrap").hidden = !paid;
       const pos = (x) => (x > 0 ? W + " 欠你 " + money(x) : x < 0 ? "你欠 " + W + " " + money(-x) : "你们两清");
@@ -4999,9 +5094,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const D = derive(), names = partnerNames(), qtyAll = lines.reduce((a, l) => a + l.qty, 0);
     const html =
       '<div class="field"><label for="f-xwho">谁拿的</label><input id="f-xwho" list="f-pnames" autocomplete="off" placeholder="例如 小王" value="' + esc(names[0] || "") + '"><datalist id="f-pnames">' + names.map((x) => '<option value="' + esc(x) + '">').join("") + "</datalist></div>" +
-      '<div class="pt-lines">' + lines.map((l, k) => '<div class="pt-line"><span class="pt-name">' + esc(nm(l.sku)) + '</span><span class="pt-q">×' + l.qty + '</span><label class="pt-u"><span>$</span><input id="f-unit-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + ptUnit(l.sku) + '" aria-label="' + esc(nm(l.sku)) + ' 每根多少钱"></label></div>').join("") + "</div>" +
+      '<div class="pt-lines">' + lines.map((l, k) => '<div class="pt-line"><span class="pt-name">' + esc(nm(l.sku)) + '</span><span class="pt-q">×' + l.qty + '</span><label class="pt-u"><span>$</span><input id="f-unit-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + tradeUnit(l.sku, names[0], "out") + '" data-auto="' + tradeUnit(l.sku, names[0], "out") + '" aria-label="' + esc(nm(l.sku)) + ' 每根多少钱"></label></div>').join("") + "</div>" +
       ptSerpBox(lines) +
-      tradeHint(lines.map((l) => l.sku)) +
+      tradeHint(lines.map((l) => [l.sku, "out"]), names[0] || "") +
       '<label class="check"><input type="checkbox" id="f-xpaid"> <span>他当场付了钱</span></label>' +
       '<div id="f-xpaywrap" hidden>' + payPick(null) + "</div>" +
       '<p class="callout xsum" id="f-xsum">–</p>' +
@@ -5009,7 +5104,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="field"><label for="f-note">备注</label><input id="f-note" placeholder="例如 他下周有货到再还"></div></div></details>';
     const read = () => lines.map((l, k) => ({ sku: l.sku, name: (itemBy(l.sku) || {}).name || l.sku, qty: l.qty, unit: numOrNull($("f-unit-" + k).value) }));
     const bal = ptBal;
+    let lastW = names[0] || "";
     function recalc() {
+      { const w0 = $("f-xwho").value.trim(); if (w0 !== lastW) { lastW = w0; tradeRefill(w0, lines.map((l, k) => ({ inp: $("f-unit-" + k), sku: l.sku, dir: "out" }))); } }
       const w = $("f-xwho").value.trim(), W = esc(w || "合伙人"), v = xLineVal(read()), paid = $("f-xpaid").checked;
       $("f-xpaywrap").hidden = !paid;
       const pos = (x) => (x > 0 ? W + " 欠你 " + money(x) : x < 0 ? "你欠 " + W + " " + money(-x) : "你们两清");
@@ -5048,20 +5145,22 @@ details.restock > summary::-webkit-details-marker { display: none; }
   function partnerSwapForm(lo, li, onDone) {
     const D = derive(), names = partnerNames(), qo = lo.reduce((a, l) => a + l.qty, 0), qi = li.reduce((a, l) => a + l.qty, 0);
     const sers = (ls) => [...new Set(ls.map((l) => seriesOf(itemBy(l.sku))))];
-    const side = (ls, sd, unit) => '<div class="pt-lines">' + ls.map((l, k) => '<div class="pt-line"><span class="pt-name">' + esc(nm(l.sku)) + '</span><span class="pt-q">×' + l.qty + '</span><label class="pt-u"><span>$</span><input id="f-unit-' + sd + k + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + unit(l.sku) + '" aria-label="' + esc(nm(l.sku)) + ' 每根"></label></div>').join("") + "</div>";
+    const side = (ls, sd, dir) => '<div class="pt-lines">' + ls.map((l, k) => '<div class="pt-line"><span class="pt-name">' + esc(nm(l.sku)) + '</span><span class="pt-q">×' + l.qty + '</span><label class="pt-u"><span>$</span><input id="f-unit-' + sd + k + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + tradeUnit(l.sku, names[0], dir) + '" data-auto="' + tradeUnit(l.sku, names[0], dir) + '" aria-label="' + esc(nm(l.sku)) + ' 每根"></label></div>').join("") + "</div>";
     const serp = (ls, sd, who) => sers(ls).map((sr) => '<label class="serp-i"><span>' + who + " 的 " + esc(sr) + ' 每根 $</span><input type="number" min="0" step="0.01" inputmode="decimal" data-srx="' + sd + '" data-sr="' + esc(sr) + '" placeholder="同一个价"></label>').join("");
     const html =
       '<div class="field"><label for="f-xwho">跟谁换</label><input id="f-xwho" list="f-pnames" autocomplete="off" placeholder="例如 小王" value="' + esc(names[0] || "") + '"><datalist id="f-pnames">' + names.map((x) => '<option value="' + esc(x) + '">').join("") + "</datalist></div>" +
-      '<h3 class="sw-h">我给 <span class="xw">合伙人</span> · ' + qo + " 根</h3>" + (lo.length ? side(lo, "o", tradeUnit) : '<p class="hint">还没选，回去在「我给他的」里点口味。</p>') +
-      '<h3 class="sw-h"><span class="xw">合伙人</span> 给我 · ' + qi + " 根</h3>" + (li.length ? side(li, "i", tradeUnit) : '<p class="hint">还没选，回去在「他给我的」里点口味。</p>') +
-      tradeHint(lo.concat(li).map((l) => l.sku)) +
+      '<h3 class="sw-h">我给 <span class="xw">合伙人</span> · ' + qo + " 根</h3>" + (lo.length ? side(lo, "o", "out") : '<p class="hint">还没选，回去在「我给他的」里点口味。</p>') +
+      '<h3 class="sw-h"><span class="xw">合伙人</span> 给我 · ' + qi + " 根</h3>" + (li.length ? side(li, "i", "in") : '<p class="hint">还没选，回去在「他给我的」里点口味。</p>') +
+      tradeHint(lo.map((l) => [l.sku, "out"]).concat(li.map((l) => [l.sku, "in"])), names[0] || "") +
       '<details class="more"><summary>按系列一起改单价</summary><div class="more-body serp">' + serp(lo, "o", "我给") + serp(li, "i", "他给") + "</div></details>" +
       '<p class="callout xsum" id="f-xsum">–</p>' +
       '<div id="f-xpaidbox" hidden><label class="check"><input type="checkbox" id="f-xpaid"> <span id="f-xpaidt">差价当场付了</span></label><div id="f-xpaywrap" hidden>' + payPick(null) + "</div></div>" +
       '<details class="more"><summary>更多：日期、备注</summary><div class="more-body"><div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
       '<div class="field"><label for="f-note">备注</label><input id="f-note" placeholder="例如 换他的 Ali"></div></div></details>';
     const read = (ls, sd) => ls.map((l, k) => ({ sku: l.sku, name: (itemBy(l.sku) || {}).name || l.sku, qty: l.qty, unit: numOrNull($("f-unit-" + sd + k).value) }));
+    let lastW = names[0] || "";
     function recalc() {
+      { const w0 = $("f-xwho").value.trim(); if (w0 !== lastW) { lastW = w0; tradeRefill(w0, lo.map((l, k) => ({ inp: $("f-unit-o" + k), sku: l.sku, dir: "out" })).concat(li.map((l, k) => ({ inp: $("f-unit-i" + k), sku: l.sku, dir: "in" })))); } }
       const wRaw = $("f-xwho").value.trim(), w = esc(wRaw || "合伙人"), o = read(lo, "o"), i = read(li, "i");
       document.querySelectorAll(".xw").forEach((e) => { e.textContent = wRaw || "合伙人"; });
       const X = xOffset([], [{ out: o, in: i }]), eff = xferEff({ out: o, in: i }), paid = $("f-xpaid").checked;
@@ -5619,6 +5718,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
      发了 → 3 天内不再列（「等回复」）；3 天没下单再列一次（可能性减半）；问过两次还没买 → 这一轮不再列，等他下次买了重新算。
      下单 / 有预定的不列。复制消息：英文（名字里有中文就写中文），写他常买、现在有货的口味和见面地点 */
   const TD_MAX = 5, TD_SENT = "发了信息";
+  const touchTxt = (t) => fmtD(t.date) + " " + (t.what || "联系过");
   const atDay = (at) => { const t = new Date(at || ""); return isNaN(t) ? "" : t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0"); };
   let TD = {};
   function todayPicks() {
@@ -5631,11 +5731,14 @@ details.restock > summary::-webkit-details-marker { display: none; }
       if (c) busy.add(c.id);
       const sentAgo = f.contacted_at ? dayGap(f.contacted_at, td) : null;
       const x = Object.assign({}, f, { key, c, v: valOf(c), sentOn: f.contacted_at });
+      /* 2026-11-24 Bowen：发了信息没回要写几号发的，好追踪 → 一律写日期（以前写「3 天前发过」） */
+      const lt = (f.touches || [])[(f.touches || []).length - 1];
+      x.why = [f.restocked ? "想要的到货了：" + wantsText(f.wants) : f.wants.length ? "想要 " + wantsText(f.wants) : "", f.note].filter(Boolean).join(" · ") || "你记的跟进";
       if (sentAgo != null && sentAgo < 3) { wait.push(x); continue; }
+      if (lt && lt.date && !(sentAgo != null && lt.what === TD_SENT && lt.date === f.contacted_at)) x.why = touchTxt(lt) + " · " + x.why; // 上次联系的日子放最前面
       if (f.date && f.date > td) { later.push(x); continue; } // 往后排到以后的：到货了也等到那天
       const p = f.restocked ? 0.6 : f.date ? 0.5 : 0.3;
-      x.why = [f.restocked ? "想要的到货了：" + wantsText(f.wants) : f.wants.length ? "想要 " + wantsText(f.wants) : "", f.note].filter(Boolean).join(" · ") || "你记的跟进";
-      if (sentAgo != null) x.why += " · " + sentAgo + " 天前发过，没回";
+      if (sentAgo != null) x.why = fmtD(f.contacted_at) + " 发了信息没回 · " + x.why; // 日期放最前面，长了也看得到
       x.p = sentAgo != null ? p / 2 : p; put(x);
     }
     for (const c of book) {
@@ -5645,8 +5748,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
       const x = { key: "a:" + c.id, src: "a", id: c.id, customer: c.name, c, v: valOf(c), wants: [], touches: c.p.touches || [] };
       if (c.p.next && ts.length) { // 「联系过了 · 往后排」约好的日子
         x.date = c.p.next;
+        x.why = (c.p.next === td ? "约好今天再问" : "约好 " + fmtD(c.p.next) + " 再问") + (lt ? " · " + touchTxt(lt) : "");
         if (c.p.next > td) { later.push(x); continue; }
-        x.p = 0.4; x.why = (c.p.next === td ? "约好今天再问" : "约好 " + fmtD(c.p.next) + " 再问") + (lt && lt.what && lt.what !== TD_SENT ? "（" + lt.what + "）" : ""); put(x); continue;
+        x.p = 0.4; put(x); continue;
       }
       if (ts.length >= 2) continue; // 问过两次没买：这一轮不再列
       const sentAgo = lt ? dayGap(lt.date, td) : null;
@@ -5658,7 +5762,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       else if (k === 2) { const g = Math.max(3, gaps[0]); if (since >= g - 1 && since <= 30) { p = 0.24; x.why = "买过 2 次 · 上次 " + since + " 天前"; } }
       else { const [lo, hi, pp] = q <= 4 ? [7, 13, 0.21] : q < 8 ? [10, 20, 0.09] : [14, 28, 0.04]; if (since >= lo && since <= hi) { p = pp; x.why = "买过一次 " + q + " 根 · " + since + " 天前"; } }
       if (!p) continue;
-      if (sentAgo != null) { p /= 2; x.why += " · " + sentAgo + " 天前发过，没回"; }
+      if (sentAgo != null) { p /= 2; x.why = (lt.what === TD_SENT ? fmtD(lt.date) + " 发了信息没回" : touchTxt(lt)) + " · " + x.why; }
       x.p = p; put(x);
     }
     const all = Object.values(cand).sort((a, b) => b.score - a.score || String(a.customer || "").localeCompare(String(b.customer || "")));
@@ -5926,7 +6030,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
      电脑上把 CPU 调慢 8 倍（≈ 普通手机）、用真实数据量实测：数据早就在手机的本地数据库里，可是 Firebase 启动本地数据库 + 读出 900 多条记录 + 算出来要 4 秒左右。
      现在每次数据变了就把页面要用的那份（口味、订单、流水……算好的样子）存一份到 localStorage；下次打开不等 Firebase，直接用这份马上显示、能复制口味。
      Firebase 读完以后整份换成真的（一次换完，不会一半新一半旧）。换之前不让保存（needDb），免得按旧数据记账 */
-  const SNAPF = ["items", "orders", "moves", "expenses", "purchases", "settles", "transfers", "customers", "followups", "places"];
+  const SNAPF = ["items", "orders", "moves", "expenses", "purchases", "settles", "transfers", "customers", "followups", "places", "pprice"];
   const snapKey = (() => { try { const u = JSON.parse(localStorage.getItem("fb-last-user") || "null"); return u && u.uid ? "fb-snap:" + u.uid : ""; } catch (_) { return ""; } })();
   const snapSchema = () => { try { return (JSON.parse(localStorage.getItem("fb-schema") || "null") || {}).version === 2 ? 2 : 1; } catch (_) { return 1; } };
   let snapOn = false, snapT = null; const R = {};
@@ -6028,6 +6132,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     window.claude.use("assets").then((a) => { assets = a; render(); }).catch(() => { assets = null; });
     db.doc("meta/sync").onSnapshot((s) => { S.sync = s.exists ? s.data() : null; renderBackup(); }, onErr);
     /* 见面地点：本地没有 ≠ 没有（没网时别把上次的清空） */
+    db.doc("meta/pprice").onSnapshot((s) => { if (!s.exists && s.metadata && s.metadata.fromCache) return; S.pprice = s.exists && Array.isArray((s.data() || {}).list) ? s.data().list : []; saveSnapSoon(); if (!snapOn) render(); }, () => {});
     db.doc("meta/places").onSnapshot((s) => { if (!s.exists && s.metadata && s.metadata.fromCache) return; S.places = s.exists && Array.isArray((s.data() || {}).list) ? s.data().list : []; saveSnapSoon(); if (!snapOn) render(); }, () => {});
     window.claude.use("downloads").then((d) => { downloads = d; $("xl-btn").disabled = !d; }).catch(() => { $("xl-btn").disabled = true; });
     mcp = window.claude && window.claude.use ? await window.claude.use("mcp") : null;

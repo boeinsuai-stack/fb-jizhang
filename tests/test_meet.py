@@ -93,7 +93,7 @@ with sync_playwright() as p:
         check("没有今天 / 明天 / 后天那一排；日期默认今天", pg.locator('input[name="f-mdr"]').count() == 0 and pg.input_value("#f-mdate") == TODAY)
         check("地点：以前用过的「Coles 停车场」点一下就行，还有「＋ 地点」", pg.locator('#f-pl input[value="Coles 停车场"]').count() == 1 and pg.is_visible("#f-pladd"))
         pg.locator("#f-cust").press_sequentially("Fay")
-        pg.fill("#f-mdate", DD(1)); pg.click('#f-mmode [data-mm="set"]'); pg.fill("#f-mtime", "16:30"); pg.click('#f-pl label:has(input[value="Coles 停车场"])'); save(pg)
+        pg.click('#f-mdays [data-md="1"]'); pg.click('#f-mmode [data-mm="set"]'); pg.fill("#f-mtime", "16:30"); pg.click('#f-pl label:has(input[value="Coles 停车场"])'); save(pg)
         new = [x for x in S(pg, "orders") if x["id"] not in before]
         check("存了：明天 16:30、Coles 停车场", len(new) == 1 and new[0].get("meet_date") == DD(1) and new[0].get("meet_time") == "16:30" and new[0].get("place") == "Coles 停车场", new and {k: new[0].get(k) for k in ("meet_date", "meet_time", "place")})
         go(pg, "customers"); C = cards(pg)
@@ -119,7 +119,7 @@ with sync_playwright() as p:
         # 编辑预定：带出来，可以改
         go(pg, "customers"); pg.evaluate("""() => document.querySelector('[data-edit-order="r-tmr"]').click()"""); pg.wait_for_selector("#f-meet")
         check("编辑 Bob 的预定：日期是明天、15:00", pg.is_visible("#f-meet") and pg.input_value("#f-mdate") == DD(1) and pg.input_value("#f-mtime") == "15:00")
-        pg.fill("#f-mdate", DD(5)); pg.fill("#f-mtime", "11:00"); pg.click('#f-pl label:has(input[value="Coles 停车场"])'); save(pg)
+        pg.click('#f-mdays [data-md="pick"]'); pg.fill("#f-mdate", DD(5)); pg.fill("#f-mtime", "11:00"); pg.click('#f-pl label:has(input[value="Coles 停车场"])'); save(pg)
         o = order(pg, "r-tmr")
         check("改成 5 天后 11:00、Coles 停车场；卡片写几月几号", o.get("meet_date") == DD(5) and o.get("meet_time") == "11:00" and o.get("place") == "Coles 停车场" and fmt(DD(5)) in dict(cards(pg)).get("r-tmr", ""), {k: o.get(k) for k in ("meet_date", "meet_time", "place")})
         pg.evaluate("""() => document.querySelector('[data-edit-order="r-tmr"]').click()"""); pg.wait_for_selector("#f-meet")

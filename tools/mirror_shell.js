@@ -127,9 +127,12 @@
       /* 见面地点（meta/places）：meta 别的都不抄，只抄这一份 */
       const mpl = relay.data.meta && relay.data.meta.places;
       if (mpl && fp(mpl) !== (meta && meta.places_fp)) { await put("set", "meta/places", mpl).catch(() => { failed++; }); }
+      /* 跟合伙人的价格（meta/pprice，2026-11-24）：对账单「价格」，也抄 */
+      const mpp = relay.data.meta && relay.data.meta.pprice;
+      if (mpp && fp(mpp) !== (meta && meta.pprice_fp)) { await put("set", "meta/pprice", mpp).catch(() => { failed++; }); }
       for (const c of COLS) if (fps[c]) await put("set", "meta/fp_" + c, { fp: fps[c] });
       const counts = {}; for (const c of COLS) if (relay.data[c]) counts[c] = Object.keys(relay.data[c]).length;
-      meta = { file_id: f.id, file_modified: f.modifiedTime, uploaded_at: relay.uploaded_at || null, last_record: relay.last_record || null, counts, places_fp: mpl ? fp(mpl) : null, mirrored_at: new Date().toISOString(), result: { written: plan.length - failed, failed } };
+      meta = { file_id: f.id, file_modified: f.modifiedTime, uploaded_at: relay.uploaded_at || null, last_record: relay.last_record || null, counts, places_fp: mpl ? fp(mpl) : null, pprice_fp: mpp ? fp(mpp) : null, mirrored_at: new Date().toISOString(), result: { written: plan.length - failed, failed } };
       await put("set", "meta/mirror", meta);
       if (failed) show("warn", failed + " 条没写进去，点「重新读取」补上", true);
       else show("ok", asof(meta) + (plan.length ? " · 刚更新 " + plan.length + " 条" : ""), true);

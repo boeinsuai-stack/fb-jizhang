@@ -36,6 +36,7 @@ run python3 tests/test_po_tidy.py
 run python3 tests/test_consign.py
 run python3 tests/test_today.py
 run python3 tests/test_xswap.py
+run python3 tests/test_pprice.py
 run python3 tests/test_fifo_gap.py
 run python3 tests/test_copy_flavours.py
 run node tests/orderparse_test.js

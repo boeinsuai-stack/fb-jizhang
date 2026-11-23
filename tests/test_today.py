@@ -116,7 +116,11 @@ with sync_playwright() as p:
         check("不列：Ben（才 3 天）、Cal（一次 10 根还早）、Eli（有预定）、Fay（不用提醒）、Jon（问过两次）、Mo（还没到）", not set(allnames) & {"Ben", "Cal", "Eli", "Fay", "Jon", "Mo"}, allnames)
         t = row(pg, "Gus").inner_text()
         check("每行：为什么找他 + 平时一单多少；复制消息 / 发了 不用点开", "买过一次 2 根 · 10 天前" in t and "平时一单 $300" in t and row(pg, "Gus").locator("[data-td-copy]").is_visible() and row(pg, "Gus").locator("[data-td-sent]").is_visible(), t)
-        check("Ivy 写「4 天前发过，没回」", "4 天前发过，没回" in pg.evaluate("[...document.querySelectorAll('#fu-list .fu-more .fu2')].map((r) => r.textContent).join('|')"))
+        # 2026-11-24 Bowen：发了信息没回要写几号发的
+        MD = lambda n: f"{int(D(n)[5:7])}月{int(D(n)[8:])}日"
+        check("Ivy 写哪天发的：「X月X日 发了信息没回」", MD(4) + " 发了信息没回" in pg.evaluate("[...document.querySelectorAll('#fu-list .fu-more .fu2')].map((r) => r.textContent).join('|')"), MD(4))
+        lou = pg.evaluate("[...document.querySelectorAll('#fu-list .fu-later .fu2')].map((r) => r.querySelector('.fu-why') ? r.querySelector('.fu-why').textContent : '').join('|')")
+        check("以后要找的 Lou：写约好哪天再问 + 上次联系的日子和说法", "约好 " + MD(-3) + " 再问 · " + MD(2) + " 他说下周" in lou, lou)
         check("Dee 写自己的节奏", "平时 5 天左右买一次 · 上次 5 天前" in row(pg, "Dee").inner_text(), row(pg, "Dee").inner_text())
         check("不再贴「重点」（今天找谁、预定卡片）", pg.locator("#fu-list .tag-vip, #resv .tag-vip").count() == 0)
         check("发了以后 7 天内下单：1 / 2 次（Mo 下了，Jon 8 天前那次没下）· 还有 3 次没满 7 天（Hal、Ivy、Jon）", pg.inner_text("#td-stat") == "发了信息的，7 天内下单 1 / 2 次 · 还有 3 次没满 7 天", pg.inner_text("#td-stat"))
