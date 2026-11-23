@@ -90,15 +90,14 @@ with sync_playwright() as p:
         # 2. 编辑预定：备注那一块直接打开，改了概览马上跟着变
         pg.evaluate("""() => document.querySelector('[data-edit-order="o-r1"]').click()"""); pg.wait_for_selector("#f-note", state="attached")
         check("编辑有备注的预定：「更多」直接展开，备注看得到", pg.is_visible("#f-note") and pg.input_value("#f-note") == "周三 6pm Coles 门口见")
-        check("「更多」里没有「区」「从哪来的」了", pg.locator("#sheet #f-sub, #sheet #f-src").count() == 0 and "区" not in pg.inner_text("#f-more-sum"), pg.inner_text("#f-more-sum"))
+        check("没有「区」「从哪来的」了", pg.locator("#sheet #f-sub, #sheet #f-src").count() == 0)
         pg.fill("#f-note", "周四 7pm 改到 Rockingham 火车站"); save(pg)
         go(pg, "customers")
         check("改了备注：概览上马上是新的", card(pg, "o-r1").locator("summary .rv-note").inner_text() == "周四 7pm 改到 Rockingham 火车站")
 
         # 3. 编辑以前填过区 / 来源的单：不会被清掉
         pg.evaluate("""() => document.querySelector('[data-edit-order="o-r3"]').click()"""); pg.wait_for_selector("#f-note", state="attached")
-        check("没备注没跟进的预定：「更多」照旧收着", not pg.evaluate("document.getElementById('f-more').open"))
-        check("预定的备注直接放出来，「更多」（日期、下次跟进）藏起来", pg.is_visible("#f-note") and pg.is_hidden("#f-more"))
+        check("预定的备注直接放出来，没有「更多」（日期、下次跟进）", pg.is_visible("#f-note") and pg.locator("#sheet #f-more").count() == 0)
         pg.fill("#f-note", "Amy 周五下班后"); save(pg)
         o3 = order(pg, "o-r3")
         check("Amy 的预定存了备注，来源自动「回头客」", o3.get("note") == "Amy 周五下班后" and o3.get("source") == "回头客", {k: o3.get(k) for k in ("note", "source", "suburb")})

@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-23 线上 fb-app-v34）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-23 线上 fb-app-v34，分支 feat-today 是 v35）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -66,7 +66,7 @@
 
 ## 规则
 - 公开仓库：不要提交邮箱、人名、金额、客户数据、备份文件
-- 记账流程要快：快速下单在最上面，记一笔不能强制填客户信息
+- 记账流程要快：快速下单在最上面（上面只有「今天」那一行），记一笔不能强制填客户信息
 - 定价策略不进 App
 - 改完先跑测试再推送：`tests/run_all.sh [真实 fixture] [v2 种子]`（Playwright + /usr/bin/google-chrome，别的路径用环境变量 CHROME）；新功能把测试加进 tests/
   - GitHub Actions `.github/workflows/test.yml`：推送到任何分支自动跑不需要真实数据的几套；推到 main 时 pages.yml 先跑测试，**不过就不发布**
@@ -368,6 +368,24 @@
 - 对账单里代销那一项没有「结款」（poPayForm 对代销直接打开对账单）；合伙人页往来记录标「代销」+ 货值 / 卖出 / 在你这；财务「现有库存」下多一行「其中代销（他的货，卖了才付）」
 - 现金：代销单不算进货付款，结账时才算「和合伙人结账」流出
 - 测试 `tests/test_consign.py` 60/60（编的数据，旧/新结构）
+
+## 「今天」页、记卖出拿掉「更多」、不追的钱算收入（feat-today，2026-11-23）
+- Bowen 11-23 21:00：①不追的钱（多给「送我的」、少给「不用收了」）要算进收入 ②「今天」首页做出来 ③记卖出的「更多：日期、下次跟进」拿掉（不太跟进）
+- **不追的钱**：`balKeep(o)` = −Σ(diff 且 gift 的 amt) + Σ(waive 的 amt)：送我的 = 多收入，少给没开下次核对 / 后来点「不追了」= 少收入；下次核对的照旧不算。
+  orderBook 多 `keep`，gross = rev + keep − cost；finBook 的 day.rev / T.rev 含 keep（`b.rev` 不含，payParts 收款照旧按实收 balCash，不会重复）。利润表多「客人多给（送我的）」「少给不追了」两行（keepParts），收入下面写「含客人多给 $X / 少给不追 −$X」。
+  golden（11-23 真实数据）main → 这版只有 rev/gross/net 变，正好是三单「送我的」的钱
+- **记卖出**：saleForm 没有 `#f-more`（日期 / 下次跟进）：日期 = 编辑的原日期或今天；`readCust` 没有 #f-fu 时 follow_up 照旧留着。查过真实数据：222 单里 2 单补记前一天，记完「编辑」（orderEditForm 有卖出日期）能改
+- **今天找谁**（`todayPicks / tdRow / tdMsg / tdSent / tdCopy / tdStat / renderToday`，替代 fuRow 和「要联系的客户」按日子排）：
+  - 回测脚本在仓库外（/home/claude/today/：hazard.py 按买过几次 × 过了几天的 7 天再买率、sim.py 每天候选、backtest.py 新旧规则比）。11-23 数据：只买过一次 1–4 根第 7–13 天 21%、5–7 根 9%、8 根以上 0/33；买过 2 天 24%；3 天以上到节奏 50%；每天够条件的人中位 31 个 → 最多列 5 个
+  - 分数 = 可能性 × 平时一单（他已付款订单金额中位数，没有就用默认值）；可能性：一次 1–4 根 7–13 天 0.21 / 5–7 根 10–20 天 0.09 / 8 根以上 14–28 天 0.04；2 天：到上次间隔（−1）、30 天内 0.24；3 天以上：到节奏 −1、max(30, 3 节奏) 内 0.5；资料设了 every 0.4；约好的 next 到了 0.4；
+    手动跟进：想要的到货了 0.6、到日子 0.5、没定日子 0.3。发了一次 3 天没下单 → 再列一次减半；发了两次 → 这一轮不列（等他再买）。有预定、every = 0 的不列；有手动跟进的人不再按记录算
+  - 回测（同期数据，参数也是这段数据估的，偏乐观）：新规则前 5 个 7 天内下单 31%；同一批候选随便挑 5 个 20%；旧「要联系的客户」前 5 个 16%（带来的钱：新规则约是随便挑的 2 倍、旧规则的 4 倍）
+  - 页面：`#fu-list` 前 5 个（`.fu2.td-pick`，summary 里直接有「复制消息」`data-td-copy`、「发了」`data-td-sent`，preventDefault 不展开）→ 折叠「还可以找」`.fu-more` / 「等回复」`.fu-wait`（发了 3 天内，「没发，撤销」`data-td-unsent`）/「以后要找的」`.fu-later`（手动跟进日子没到、约好的 next 没到）；点开照旧 记预定 / 联系过了 / 不用跟了 / 改。不再贴「重点」（预定卡片也不贴）
+  - 发了：自动的记客户资料 touches `{date, what:"发了信息"}` 并清 next；手动的记 contacted_at + touches（跟以前「已发信息」一样）。`#td-stat`：发了信息以后 7 天内下单 M / N 次（满 7 天的才算）
+  - 复制消息 tdMsg：英文（名字里有中文就中文）；记了想要的口味：有货的写「back in stock」/ 不够数写现在有几根；不然写他常买、现在有货的（favsOf 前 3）；客户资料有地点就「Happy to meet at X again」
+- 导航「客户」改叫「今天」（图标日历），页面标题「今天」：预定（交货）→ 今天找谁 →「＋ 记一个要找的人」→ 全部客户。角标 = 今天 / 已过交货的预定 + 今天找谁人数
+- 库存页快速下单上面一行 `#td-strip`「今天 交货 N 单 · 找 N 个人 ›」，点了到「今天」；没事就不显示（**快速下单上面只多这一行，别再往上加东西**）
+- 测试 `tests/test_today.py` 54/54（编的数据，旧/新结构）；test_followup、test_place_fu、test_meet、test_resv_note、test_gift、test_cust_bal 跟着改成新规则
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超

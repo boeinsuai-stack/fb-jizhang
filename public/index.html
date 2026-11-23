@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v34"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v35"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -792,6 +792,14 @@ details.restock > summary::-webkit-details-marker { display: none; }
 .fu-body { display: grid; gap: 4px; padding: 0 16px 14px; } .fu-body .l-actions { margin-top: 6px; }
 .fu2[open] > summary { padding-bottom: 6px; }
 .fu-later { border-top: 1px solid var(--line); } .fu-later > summary { cursor: pointer; padding: 11px 16px; color: var(--muted); font-size: .88rem; }
+/* 今天找谁（2026-11-23）：名字 · 平时一单多少；为什么找他；复制消息 / 发了 不用点开 */
+.fu-more, .fu-wait { border-top: 1px solid var(--line); } .fu-more > summary, .fu-wait > summary { cursor: pointer; padding: 11px 16px; color: var(--muted); font-size: .88rem; }
+.fu-amt { margin-left: auto; font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fu-q { display: flex; gap: 8px; margin-top: 6px; }
+.td-none { padding: 11px 16px; margin: 0; }
+.td-stat { margin: 10px 2px 0; }
+.td-strip { display: flex; align-items: center; gap: 8px; width: 100%; margin: -4px 0 10px; padding: 7px 12px; font-size: .92rem; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.td-strip[hidden] { display: none; } .td-strip b { color: var(--accent); } .td-strip .pt-more { margin-left: auto; color: var(--muted); }
 .hero-oc { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; margin-top: 10px; padding: 10px 0 0; border: 0; border-top: 1px solid var(--line); background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .hero-oc b { font-weight: 700; } .hero-oc small { color: var(--muted); font-size: .8rem; }
 .cb-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; } .cb-top .k { display: block; font-size: .8rem; color: var(--muted); } .cb-tot { font-size: 1.6rem; font-weight: 700; }
@@ -825,7 +833,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <a id="nav-inv" href="#inventory" aria-current="page"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.6 12 3.4l8.5 4.2v8.8L12 20.6l-8.5-4.2z"/><path d="M3.5 7.6 12 11.8l8.5-4.2M12 11.8v8.8"/></svg></span>库存</a>
       <a id="nav-po" href="#purchases"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h10.5v9H3zM13.5 9.5h3.8l3.2 3.3v2.7h-7"/><circle cx="7" cy="17.6" r="1.8"/><circle cx="17" cy="17.6" r="1.8"/></svg></span>订货</a>
       <a id="nav-fin" href="#finance"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20h17"/><rect x="5" y="11" width="3.4" height="6" rx="1"/><rect x="10.3" y="5" width="3.4" height="12" rx="1"/><rect x="15.6" y="13.5" width="3.4" height="3.5" rx="1"/></svg></span>财务</a>
-      <a id="nav-cu" href="#customers"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.7"/><path d="M4.8 20c.8-3.9 3.6-6 7.2-6s6.4 2.1 7.2 6"/></svg><i class="nav-badge" id="cu-badge" hidden></i></span>客户</a>
+      <a id="nav-cu" href="#customers"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4M8.8 15l2.2 2 4.2-4.2"/></svg><i class="nav-badge" id="cu-badge" hidden></i></span>今天</a>
       <a id="nav-ptx" href="#partner"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h15M15.5 5 19 8.5 15.5 12M20 15.5H5M8.5 12 5 15.5 8.5 19"/></svg></span>合伙人</a>
       <a id="nav-set" href="#settings"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.1"/><circle cx="9" cy="17" r="2.1"/></svg><i class="nav-dot" id="set-dot" hidden></i></span>设置</a>
     </nav>
@@ -835,6 +843,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   <div class="health" id="health" hidden><span id="health-text"></span><button class="btn small" id="health-open" type="button">查看</button></div>
 
   <main id="inv-view">
+    <button class="td-strip" id="td-strip" type="button" hidden></button>
     <section class="qo" id="qo-sec" aria-label="快速下单">
       <div class="qo-top">
         <h2 id="qo-h">快速下单 · 点口味加一根</h2>
@@ -1001,11 +1010,12 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <div class="owe" id="resv-pick" hidden></div>
       <div class="list" id="resv"></div>
     </section>
-    <div class="actions"><button class="btn primary" id="cu-fu-new" type="button">+ 记跟进</button></div>
     <section id="fu-sec" hidden>
-      <h2>要联系的客户 <small class="rc-n" id="fu-n"></small></h2>
+      <h2>今天找谁 <small class="rc-n" id="fu-n"></small></h2>
       <div class="list" id="fu-list"></div>
+      <p class="hint td-stat" id="td-stat" hidden></p>
     </section>
+    <div class="actions"><button class="btn ghost small" id="cu-fu-new" type="button">＋ 记一个要找的人</button></div>
     <h2 class="cu-h">全部客户</h2>
     <p class="hint cu-stat" aria-label="客户概览"><b id="c-n">–</b> 个客户 · 回头客 <b id="c-rep">–</b>（<span id="c-rate">–</span>）· 平均每人 <b id="c-avg">–</b></p>
     <p class="hint" id="c-noname" hidden></p>
@@ -1161,7 +1171,12 @@ details.restock > summary::-webkit-details-marker { display: none; }
   }
   /* the money of one order split by how it came in, for the payment summaries */
   /* 这单实际收到多少（2026-11-19 Bowen：客人少给 $20，财务「收款」里现金还写 $60，应该写 $40）：合计 − 这单少给的 + 多给的 + 这单收回上次少给的 − 抵掉上次多给的。
-     收入、净赚照旧按合计（少给的下次会还）；「不追了」不动钱 */
+     收入、净赚照旧按合计（少给的下次会还）；「不追了」不动钱。
+     2026-11-23 Bowen：不追的钱要算进收入 → balKeep：多给「送我的」= 多收入；少给没开「下次核对」/ 后来点「不追了」= 少收入（那笔钱不会来了）。
+     下次核对的照旧不算（会还 / 会收回来）。只动收入、净赚，收款照旧按实收（balCash） */
+  const balKeep = (o) => r2((Array.isArray(o && o.bal) ? o.bal : []).reduce((a, e) => a + (e.kind === "waive" ? Number(e.amt) || 0 : e.kind === "diff" && e.gift ? -(Number(e.amt) || 0) : 0), 0));
+  const keepLbl = (k) => (k > 0 ? "客人多给（送我的）" : "少给不追了");
+  const keepParts = (o) => { let p = 0, m = 0; for (const e of Array.isArray(o && o.bal) ? o.bal : []) { const v = e.kind === "waive" ? Number(e.amt) || 0 : e.kind === "diff" && e.gift ? -(Number(e.amt) || 0) : 0; if (v > 0) p += v; else m -= v; } return [r2(p), r2(m)]; };
   const balCash = (o) => r2(-(Array.isArray(o && o.bal) ? o.bal : []).filter((e) => e.kind === "diff" || e.kind === "back").reduce((a, e) => a + (Number(e.amt) || 0), 0));
   const payParts = (o, amt) => {
     const d = amt == null ? 0 : balCash(o), got = amt == null ? amt : r2(amt + d);
@@ -1671,9 +1686,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
     wireCustSug(() => upd(true));
   }
   function readCust(o) {
-    const v = (id) => ($(id).value || "").trim(), prev = (o && o.follow_up) || {};
+    const v = (id) => (($(id) || {}).value || "").trim(), prev = (o && o.follow_up) || {};
     const d = v("f-fu"), n = v("f-funote"), done = $("f-fudone") ? $("f-fudone").checked : false;
-    const fu = d || n ? Object.assign({ date: d || null, note: n, done }, done && prev.done_at ? { done_at: prev.done_at } : {}, prev.contacted_at ? { contacted_at: prev.contacted_at } : {}) : null;
+    const fu = !$("f-fu") ? (o && o.follow_up) || null : d || n ? Object.assign({ date: d || null, note: n, done }, done && prev.done_at ? { done_at: prev.done_at } : {}, prev.contacted_at ? { contacted_at: prev.contacted_at } : {}) : null;
     const name = v("f-cust") || null; // 区、来源不再填：以前记的照旧留着；来源跟以前一样，买过的人自动记「回头客」
     return { customer: name, suburb: (o && o.suburb) || null, source: (o && o.source) || (name && custOrders(name, o && o.id).length ? "回头客" : null), follow_up: fu };
   }
@@ -1801,14 +1816,12 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="field fee-row"><label for="f-fee">配送费 $</label><input id="f-fee" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0（自取）" value="' + esc(edit && edit.delivery_fee ? edit.delivery_fee : "") + '"></div>' +
       mixRowHtml(edit || null) +
       /* 2026-11-18 Bowen：少给 / 多给是交货时临时发生的，记单的时候不知道 → 新记的单不放这个（编辑预定、结算、改已卖出的单才有）；
-         上次少给 / 多给的提醒照旧。备注直接放出来；预定已经有交货时间，「更多」（日期、下次跟进）只在记卖出时有 */
+         上次少给 / 多给的提醒照旧。备注直接放出来。
+         2026-11-23 Bowen：记卖出的「更多：日期、下次跟进」拿掉（不太跟进；真实数据 222 单里只有 2 单补记前一天的，记完「编辑」能改卖出日期）。
+         日期 = 今天（编辑预定照旧用原来的日期）；订单上以前记的跟进照旧保留 */
       custNameHtml(custPre) + meetHtml(edit, !!(edit || reserve)) + balHtml(edit, !edit) +
       '<p class="total">合计<b id="f-total">–</b></p><p id="f-baltot" hidden></p>' +
       '<div class="field"><label for="f-note">备注</label><textarea id="f-note" rows="2" placeholder="其他说明">' + esc(edit ? edit.note || "" : "") + "</textarea></div>" +
-      '<details class="more" id="f-more"' + (edit || reserve ? " hidden" : "") + (edit && edit.follow_up ? " open" : "") + '><summary id="f-more-sum">更多：日期、下次跟进</summary><div class="more-body">' +
-        '<div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + esc((edit && edit.date) || today()) + '"></div>' +
-        custMoreHtml(custPre) +
-      "</div></details>" +
       '<p class="callout" id="f-pickhint" hidden></p>' + pnameField(edit ? edit.pick_from || "" : "", true) + splitter.html;
     function addLine(sku, qty) {
       const k = n++;
@@ -1836,7 +1849,6 @@ details.restock > summary::-webkit-details-marker { display: none; }
       $("f-total").textContent = totalText(ls, Number($("f-fee").value) || 0);
       mixSync(formTotalNum(ls, Number($("f-fee").value) || 0));
       if (bal) bal.setTotal(formTotalNum(ls, Number($("f-fee").value) || 0));
-      updQuote();
       const want = {};
       $("f-lines").querySelectorAll(".line").forEach((row) => { const k = row.dataset.line, sku = $("f-sku-" + k).value; if (sku) want[sku] = (want[sku] || 0) + (Number($("f-qty-" + k).value) || 0); });
       const RVn = reservedQty(edit ? edit.id : undefined), short = Object.entries(want).map(([sku, q]) => [sku, Math.max(0, q - Math.max(0, (D.st[sku] || 0) - (RVn[sku] || 0)))]).filter((x) => x[1] > 0);
@@ -1846,13 +1858,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
       splitter.setShort(short);
       ph.textContent = short.length ? "手上不够，要找合伙人拿：" + short.map(([sku, q]) => nm(sku) + " ×" + q).join("、") + (resv ? "。预定先记着，结算时会记成合伙人拿货。" : "。保存时会自动记成合伙人拿货。") : "";
     }
-    function updQuote() {
-      const d = $("f-date").value;
-      $("f-more-sum").textContent = d && d !== today() ? "更多（日期 " + fmtD(d) + "）" : "更多：日期、下次跟进";
-    }
     async function submit() {
       needDb();
-      const date = $("f-date").value || today();
+      const date = (edit && edit.date) || today();
       const lump = readLump();
       const merged = {};
       for (const row of $("f-lines").querySelectorAll(".line")) {
@@ -1926,7 +1934,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       };
       $("f-payshow").addEventListener("click", () => { payShown = true; layout(); });
       layout();
-      $("f-resv").addEventListener("change", () => { $("sheet-title").textContent = $("f-resv").checked ? "记一笔预定" : "记一笔卖出"; $("f-meet").hidden = !$("f-resv").checked; $("f-more").hidden = $("f-resv").checked; layout(); bal.paint(); recalc(); });
+      $("f-resv").addEventListener("change", () => { $("sheet-title").textContent = $("f-resv").checked ? "记一笔预定" : "记一笔卖出"; $("f-meet").hidden = !$("f-resv").checked; layout(); bal.paint(); recalc(); });
       wireMeet(); wireMeetCust();
       /* 再点一下已选的付款方式 = 取消（预定可以先不选） */
       let payWas = curPay();
@@ -2848,12 +2856,12 @@ details.restock > summary::-webkit-details-marker { display: none; }
         else { const u = UC[l.sku]; if (u == null) known = false; else cost += need * u; }
       }
     }
-    const rev = goods == null ? null : r2(goods + fee);
-    return { qty, goods, fee, rev, cost: known ? r2(cost) : null, gross: rev != null && known ? r2(rev - cost) : null };
+    const rev = goods == null ? null : r2(goods + fee), keep = goods == null ? 0 : balKeep(o);
+    return { qty, goods, fee, rev, keep, cost: known ? r2(cost) : null, gross: rev != null && known ? r2(rev + keep - cost) : null };
   }
   function finBook(pred) {
     const PK = pickIndex(), FI = fifoBook(PK), UC = Object.assign(avgAllCosts(), FI.unitNow), days = {}, cats = {};
-    const day = (d) => days[d] || (days[d] = { date: d, orders: [], exps: [], buys: [], shr: [], shrink: 0, n: 0, qty: 0, cqty: 0, costAll: 0, goods: 0, fee: 0, rev: 0, cash: 0, cost: 0, gross: 0, opex: 0, net: 0, buy: 0, pick: 0, miss: 0, unk: 0 });
+    const day = (d) => days[d] || (days[d] = { date: d, orders: [], exps: [], buys: [], shr: [], shrink: 0, n: 0, qty: 0, cqty: 0, costAll: 0, goods: 0, fee: 0, keep: 0, rev: 0, cash: 0, cost: 0, gross: 0, opex: 0, net: 0, buy: 0, pick: 0, miss: 0, unk: 0 });
     for (const o of S.orders) {
       if (isReserved(o) || !pred(o.date)) continue;
       const b = orderBook(o, UC, PK, FI.OC), d = day(o.date || "");
@@ -2862,7 +2870,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       if (b.cost != null) d.costAll += b.cost;
       if (b.goods == null) d.miss++;
       else if (b.cost == null) d.unk++;
-      else { d.cqty += b.qty; d.goods += b.goods; d.fee += b.fee; d.rev += b.rev; d.cost += b.cost; d.gross += b.gross; }
+      else { d.cqty += b.qty; d.goods += b.goods; d.fee += b.fee; d.keep += b.keep; d.rev += b.rev + b.keep; d.cost += b.cost; d.gross += b.gross; }
     }
     for (const x of S.expenses) {
       if (!pred(x.date)) continue;
@@ -2871,9 +2879,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
       else { d.exps.push(x); d.opex += a; const c = x.category || "其他"; cats[c] = (cats[c] || 0) + a; }
     }
     for (const x of FI.SH) { if (!pred(x.date)) continue; const d = day(x.date); d.shr.push(x); d.shrink += x.cost; }
-    const K = ["goods", "fee", "rev", "cash", "cost", "costAll", "gross", "opex", "buy", "pick", "shrink"];
+    const K = ["goods", "fee", "keep", "rev", "cash", "cost", "costAll", "gross", "opex", "buy", "pick", "shrink"];
     const list = Object.values(days).map((d) => { K.forEach((k) => { d[k] = r2(d[k]); }); d.net = r2(d.gross - d.opex - d.shrink); return d; }).sort((a, b) => b.date.localeCompare(a.date));
-    const T = { n: 0, qty: 0, cqty: 0, costAll: 0, goods: 0, fee: 0, rev: 0, cash: 0, cost: 0, gross: 0, opex: 0, net: 0, buy: 0, pick: 0, miss: 0, unk: 0, shrink: 0 };
+    const T = { n: 0, qty: 0, cqty: 0, costAll: 0, goods: 0, fee: 0, keep: 0, rev: 0, cash: 0, cost: 0, gross: 0, opex: 0, net: 0, buy: 0, pick: 0, miss: 0, unk: 0, shrink: 0 };
     for (const d of list) for (const k in T) T[k] += d[k];
     for (const k in T) T[k] = r2(T[k]);
     for (const c in cats) cats[c] = r2(cats[c]);
@@ -2932,7 +2940,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     $("f-oc").innerHTML = '<span>其他成本 <b>' + money(T.opex) + "</b>" + (ocs.length ? '<small> · ' + ocs.map(([c, v]) => esc(c) + " " + money(v)).join(" · ") + "</small>" : '<small> · 邮费、广告费…</small>') + '</span><span class="pt-more">账本 ›</span>';
     $("f-qty").textContent = L ? T.qty + " 根" : "–";
     $("f-paysum").innerHTML = L ? paySum(FB.list.flatMap((d) => d.orders.flatMap(({ o, b }) => payParts(o, b.rev)))) : "";
-    $("f-sers").textContent = L ? ([serTxt(PQ), T.fee ? "含配送费 " + money(T.fee) : "", T.n ? T.n + " 单" : ""].filter(Boolean).join(" · ") || "这段时间还没有卖出。") : "";
+    $("f-sers").textContent = L ? ([serTxt(PQ), T.fee ? "含配送费 " + money(T.fee) : "", T.keep ? (T.keep > 0 ? "含客人多给 " : "少给不追 −") + money(Math.abs(T.keep)) : "", T.n ? T.n + " 单" : ""].filter(Boolean).join(" · ") || "这段时间还没有卖出。") : "";
 
     /* 合伙人的账：财务里每人只占一行，点「看账」打开按日期排的对账单 */
     const OW = partnerNames().concat(openPOs("").map(poWho)).filter((w, k, a) => a.indexOf(w) === k).map((w) => [w, ledgerNet(w), pendingPicks(w).length]).filter((x) => Math.abs(x[1]) >= 0.01 || x[2]);
@@ -2946,7 +2954,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const row = (label, v, cls) => '<div class="st-row' + (cls ? " " + cls : "") + '"><span>' + label + "</span><b>" + v + "</b></div>";
     const catRows = Object.entries(FB.cats).sort((a, b) => b[1] - a[1]);
     $("f-stmt").innerHTML = "<h3>利润表 · " + plabel() + "</h3>" +
-      row("商品销售额", money(T.goods)) + row("配送费收入", money(T.fee)) + row("营业收入", money(T.rev), "sub") +
+      row("商品销售额", money(T.goods)) + row("配送费收入", money(T.fee)) + (() => { const [p, m] = FB.list.flatMap((d) => d.orders.filter(({ b }) => b.goods != null && b.cost != null).map(({ o }) => keepParts(o))).reduce((a, x) => [a[0] + x[0], a[1] + x[1]], [0, 0]);
+        return (p ? row(keepLbl(1), money(r2(p))) : "") + (m ? row(keepLbl(-1), "−" + money(r2(m))) : ""); })() + row("营业收入", money(T.rev), "sub") +
       row("减：销货成本（" + T.cqty + " 根）", T.cost ? "−" + money(T.cost) : money(0)) +
       row("毛利" + (T.rev ? "（毛利率 " + Math.round((T.gross / T.rev) * 100) + "%）" : ""), money(T.gross), "sub") +
       (catRows.length ? catRows.map(([c, v]) => row("减：" + esc(c), "−" + money(v))).join("") : row("减：经营费用", money(0))) +
@@ -2992,7 +3001,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
             return '<div class="ord-pick"><span>找 <b>' + esc(gWho(g)) + "</b> 拿 " + n + " 根 · 拿货成本 " + (g.known ? money(g.cost) + (g.moves.length === 1 && u != null ? "（" + money(u) + "/根）" : "") : '<span class="pill warn">未填</span>') + (g.sid ? " · 已结账" : "") + "</span>" +
               (gi === A.length - 1 ? '<button class="btn small" type="button" data-pt-cost="' + esc(o.id) + '">编辑</button>' : "") + "</div>"; }).join("") : "") +
           (sub ? '<span class="l-sub">' + sub + "</span>" : "") + ph +
-          '<div class="ogrid">' + kv("收入", b.rev == null ? '<span class="pill warn">未填单价</span>' : money(b.rev)) + kv("其中配送费", mc(b.fee)) +
+          '<div class="ogrid">' + kv("收入", b.rev == null ? '<span class="pill warn">未填单价</span>' : money(b.rev + b.keep) + (b.keep ? '<small> · ' + keepLbl(b.keep) + " " + (b.keep < 0 ? "−" : "+") + money(Math.abs(b.keep)) + "</small>" : "")) + kv("其中配送费", mc(b.fee)) +
           kv("成本", b.cost == null ? '<span class="pill warn">缺进价</span>' : money(b.cost)) + kv("利润", b.gross == null ? "–" : money(b.gross), b.gross < 0 ? "neg" : "") + "</div></div>";
       }).join("");
       const exps = d.exps.slice().sort(moveSort).map((x) => '<div class="ord exp"><div class="ord-top"><span class="ord-what">费用 · ' + esc(x.category || "其他") + (x.note ? " · " + esc(x.note) : "") + "</span>" +
@@ -3231,7 +3240,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
     else saleForm(f ? (f.wants || []).map((w) => ({ sku: w.sku, qty: w.qty })) : [], true, () => patch({ done: true, done_at: new Date().toISOString() }, ""), { customer: x.customer, suburb: x.suburb, source: o ? "回头客" : "" });
     return true;
   }
+  $("td-strip").addEventListener("click", () => { location.hash = "#customers"; });
   $("fu-list").addEventListener("click", (e) => {
+    const q = e.target.closest("[data-td-copy],[data-td-sent],[data-td-unsent]");
+    if (q) { e.preventDefault(); if (q.dataset.tdCopy) tdCopy(q.dataset.tdCopy); else if (q.dataset.tdSent) tdSent(q.dataset.tdSent); else tdSent(q.dataset.tdUnsent, true); return; }
     if (followUpClick(e)) return;
     const t = e.target.closest("[data-edit-order]"); if (t) orderEditForm(t.dataset.editOrder);
   });
@@ -5508,36 +5520,145 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const g = dayGap(today(), d), WDN = "日一二三四五六";
     return g < 0 ? ["已过 " + -g + " 天", " late"] : g === 0 ? ["今天", " now"] : g === 1 ? ["明天", ""] : g === 2 ? ["后天", ""] : [fmtD(d) + " 周" + WDN[new Date(d + "T12:00:00").getDay()], ""];
   }
-  function fuRow(x) {
-    const c = x.c, [lbl, cls] = fuWhenLbl(x.date), auto = x.src === "a";
-    let why;
-    if (auto) why = x.next ? "约好" + (x.next < today() ? " " + fmtD(x.next) + " " : "今天") + "再问" + (x.touches.length && x.touches[x.touches.length - 1].what ? "（" + x.touches[x.touches.length - 1].what + "）" : "") : (x.r.mine ? "你设的每 " + x.r.every + " 天一次" : x.r.boxDef ? "一次买过 " + x.r.box + " 根" : "大概 " + x.r.every + " 天买一次") + " · 上次 " + fmtD(x.r.last) + "（" + agoText(x.r.last) + "）";
-    else why = [x.note, x.wants.length ? "想要 " + wantsText(x.wants) : ""].filter(Boolean).join(" · ") || x.origin;
-    const call = c ? callTxt(c.call) : "", favs = auto ? favsOf(c) : [];
-    const extra = (auto ? (favs.length ? '<span class="l-sub">常买：' + favs.map((f) => esc(nm(f.sku)) + " ×" + f.n + (f.have ? ' <b class="fu-ok">有 ' + f.have + "</b>" : ' <span class="fu-no">没货</span>')).join("、") + "</span>" : "") + (x.next ? '<span class="l-sub">' + esc(rhythmTxt(x.r)) + " · 上次 " + fmtD(x.r.last) + "</span>" : "")
-      : (x.wants.length ? '<span class="l-sub">想要：' + wantsHtml(x.wants) + "</span>" : "") + '<span class="l-sub">' + esc(x.origin) + "</span>" + (x.contacted_at ? '<span class="l-sub">' + fmtD(x.contacted_at) + " 发过信息</span>" : "")) +
-      (c && c.p.note ? '<span class="l-sub fu-pnote">' + esc(c.p.note) + "</span>" : "") + (x.touches.length ? '<span class="l-sub">' + esc(lastTouch(x.touches)) + "</span>" : "") +
-      (c && c.paid.length ? '<span class="l-sub">买过 ' + c.paid.length + " 次、" + c.qty + " 根</span>" : "");
-    return '<details class="fu2' + cls + '" data-fu-row="' + esc(x.id) + '"><summary><span class="fu-l1"><span class="fu-when' + cls + '">' + lbl + "</span><b>" + esc(x.customer || "（没写名字）") + "</b>" +
-      (c && c.vip ? '<span class="tag tag-vip">重点</span>' : "") + (c && c.place ? '<span class="tag-pl">' + esc(c.place) + "</span>" : "") + (x.restocked ? '<span class="pill ok">到货了</span>' : "") + "</span>" +
-      '<span class="l-sub fu-why">' + esc(why) + "</span>" + (call ? '<span class="l-sub fu-call">' + esc(call) + "联系</span>" : "") + "</summary>" +
-      '<div class="fu-body">' + extra + '<div class="l-actions">' + fuButtons(x) + "</div></div></details>";
+  /* ---------- 今天找谁（2026-11-23 Bowen 同意「今天」首页）----------
+     以前「要联系的客户」按日期排、谁到日子就列谁，一天能冒出 30 个，重点标签人人都有等于没有。现在 App 自己挑最多 5 个，按「可能带来多少钱」排：
+     可能性 × 他平时一单多少钱。可能性拿真实记录回测（11-23 数据，154 个客人、205 单；每一天只用那天以前的记录，看之后 7 天有没有下单）：
+       只买过一次、买了 1–4 根：第 7–13 天 21%；5–7 根：9%（手上还有货，晚点再问：第 10–20 天）；8 根以上：0/33（第 14–28 天，4%）
+       买过 2 天：到他上次的间隔 24%；3 天以上：到他自己的节奏 50%；你在资料里设了多久一次：40%；约好今天再问：40%
+       手动记的跟进：到日子 50%、想要的口味到货了 60%、没定日子的 30%
+     发了 → 3 天内不再列（「等回复」）；3 天没下单再列一次（可能性减半）；问过两次还没买 → 这一轮不再列，等他下次买了重新算。
+     下单 / 有预定的不列。复制消息：英文（名字里有中文就写中文），写他常买、现在有货的口味和见面地点 */
+  const TD_MAX = 5, TD_SENT = "发了信息";
+  const atDay = (at) => { const t = new Date(at || ""); return isNaN(t) ? "" : t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0"); };
+  let TD = {};
+  function todayPicks() {
+    const td = today(), book = customerBook(), CB = {}; for (const c of book) CB[c.id] = c;
+    const valOf = (c) => { const vs = c ? c.paid.map(orderTotal).filter((v) => v > 0) : []; return vs.length ? r2(median(vs)) : 140; };
+    const cand = {}, wait = [], later = [], busy = new Set();
+    const put = (x) => { x.score = r2(x.p * x.v); const o = cand[x.key]; if (!o || x.score > o.score) cand[x.key] = x; };
+    for (const f of openFUs()) {
+      const c = f.customer ? CB[custId(f.customer)] || null : null, key = (f.src === "o" ? "o:" : "f:") + f.id;
+      if (c) busy.add(c.id);
+      const sentAgo = f.contacted_at ? dayGap(f.contacted_at, td) : null;
+      const x = Object.assign({}, f, { key, c, v: valOf(c), sentOn: f.contacted_at });
+      if (sentAgo != null && sentAgo < 3) { wait.push(x); continue; }
+      if (f.date && f.date > td) { later.push(x); continue; } // 往后排到以后的：到货了也等到那天
+      const p = f.restocked ? 0.6 : f.date ? 0.5 : 0.3;
+      x.why = [f.restocked ? "想要的到货了：" + wantsText(f.wants) : f.wants.length ? "想要 " + wantsText(f.wants) : "", f.note].filter(Boolean).join(" · ") || "你记的跟进";
+      if (sentAgo != null) x.why += " · " + sentAgo + " 天前发过，没回";
+      x.p = sentAgo != null ? p / 2 : p; put(x);
+    }
+    for (const c of book) {
+      if (!c.paid.length || c.resv.length || busy.has(c.id) || c.p.every === 0) continue;
+      const days = [...new Set(c.paid.map((o) => o.date).filter(Boolean))].sort(), k = days.length, last = days[k - 1], since = dayGap(last, td);
+      const ts = (c.p.touches || []).filter((t) => t.date > last), lt = ts[ts.length - 1];
+      const x = { key: "a:" + c.id, src: "a", id: c.id, customer: c.name, c, v: valOf(c), wants: [], touches: c.p.touches || [] };
+      if (c.p.next && ts.length) { // 「联系过了 · 往后排」约好的日子
+        x.date = c.p.next;
+        if (c.p.next > td) { later.push(x); continue; }
+        x.p = 0.4; x.why = (c.p.next === td ? "约好今天再问" : "约好 " + fmtD(c.p.next) + " 再问") + (lt && lt.what && lt.what !== TD_SENT ? "（" + lt.what + "）" : ""); put(x); continue;
+      }
+      if (ts.length >= 2) continue; // 问过两次没买：这一轮不再列
+      const sentAgo = lt ? dayGap(lt.date, td) : null;
+      if (sentAgo != null && sentAgo < 3) { x.sentOn = lt.date; wait.push(x); continue; }
+      const gaps = days.slice(1).map((d, i) => dayGap(days[i], d)), q = c.paid.filter((o) => o.date === last).reduce((a, o) => a + (o.lines || []).reduce((b, l) => b + (Number(l.qty) || 0), 0), 0);
+      let p = 0;
+      if (c.p.every > 0) { if (since >= c.p.every - 1) { p = 0.4; x.why = "你设的每 " + c.p.every + " 天一次 · 上次 " + since + " 天前"; } }
+      else if (k >= 3) { const g = Math.max(3, Math.round(median(gaps))); if (since >= g - 1 && since <= Math.max(30, 3 * g)) { p = 0.5; x.why = "平时 " + g + " 天左右买一次 · 上次 " + since + " 天前"; } }
+      else if (k === 2) { const g = Math.max(3, gaps[0]); if (since >= g - 1 && since <= 30) { p = 0.24; x.why = "买过 2 次 · 上次 " + since + " 天前"; } }
+      else { const [lo, hi, pp] = q <= 4 ? [7, 13, 0.21] : q < 8 ? [10, 20, 0.09] : [14, 28, 0.04]; if (since >= lo && since <= hi) { p = pp; x.why = "买过一次 " + q + " 根 · " + since + " 天前"; } }
+      if (!p) continue;
+      if (sentAgo != null) { p /= 2; x.why += " · " + sentAgo + " 天前发过，没回"; }
+      x.p = p; put(x);
+    }
+    const all = Object.values(cand).sort((a, b) => b.score - a.score || String(a.customer || "").localeCompare(String(b.customer || "")));
+    later.sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
+    wait.sort((a, b) => (b.sentOn || "").localeCompare(a.sentOn || ""));
+    TD = {}; for (const x of all.concat(wait, later)) TD[x.key] = x;
+    return { pick: all.slice(0, TD_MAX), more: all.slice(TD_MAX), wait, later, stat: tdStat() };
+  }
+  /* 发了以后 7 天内有没有下单（看这个功能有没有用；满 7 天的才算） */
+  function tdStat() {
+    const td = today(), sends = [], od = {};
+    const add = (name, ts) => { if (name) for (const t of ts || []) if (t.what === TD_SENT && t.date) sends.push({ k: normName(name), date: t.date }); };
+    for (const p of S.customers) add(p.name, p.touches);
+    for (const f of S.followups) add(f.customer, f.touches);
+    for (const o of S.orders) if (o.follow_up) add(o.customer, o.follow_up.touches);
+    for (const o of S.orders) { const k = normName(o.customer || ""); if (k) (od[k] = od[k] || []).push(atDay(o.at) || o.date); }
+    let n = 0, hit = 0, pend = 0;
+    for (const s of sends) { if (dayGap(s.date, td) < 7) { pend++; continue; } n++; if ((od[s.k] || []).some((d) => d >= s.date && dayGap(s.date, d) <= 7)) hit++; }
+    return { n, hit, pend };
+  }
+  const enName = (sku) => { const i = itemBy(sku) || {}; return [i.series, i.variant || i.name || sku].filter(Boolean).join(" "); };
+  const enList = (a) => a.length <= 1 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
+  function tdMsg(x) {
+    const c = x.c, name = String(x.customer || (c && c.name) || "").trim(), zh = /[㐀-鿿]/.test(name), first = zh ? name : name.split(/\s+/)[0];
+    /* 记了想要的口味：有货就说这几种（不够数的写现在有几根）；一根都没有才说他常买的 */
+    const ws = x.wants && x.wants.length ? wantsStock(x.wants).filter((w) => w.q > 0) : [], allOk = ws.length && ws.every((w) => w.ok);
+    const favs = c ? favsOf(c) : [], have = favs.filter((f) => f.have > 0).map((f) => f.sku).slice(0, 3);
+    const pl = (c && c.place) || "", once = c && c.paid.length && new Set(c.paid.map((o) => o.date)).size === 1;
+    const cnName = (sku) => (itemBy(sku) || {}).name || nm(sku);
+    if (zh) return name + " 你好！" + (ws.length ? "你想要的 " + ws.map((w) => cnName(w.l.sku) + (w.ok ? "" : "（现在有 " + w.q + " 根）")).join("、") + (allOk ? " 到货了" : "") + "，要不要给你留着？"
+      : (once ? "上次的用得怎么样？" : "最近用得怎么样？") + (have.length ? have.map(cnName).join("、") + " 现在都有货，" : "") + "需要的话跟我说。") + (pl ? "还是在 " + pl + " 见。" : "");
+    const list = enList(have.map(enName));
+    return "Hi " + first + "! " + (ws.length ? (allOk ? "Good news, " + enList(ws.map((w) => enName(w.l.sku))) + (ws.length > 1 ? " are" : " is") + " back in stock."
+        : "Good news, I've got " + enList(ws.map((w) => (w.ok ? "" : w.q + " ") + enName(w.l.sku))) + " at the moment.") + " Want me to put some aside for you?"
+      : (once && favs[0] ? "Hope you're enjoying the " + enName(favs[0].sku) + ". " : "Just checking in, need a top-up? ") + (have.length ? "I've got " + list + " in stock at the moment." : "I've got plenty of flavours in stock at the moment.")) +
+      (pl ? " Happy to meet at " + pl + " again." : "");
+  }
+  function tdRow(x, mode) {
+    const c = x.c, call = c ? callTxt(c.call) : "", pl = c && c.place, k = esc(x.key);
+    const lbl = mode === "later" ? fuWhenLbl(x.date) : mode === "wait" ? [fmtD(x.sentOn) + " 发的", ""] : null;
+    const quick = mode === "wait" ? '<span class="fu-q"><button class="btn small ghost" type="button" data-td-unsent="' + k + '">没发，撤销</button></span>'
+      : mode === "later" ? "" : '<span class="fu-q"><button class="btn small primary" type="button" data-td-copy="' + k + '">复制消息</button><button class="btn small" type="button" data-td-sent="' + k + '">发了</button></span>';
+    const favs = c ? favsOf(c) : [];
+    const body = (x.wants && x.wants.length ? '<span class="l-sub">想要：' + wantsHtml(x.wants) + "</span>" : favs.length ? '<span class="l-sub">常买：' + favs.map((f) => esc(nm(f.sku)) + " ×" + f.n + (f.have ? ' <b class="fu-ok">有 ' + f.have + "</b>" : ' <span class="fu-no">没货</span>')).join("、") + "</span>" : "") +
+      (c && c.p.note ? '<span class="l-sub fu-pnote">' + esc(c.p.note) + "</span>" : "") + (x.touches && x.touches.length ? '<span class="l-sub">' + esc(lastTouch(x.touches)) + "</span>" : "") +
+      (c && c.paid.length ? '<span class="l-sub">买过 ' + c.paid.length + " 次、" + c.qty + " 根</span>" : "") +
+      '<div class="l-actions">' + fuButtons(x) + "</div>";
+    return '<details class="fu2 td-' + mode + '" data-fu-row="' + esc(x.id) + '"><summary><span class="fu-l1">' + (lbl ? '<span class="fu-when' + lbl[1] + '">' + lbl[0] + "</span>" : "") + "<b>" + esc(x.customer || "（没写名字）") + "</b>" +
+      (pl ? '<span class="tag-pl">' + esc(pl) + "</span>" : "") + (x.restocked ? '<span class="pill ok">到货了</span>' : "") + (mode !== "later" && mode !== "wait" ? '<span class="fu-amt">平时一单 ' + money(x.v) + "</span>" : "") + "</span>" +
+      (x.why ? '<span class="l-sub fu-why">' + esc(x.why) + "</span>" : "") + (call && mode !== "wait" ? '<span class="l-sub fu-call">' + esc(call) + "联系</span>" : "") + quick + "</summary>" +
+      '<div class="fu-body">' + body + "</div></details>";
+  }
+  function renderToday() {
+    const T = todayPicks(), td = today();
+    const fold = (cls, title, xs, mode) => xs.length ? '<details class="' + cls + '"><summary>' + title + " · " + xs.length + " 个</summary>" + xs.map((x) => tdRow(x, mode)).join("") + "</details>" : "";
+    $("fu-sec").hidden = !(T.pick.length + T.wait.length + T.later.length);
+    $("fu-n").textContent = T.pick.length ? String(T.pick.length) : "";
+    $("fu-list").innerHTML = (T.pick.length ? T.pick.map((x) => tdRow(x, "pick")).join("") : '<p class="hint td-none">今天没有特别要找的人。</p>') +
+      fold("fu-more", "还可以找", T.more, "more") + fold("fu-wait", "等回复", T.wait, "wait") + fold("fu-later", "以后要找的", T.later, "later");
+    $("td-stat").hidden = !(T.stat.n || T.stat.pend);
+    $("td-stat").textContent = T.stat.n ? "发了信息的，7 天内下单 " + T.stat.hit + " / " + T.stat.n + " 次" + (T.stat.pend ? " · 还有 " + T.stat.pend + " 次没满 7 天" : "") : "发了 " + T.stat.pend + " 次信息，满 7 天后这里算有没有下单";
+    return T;
+  }
+  async function tdSent(key, undo) {
+    const x = TD[key]; if (!x) return;
+    try {
+      needDb(); const td = today(), who = x.customer || "这位客人";
+      if (x.src === "a") {
+        const ts = (x.c.p.touches || []).slice();
+        if (undo) { const i = ts.map((t) => t.what === TD_SENT && t.date === x.sentOn).lastIndexOf(true); if (i >= 0) ts.splice(i, 1); await custPatch(x.c, { touches: ts }); toast("撤销了。"); }
+        else { await custPatch(x.c, { touches: ts.concat([{ date: td, what: TD_SENT }]).slice(-20), next: null }); toast("记下了：给 " + who + " 发了。3 天没下单会再提醒一次。"); }
+        return;
+      }
+      const o = x.src === "o" ? S.orders.find((y) => y.id === x.id) : null, f = o ? null : S.followups.find((y) => y.id === x.id); if (!o && !f) return;
+      const cur = o ? o.follow_up : f, ts = (cur.touches || []).slice();
+      let patch;
+      if (undo) { const i = ts.map((t) => t.what === TD_SENT && t.date === cur.contacted_at).lastIndexOf(true); if (i >= 0) ts.splice(i, 1); const prev = ts.filter((t) => t.what === TD_SENT).pop(); patch = { touches: ts, contacted_at: prev ? prev.date : null }; }
+      else patch = { contacted_at: td, touches: ts.concat([{ date: td, what: TD_SENT }]).slice(-20) };
+      if (o) await db.doc("orders/" + o.id).update({ follow_up: Object.assign({}, o.follow_up, patch) }); else await db.doc("followups/" + f.id).update(patch);
+      toast(undo ? "撤销了。" : "记下了：给 " + who + " 发了。3 天没下单会再提醒一次。");
+    } catch (e) { toast(e.userMsg || errText(e)); }
+  }
+  async function tdCopy(key) {
+    const x = TD[key]; if (!x) return;
+    const t = tdMsg(x);
+    try { await navigator.clipboard.writeText(t); toast("已复制给 " + (x.customer || "客人") + " 的消息，粘贴发出去后点「发了」。"); }
+    catch (_) { openSheet("复制消息", '<div class="field"><label for="c-text">浏览器不让自动复制，长按选中复制</label><textarea id="c-text" rows="6"></textarea></div>', async () => { try { await navigator.clipboard.writeText($("c-text").value); return "已复制。"; } catch (e) { $("c-text").focus(); $("c-text").select(); throw userError("还是复制不了，长按文字手动复制。"); } }, () => { $("c-text").value = t; }); }
   }
   function renderFuResv() {
-    /* 要联系的客户（2026-11-21 Bowen 重排）：手动记的跟进和按节奏 / 重点客户的自动提醒合成一个列表，离今天近的在上面（见下面 near），没定日子的跟在后面，
-       三天以后的收进「以后」。每条默认两行（哪天 · 谁 · 为什么找他），点开才有按钮 */
-    const td = today(), CBF = {}; for (const c of customerBook()) CBF[normName(c.name)] = c;
-    const items = openFUs().map((x) => Object.assign({ c: CBF[normName(x.customer || "")] || null }, x)).concat(autoFUs());
-    const rank = (x) => x.date || "9999-99-99";
-    items.sort((a, b) => rank(a).localeCompare(rank(b)) || ((b.c && b.c.vip) - (a.c && a.c.vip)) || String(a.customer || "").localeCompare(String(b.customer || "")));
-    const soon = items.filter((x) => !x.date || dayGap(td, x.date) <= 2), later = items.filter((x) => x.date && dayGap(td, x.date) > 2);
-    /* 2026-11-21 Bowen：过期很久的重点客户把上面占满了，今天、明天要找的反而看不到 → 离今天越近越靠上：
-       今天 → 明天 → 后天（「以后」里的提前两天自己出来）→ 过了的（刚过的在前，过了很久的在后）→ 没定日子的 */
-    const near = (x) => { if (!x.date) return 1e6; const g = dayGap(td, x.date); return g >= 0 ? g : 1000 - g; };
-    soon.sort((a, b) => near(a) - near(b) || ((b.c && b.c.vip) - (a.c && a.c.vip)) || String(a.customer || "").localeCompare(String(b.customer || "")));
-    $("fu-sec").hidden = !items.length;
-    $("fu-n").textContent = soon.length ? String(soon.length) : "";
-    $("fu-list").innerHTML = soon.map(fuRow).join("") + (later.length ? '<details class="fu-later"><summary>以后要找的 · ' + later.length + " 个</summary>" + later.map(fuRow).join("") + "</details>" : "");
+    const TDY = renderToday();
     /* 按交货时间排：定了时间的在前（最早的最上面，过了的在最上面标「已过」），没定时间的在后（新记的在前） */
     const resv = S.orders.filter(isReserved).sort((a, b) => { const x = meetKey(a), y = meetKey(b); return x && y ? x.localeCompare(y) || moveSort(a, b) : x ? -1 : y ? 1 : moveSort(a, b); });
     const RA = resvAlloc(), RS = RA.RS, RW = RA.RW, PKO = {}; for (const g of pickups()) (PKO[g.oid] = PKO[g.oid] || []).push(g);
@@ -5545,7 +5666,11 @@ details.restock > summary::-webkit-details-marker { display: none; }
     $("resv-sec").hidden = !resv.length;
     const rvN = resv.reduce((a, o) => a + (o.lines || []).reduce((b, l) => b + (Number(l.qty) || 0), 0), 0);
     $("resv-n").textContent = resv.length + " 单 · " + rvN + " 根";
-    $("cu-badge").hidden = !resv.length; $("cu-badge").textContent = resv.length > 99 ? "99+" : String(resv.length);
+    const dueN = resv.filter((o) => o.meet_date && o.meet_date <= today()).length, tdN = dueN + TDY.pick.length;
+    $("cu-badge").hidden = !tdN; $("cu-badge").textContent = tdN > 99 ? "99+" : String(tdN);
+    /* 库存页（打开 App 第一眼）快速下单上面一行：今天交货几单、找几个人，点一下到「今天」 */
+    $("td-strip").hidden = !tdN;
+    $("td-strip").innerHTML = '<b>今天</b>' + [dueN ? "交货 " + dueN + " 单" : "", TDY.pick.length ? "找 " + TDY.pick.length + " 个人" : ""].filter(Boolean).join(" · ") + '<span class="pt-more">›</span>';
     const CB = {}; for (const c of customerBook()) CB[normName(c.name)] = c;
     $("resv").innerHTML = resv.map((o) => { const t = orderTotal(o), n = (o.lines || []).reduce((a, l) => a + (Number(l.qty) || 0), 0);
       const cc = CB[normName(o.customer || "")] || null, pl = o.place || (cc && cc.place) || "", call = !o.meet_time ? callTxt(o.call_win || (cc && cc.call) || "") : "";
@@ -5557,7 +5682,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       return '<details class="rv"><summary><span class="rv-main"><span class="l-date"><span class="tag-resv">预定</span>' +
         (mt ? '<b class="rv-meet' + (o.meet_date < today() ? " late" : o.meet_date === today() ? " now" : "") + '">' + esc(mt) + "</b>" : '<span class="rv-nomeet">' + fmtD(o.date) + " 记 · 暂未确定时间</span>") + "</span>" + (call ? '<span class="rv-call">' + esc(call) + "联系</span>" : "") +
         '<span class="rv-who"><b>' + esc(who || "（没写客人名字）") + "</b>" + (() => { const h = handoffOf(o); return '<span class="tag-ho' + (h === "配送" ? " ho-d" : " ho-p") + '">' + h + "</span>"; })() +
-          (pl ? '<span class="rv-place">' + esc(pl) + "</span>" : "") + (cc && cc.vip ? '<span class="tag tag-vip">重点</span>' : "") + "</span>" +
+          (pl ? '<span class="rv-place">' + esc(pl) + "</span>" : "") + "</span>" +
         '<span class="l-sub">' + esc(serTxt(serQty([o]))) + "</span>" + rvNote +
         ((() => { const cb = o.customer ? custBal(o.customer, o.id) : { amt: 0 }; const d = balOf(o).find((e) => e.kind === "diff");
           return (cb.amt ? '<span class="pill ' + (cb.amt > 0 ? "warn" : "ok") + '">' + (cb.amt > 0 ? "上次少给 " : "上次多给 ") + money(Math.abs(cb.amt)) + "</span>" : "") +
@@ -5572,7 +5697,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   }
   function renderSetDot() { const s0 = S.sync, at = s0 && (s0.synced_at || (s0.history && s0.history[0] && s0.history[0].at)); const old = !at || Date.now() - new Date(at).getTime() > 7 * 864e5; $("set-dot").hidden = !S.loaded || !old; }
   function render() { CONS = null; renderSetDot(); renderFuResv(); if (view === "finance") renderOrderSearch(); renderHealth(); resolveNames(); if (view === "inventory" && !STANDALONE) renderLog(); if (view === "finance") renderFinance(); else if (view === "customers") renderCustomers(); else if (view === "partner") renderPartnerPage(); else if (view === "purchases") renderPurchases(); else renderInventory(); renderBackup(); renderCart(); }
-  const VIEWS = { inventory: ["inv-view", "nav-inv", "库存"], purchases: ["po-view", "nav-po", "订货"], finance: ["fin-view", "nav-fin", "财务"], customers: ["cu-view", "nav-cu", "客户"], partner: ["ptx-view", "nav-ptx", "合伙人"], settings: ["set-view", "nav-set", "设置"] };
+  const VIEWS = { inventory: ["inv-view", "nav-inv", "库存"], purchases: ["po-view", "nav-po", "订货"], finance: ["fin-view", "nav-fin", "财务"], customers: ["cu-view", "nav-cu", "今天"], partner: ["ptx-view", "nav-ptx", "合伙人"], settings: ["set-view", "nav-set", "设置"] };
   function route() {
     window.scrollTo(0, 0); // 换页从顶上开始看
     let h = location.hash.slice(1);

@@ -79,13 +79,14 @@ with sync_playwright() as p:
         print("== " + mode)
         go(pg, "customers"); pg.wait_for_timeout(300)
         names = fu_names(pg)
-        check("离今天近的在上面：Kit（明天）→ Lou（后天）→ Ben（按节奏，已过 2 天）→ Amy（已过 3 天）→ Cat（重点，已过 6 天）→ Dan（没定日子）", names == ["Kit", "Lou", "Ben", "Amy", "Cat", "Dan"], names)
-        check("三天以后的收进「以后」：Eve", fold_names(pg) == ["Eve"] and "以后要找的 · 1 个" in pg.inner_text("#fu-list .fu-later > summary"), fold_names(pg))
+        # 2026-11-23 起「今天找谁」：按 可能性 × 平时一单 排（Hal 批发 50 根 0.04×3000=120 · Amy 跟进到日子 0.5×140 · Dan 没定日子 0.3×140 · Ben 5 天一次 0.5×60 · Cat 一次 10 根 0.04×600）
+        check("今天找谁：Hal、Amy、Dan、Ben、Cat（按可能带来的钱）", names == ["Hal", "Amy", "Dan", "Ben", "Cat"], names)
+        check("还没到日子的收进「以后要找的」：Kit（明天）、Lou（后天）、Eve", fold_names(pg) == ["Kit", "Lou", "Eve"] and "以后要找的 · 3 个" in pg.inner_text("#fu-list .fu-later > summary"), fold_names(pg))
         check("有预定的 Fay、记跟进以后又买了的 Gus 不列", "Fay" not in names and "Gus" not in names)
-        lbl = pg.evaluate("[...document.querySelectorAll('#fu-list > .fu2 .fu-when')].map((x) => x.innerText)")
-        check("日子写「明天 / 后天 / 已过 2 天 / 已过 3 天 / 已过 6 天 / 没定日期」", lbl == ["明天", "后天", "已过 2 天", "已过 3 天", "已过 6 天", "没定日期"], lbl)
+        lbl = pg.evaluate("[...document.querySelectorAll('#fu-list .fu-later .fu2 .fu-when')].map((x) => x.textContent)")
+        check("「以后」里写哪天：明天 / 后天 / 日期", lbl[:2] == ["明天", "后天"] and len(lbl) == 3, lbl)
         c1 = row(pg, "Cat").first
-        check("Cat 标「重点」，写「一次买过 10 根」", c1.locator(".tag-vip").count() == 1 and "一次买过 10 根" in c1.locator(".fu-why").inner_text(), c1.inner_text())
+        check("Cat 不再标「重点」，写「买过一次 10 根 · 20 天前」", c1.locator(".tag-vip").count() == 0 and "买过一次 10 根 · 20 天前" in c1.locator(".fu-why").inner_text(), c1.inner_text())
         check("收起时看不到按钮", not c1.locator("[data-au-resv]").is_visible())
         c1.locator("summary").click(); pg.wait_for_timeout(200)
         bt = c1.locator(".l-actions button").all_inner_texts()
@@ -99,14 +100,14 @@ with sync_playwright() as p:
         pg.click('#f-lwq [data-lw="发了信息没回"]'); pg.check('input[name="f-whenr"][value="3"]'); save(pg)
         cp = cust(pg, "Cat")
         check("Cat：下次 3 天后，记一笔「发了信息没回」", cp.get("next") == D(3) and (cp.get("touches") or [{}])[-1].get("what") == "发了信息没回", (cp.get("next"), cp.get("touches")))
-        check("Cat 挪到「以后」（3 天后，还没到前两天）", fu_names(pg) == ["Kit", "Lou", "Ben", "Amy", "Dan"] and "Cat" in fold_names(pg), (fu_names(pg), fold_names(pg)))
+        check("Cat 挪到「以后」（约好 3 天后）", fu_names(pg) == ["Hal", "Amy", "Dan", "Ben"] and fold_names(pg) == ["Kit", "Lou", "Cat", "Eve"], (fu_names(pg), fold_names(pg)))
         row(pg, "Amy").first.locator("summary").click(); pg.wait_for_timeout(150)
         row(pg, "Amy").first.locator("[data-fu-done]").click(); pg.wait_for_timeout(500)
         fa = next(x for x in S(pg, "followups") if x["id"] == "fu-a")
-        check("Amy 不用跟了 → 这条关掉", fa.get("done") is True and fu_names(pg) == ["Kit", "Lou", "Ben", "Dan"], (fa.get("done"), fu_names(pg)))
-        # 「以后」里的到了前两天自己出来：把 Eve 改成后天
-        pg.evaluate("window.__GM.S.followups.find((f) => f.id === 'fu-e').date = '" + D(2) + "'"); go(pg, "inventory"); go(pg, "customers")
-        check("「以后」里的 Eve 到了前两天，自己出来排在上面（后天那一档）", fu_names(pg)[:3] == ["Kit", "Eve", "Lou"] and "Eve" not in fold_names(pg), (fu_names(pg), fold_names(pg)))
+        check("Amy 不用跟了 → 这条关掉", fa.get("done") is True and fu_names(pg) == ["Hal", "Dan", "Ben"], (fa.get("done"), fu_names(pg)))
+        # 「以后」里的到了日子自己出来：把 Eve 改成今天
+        pg.evaluate("window.__GM.S.followups.find((f) => f.id === 'fu-e').date = '" + D(0) + "'"); go(pg, "inventory"); go(pg, "customers")
+        check("「以后」里的 Eve 到了日子，出来到今天找谁", "Eve" in fu_names(pg) and "Eve" not in fold_names(pg), (fu_names(pg), fold_names(pg)))
 
         # 重点客户
         pg.click('[data-cs="vip"]'); pg.wait_for_timeout(250)
@@ -117,7 +118,7 @@ with sync_playwright() as p:
         check("客户资料：「重点客户」已勾（一次买过 10 根）", pg.is_checked("#f-cvip") and "一次买过 10 根" in pg.inner_text("#sheet-form"))
         pg.uncheck("#f-cvip"); save(pg)
         check("取消勾选 → 存 vip:false，不在重点客户里", cust(pg, "Cat").get("vip") is False and "还没有重点客户" in pg.inner_text("#c-list"), (cust(pg, "Cat").get("vip"), pg.inner_text("#c-list")[:80]))
-        check("也不再按「重点」提醒", "Cat" not in fold_names(pg) + fu_names(pg), fold_names(pg))
+        check("「今天找谁」不看重点标记：Cat 照旧在「以后」（约好 3 天后）", "Cat" in fold_names(pg), fold_names(pg))
         pg.click('[data-cs="recent"]'); pg.wait_for_timeout(200)
 
         # 地点

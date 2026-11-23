@@ -98,10 +98,11 @@ with sync_playwright() as p:
         print("== " + mode)
         go(pg, "customers")
         names = names_(pg)
-        check("要联系的客户：Kim（跟进）、Amy（按记录 5 天一次）、Dan（你设的每 3 天）", set(names) == {"Kim", "Amy", "Dan"}, names)
-        check("不提醒：Bob（只买过 2 次）、Cat（已经有预定）、Eve（60 天没来、不是你设的）", not ({"Bob", "Cat", "Eve"} & set(names)), names)
+        # 2026-11-23 起「今天找谁」：买过 2 次的也算（回测 7 天内 24% 会再买），Bob 18 天前买过第二次 → 列
+        check("今天找谁：Kim（跟进）、Amy（按记录 5 天一次）、Dan（你设的每 3 天）、Bob（买过 2 次）", set(names) == {"Kim", "Amy", "Dan", "Bob"}, names)
+        check("不提醒：Cat（已经有预定）、Eve（60 天没来、不是你设的）", not ({"Cat", "Eve"} & set(names)), names)
         a = row(pg, "Amy")
-        check("Amy：写他的节奏和上次哪天", "大概 5 天买一次 · 上次" in a and "买过 3 次" in a and "4 天前" in a, a)
+        check("Amy：写他的节奏和上次哪天", "平时 5 天左右买一次 · 上次 4 天前" in a and "买过 3 次" in a, a)
         check("Amy：常买的按根数排，写现在有没有货", "常买：Banana Buzz ×4 有 40、Pink Lemon ×3 有 40、Grape Ice ×2 有 40" in a, a)
         d = row(pg, "Dan")
         check("Dan：「你设的每 3 天一次」+ 你写的「很热情，买得多」", "你设的每 3 天一次" in d and "很热情，买得多" in d, d)
@@ -120,7 +121,7 @@ with sync_playwright() as p:
         f = fu(pg, "fu-kim")
         check("选日期：日期改了，记录 2 笔，最后一笔「发了信息没回」", f.get("date") == D(-10) and not f.get("contacted_at") and len(f.get("touches") or []) == 2 and f["touches"][-1]["what"] == "发了信息没回", {k: f.get(k) for k in ("date", "contacted_at", "touches")})
         act(pg, '[data-fu-later="fu-kim"]'); pg.wait_for_selector("#f-lwhat"); pick_when(pg, ""); save(pg)
-        check("往后排选「不定」：没日期，还留在列表里", fu(pg, "fu-kim").get("date") is None and "没定日期" in row(pg, "Kim"))
+        check("往后排选「不定」：没日期，还留在今天找谁里", fu(pg, "fu-kim").get("date") is None and "Kim" in names_(pg, False))
 
         # 2. 新记跟进：默认不定
         pg.click("#cu-fu-new"); pg.wait_for_selector("#f-cust")

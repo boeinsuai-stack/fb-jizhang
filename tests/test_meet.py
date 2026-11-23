@@ -86,9 +86,9 @@ with sync_playwright() as p:
         before = {x["id"] for x in S(pg, "orders")}
         go(pg, "finance"); pg.click("#fin-sale"); pg.wait_for_selector("#f-skuq-0")
         pg.fill("#f-skuq-0", "香蕉"); pg.press("#f-skuq-0", "Enter"); pg.fill("#f-qty-0", "1")
-        check("记卖出：没有交货这一栏；备注直接放出来，「更多：日期、下次跟进」收着", pg.is_hidden("#f-meet") and pg.is_visible("#f-note") and pg.is_visible("#f-more") and "日期、下次跟进" in pg.inner_text("#f-more-sum"))
+        check("记卖出：没有交货这一栏；备注直接放出来，没有「更多：日期、下次跟进」（11-23 拿掉）", pg.is_hidden("#f-meet") and pg.is_visible("#f-note") and pg.locator("#sheet #f-more, #sheet #f-date, #sheet #f-fu").count() == 0)
         pg.check("#f-resv"); pg.wait_for_timeout(100)
-        check("勾「只是预定」：「更多」（日期、下次跟进）不要了，只剩备注", pg.is_hidden("#f-more") and pg.is_visible("#f-note"))
+        check("勾「只是预定」：只剩备注", pg.is_visible("#f-note"))
         check("勾「只是预定」：交货出现，就在客户那一栏下面", pg.is_visible("#f-meet") and pg.evaluate("(() => { const c = document.getElementById('f-cust').closest('.field'); let n = c.nextElementSibling; while (n && n.offsetParent === null) n = n.nextElementSibling; return n && n.id; })()") == "f-meet")
         check("没有今天 / 明天 / 后天那一排；日期默认今天", pg.locator('input[name="f-mdr"]').count() == 0 and pg.input_value("#f-mdate") == TODAY)
         check("地点：以前用过的「Coles 停车场」点一下就行，还有「＋ 地点」", pg.locator('#f-pl input[value="Coles 停车场"]').count() == 1 and pg.is_visible("#f-pladd"))

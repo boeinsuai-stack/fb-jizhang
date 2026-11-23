@@ -131,7 +131,8 @@ with sync_playwright() as p:
         go(pg, "finance"); pg.wait_for_timeout(300)
         paysum = pg.inner_text("#f-paysum")
         check("财务「收款」：现金 $215（Amy 多给 10 → 70、Bob 多给 5 → 65、Cat 少给 20 → 40、Dan 少给 20 → 40）", "现金 $215" in paysum, paysum)
-        check("收入照旧按合计：$240", "$240" in pg.inner_text("#f-inc"), pg.inner_text("#f-inc"))
+        # 2026-11-23 Bowen：不追的钱算进收入 → 合计 $240 + Amy 多给送你的 $10 − Dan 少给不用收的 $20；Bob、Cat 点了下次核对的不算
+        check("收入：合计 $240 + 送你的 $10 − 不用收的 $20 = $230", "$230" in pg.inner_text("#f-inc"), pg.inner_text("#f-inc"))
         pg.evaluate("document.querySelectorAll('details.day').forEach((d) => { d.open = true; })"); pg.wait_for_timeout(150)
         day = pg.inner_text("body")
         check("那一单写「现金 $40」", "现金 $40" in day, day[:300])

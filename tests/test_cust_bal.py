@@ -175,7 +175,9 @@ with sync_playwright() as p:
         # 5. 钱的数字不变、刷新后还在
         go(pg, "finance"); pg.click('#period [data-p="all"]'); pg.wait_for_timeout(200)
         tot = pg.evaluate("window.__GM.S.orders.filter((o) => o.status === 'paid').reduce((a, o) => a + o.lines.reduce((s, l) => s + l.qty * l.unit_price, 0) + (o.delivery_fee || 0), 0)")
-        check(f"收入 = 订单合计加起来 ${tot:g}（少给多给不改收入）", f"${tot:g}" in pg.inner_text("#f-inc"), (tot, pg.inner_text("#f-inc")))
+        # 2026-11-23 Bowen：不追的钱算进收入 → 合计 + 送你的 − 不用收的 / 不追了的（下次核对的照旧不算）
+        keep = pg.evaluate("window.__GM.S.orders.filter((o) => o.status === 'paid').reduce((a, o) => a + (o.bal || []).reduce((s, e) => s + (e.kind === 'waive' ? e.amt : e.kind === 'diff' && e.gift ? -e.amt : 0), 0), 0)")
+        check(f"收入 = 订单合计 ${tot:g} + 不追的 {keep:+g}（下次核对的不算）", f"${tot + keep:g}" in pg.inner_text("#f-inc"), (tot, keep, pg.inner_text("#f-inc")))
         # 新结构：页面上的订单（含 bal）整份拿出来 → v2.js 迁移成新结构 → 再算回旧样子，bal 一字不差（刷新后看到的就是这样算出来的）
         if mode == "新结构":
             olds = pg.evaluate("Object.fromEntries(window.__GM.S.orders.map((o) => { const x = Object.assign({}, o); delete x.id; delete x._v; return [o.id, x]; }))")
