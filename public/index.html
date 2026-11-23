@@ -2692,7 +2692,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const cell = (id, x, label) => '<input id="' + id + '" type="number" min="0" step="0.01" inputmode="decimal" aria-label="' + label + '" placeholder="' + (x.mixed ? "不统一" : "未设") + '" value="' + (x.v == null ? "" : esc(x.v)) + '">';
     const open = pickups().filter((g) => !g.sid);
     const html = '<div class="serp head"><span>系列</span><span>售价 $/根</span><span>拿货价 $/根</span></div>' +
-      cur.map((x, k) => '<div class="serp"><b>' + esc(x.sr) + (x.p.mixed || x.c.mixed ? "<small>现在各口味价格不一样，填了就统一</small>" : "") + "</b>" + cell("f-sp-" + k, x.p, x.sr + " 售价") + cell("f-sc-" + k, x.c, x.sr + " 拿货价") + "</div>").join("") +
+      cur.map((x, k) => '<div class="serp"><b>' + esc(x.sr) + (x.p.mixed || x.c.mixed ? "<small>现在各口味价格不一样，填了就统一</small>" : "") + (lastBuy()[x.sr] ? '<small class="sp-last">最近进货 ' + money(lastBuy()[x.sr].u) + "（" + fmtD(lastBuy()[x.sr].date) + "）</small>" : "") + "</b>" + cell("f-sp-" + k, x.p, x.sr + " 售价") + cell("f-sc-" + k, x.c, x.sr + " 拿货价") + "</div>").join("") +
       (open.length ? '<label class="check"><input type="checkbox" id="f-sp-open" checked> 还没结账的 ' + open.length + " 笔合伙人拿货也按新拿货价重算</label>" : "") +
       '<p class="hint">改哪个数就只改哪一项。改的是这个系列所有口味的默认价：以后下单自动带售价，找合伙人拿货按拿货价算成本。已经结账的账不受影响。</p>';
     openSheet("系列价格", html, async () => {
@@ -4394,7 +4394,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="grid2"><div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
       '<div class="field"><label for="f-note">备注</label><input id="f-note" placeholder="例如 他下周有货到再还"></div></div>' +
       '<p class="callout xsum" id="f-xsum">–</p>' +
-      '<p class="hint">单价默认按进价/拿货价算，可以改成你们说好的价。这里不算卖出、不算利润，只记库存和谁欠谁。</p>';
+      '<p class="hint">单价默认按你的进货价（两边一样），可以改成你们说好的价。这里不算卖出、不算利润，只记库存和谁欠谁。</p>';
     const kind = () => (document.querySelector('input[name="f-xk"]:checked') || {}).value || "take";
     const who = () => $("f-xwho").value.trim();
     const addLine = (side, sku) => {
@@ -4406,8 +4406,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
         '<button type="button" class="btn ghost small" data-rm="' + k + '" aria-label="删掉这一行">删掉</button>';
       $(side === "o" ? "f-lines-o" : "f-lines-i").append(row);
     };
-    const defUnit = (k) => { const row = document.querySelector('.xline[data-line="' + k + '"]'), sku = $("f-sku-" + k).value, it = itemBy(sku), u = $("f-unit-" + k); if (!it || u.value !== "") return;
-      const v = row.dataset.side === "o" ? (UC[sku] != null ? UC[sku] : numOrNull(it.cost_aud)) : (numOrNull(it.cost_aud) != null ? numOrNull(it.cost_aud) : UC[sku]); if (v != null) u.value = r2(v); };
+    const defUnit = (k) => { const sku = $("f-sku-" + k).value, it = itemBy(sku), u = $("f-unit-" + k); if (!it || u.value !== "") return;
+      const v = tradeUnit(sku); if (v !== "") u.value = v; }; // 两边都按我的进货价（2026-11-24）
     const read = (side) => { const m = {}; document.querySelectorAll('#f-lines-' + side + ' .xline').forEach((row) => { const k = row.dataset.line, sku = $("f-sku-" + k).value; if (!sku) return; const q = Number($("f-qty-" + k).value), u = numOrNull($("f-unit-" + k).value);
       if (m[sku]) { m[sku].qty += q; } else m[sku] = { sku, name: (itemBy(sku) || {}).name || sku, qty: q, unit: u }; }); return Object.values(m); };
     const bal = (w, extra) => { const x = ledgerFrom(partnerItems(w), openXfers(w).concat(extra ? [extra] : []), openPOs(w), [])[w]; return x ? r2(-x.net) : 0; };
@@ -4838,10 +4838,26 @@ details.restock > summary::-webkit-details-marker { display: none; }
     cartS = cart = {}; saveCart(); renderQuick(derive());
   };
   $("cb-go").addEventListener("click", () => (view === "partner" ? (ptDir === "swap" ? partnerSwapForm(linesOf(cartXo), linesOf(cartXi), doneCart) : (ptDir === "take" ? partnerTakeForm : partnerGiveForm)(cartLines(), doneCart)) : saleForm(cartLines(), false, doneCart)));
-  /* price for a stick I take from a partner: his price to me */
-  const giveUnit = (sku) => { const it = itemBy(sku), v = numOrNull(it && it.cost_aud); return v != null ? r2(v) : ptUnit(sku); };
-  /* default price for a stick a partner takes: what it cost me */
-  const ptUnit = (sku) => { const UC = stockUnitCosts(), it = itemBy(sku), v = UC[sku] != null ? UC[sku] : numOrNull(it && it.cost_aud); return v == null ? "" : r2(v); };
+  /* 跟合伙人之间的默认单价（2026-11-24 Bowen：谁拿谁的、换货都按我的进货价，两边同一个价）
+     = 这个系列我自己最近一次进货的每根价（订货到货 / 进货的流水；合伙人往来、随单拿的、代销的不算）；这个系列没自己进过货 → 系列价格里的价 → 手上货的成本。
+     以前：他拿我的按手上货的成本（如 $33）、我拿他的按系列价格的拿货价（如 $36），同一种货两边不一样 */
+  let LASTBUY = null;
+  function lastBuy() {
+    if (LASTBUY) return LASTBUY;
+    const r = {}, CP = new Set(S.purchases.filter((x) => x.consign).map((x) => x.id));
+    for (const m of S.moves) {
+      const q = Number(m.qty) || 0;
+      if (m.type !== "in" || m.transfer_id || m.order_id || m.partner || q <= 0 || m.cost == null || m.cost === "" || (m.po_id && CP.has(m.po_id))) continue;
+      const sr = seriesOf(itemBy(m.sku)), k = (m.date || "") + "|" + (m.at || "");
+      if (!r[sr] || k > r[sr].k) r[sr] = { k, u: r2(Number(m.cost) / q), date: m.date };
+    }
+    return (LASTBUY = r);
+  }
+  const tradeUnit = (sku) => { const it = itemBy(sku), b = lastBuy()[seriesOf(it)]; if (b) return b.u; const v = numOrNull(it && it.cost_aud); if (v != null) return r2(v); const UC = stockUnitCosts(); return UC[sku] != null ? r2(UC[sku]) : ""; };
+  const giveUnit = tradeUnit, ptUnit = tradeUnit;
+  /* 表单里写一行：默认按你的进货价 Bar Pro $34（11月22日 进货）· Ali $33（11月20日） */
+  const tradeHint = (skus) => { const sers = [...new Set(skus.map((k) => seriesOf(itemBy(k))))], L = lastBuy();
+    return '<p class="hint" id="f-trhint">单价默认按你的进货价（两边一样）：' + sers.map((sr) => esc(sr) + " " + (L[sr] ? money(L[sr].u) + "（" + fmtD(L[sr].date) + " 进货）" : "没进过货，按系列价格")).join(" · ") + "</p>"; };
   const ptSerpBox = (lines) => { const sers = [...new Set(lines.map((l) => seriesOf(itemBy(l.sku))))]; return '<div class="serp" id="f-serp">' + serpHtml(sers, {}) + "</div>"; };
   const wirePtSerp = (lines) => $("f-serp").addEventListener("input", (e) => {
     const sr = e.target.dataset && e.target.dataset.sr; if (!sr) return;
@@ -4942,7 +4958,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="field"><label for="f-xwho">跟谁拿的</label><input id="f-xwho" list="f-pnames" autocomplete="off" placeholder="例如 小王" value="' + esc(names[0] || "") + '"><datalist id="f-pnames">' + names.map((x) => '<option value="' + esc(x) + '">').join("") + "</datalist></div>" +
       '<div class="pt-lines">' + lines.map((l, k) => '<div class="pt-line"><span class="pt-name">' + esc(nm(l.sku)) + '</span><span class="pt-q">×' + l.qty + '</span><label class="pt-u"><span>$</span><input id="f-unit-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + giveUnit(l.sku) + '" aria-label="' + esc(nm(l.sku)) + ' 每根多少钱"></label></div>').join("") + "</div>" +
       ptSerpBox(lines) +
-      '<p class="hint">一般整个系列同一个价，在「整系列每根」填一次就行；个别口味不一样再单独改。</p>' +
+      tradeHint(lines.map((l) => l.sku)) +
       '<label class="check"><input type="checkbox" id="f-xpaid"> <span>我当场付了钱</span></label>' +
       '<div id="f-xpaywrap" hidden>' + payPick(null) + "</div>" +
       '<p class="callout xsum" id="f-xsum">–</p>' +
@@ -4985,7 +5001,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="field"><label for="f-xwho">谁拿的</label><input id="f-xwho" list="f-pnames" autocomplete="off" placeholder="例如 小王" value="' + esc(names[0] || "") + '"><datalist id="f-pnames">' + names.map((x) => '<option value="' + esc(x) + '">').join("") + "</datalist></div>" +
       '<div class="pt-lines">' + lines.map((l, k) => '<div class="pt-line"><span class="pt-name">' + esc(nm(l.sku)) + '</span><span class="pt-q">×' + l.qty + '</span><label class="pt-u"><span>$</span><input id="f-unit-' + k + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + ptUnit(l.sku) + '" aria-label="' + esc(nm(l.sku)) + ' 每根多少钱"></label></div>').join("") + "</div>" +
       ptSerpBox(lines) +
-      '<p class="hint">默认按进价，说好别的价就在「整系列每根」填一次；个别口味不一样再单独改。</p>' +
+      tradeHint(lines.map((l) => l.sku)) +
       '<label class="check"><input type="checkbox" id="f-xpaid"> <span>他当场付了钱</span></label>' +
       '<div id="f-xpaywrap" hidden>' + payPick(null) + "</div>" +
       '<p class="callout xsum" id="f-xsum">–</p>' +
@@ -5036,8 +5052,9 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const serp = (ls, sd, who) => sers(ls).map((sr) => '<label class="serp-i"><span>' + who + " 的 " + esc(sr) + ' 每根 $</span><input type="number" min="0" step="0.01" inputmode="decimal" data-srx="' + sd + '" data-sr="' + esc(sr) + '" placeholder="同一个价"></label>').join("");
     const html =
       '<div class="field"><label for="f-xwho">跟谁换</label><input id="f-xwho" list="f-pnames" autocomplete="off" placeholder="例如 小王" value="' + esc(names[0] || "") + '"><datalist id="f-pnames">' + names.map((x) => '<option value="' + esc(x) + '">').join("") + "</datalist></div>" +
-      '<h3 class="sw-h">我给 <span class="xw">合伙人</span> · ' + qo + " 根</h3>" + (lo.length ? side(lo, "o", ptUnit) : '<p class="hint">还没选，回去在「我给他的」里点口味。</p>') +
-      '<h3 class="sw-h"><span class="xw">合伙人</span> 给我 · ' + qi + " 根</h3>" + (li.length ? side(li, "i", giveUnit) : '<p class="hint">还没选，回去在「他给我的」里点口味。</p>') +
+      '<h3 class="sw-h">我给 <span class="xw">合伙人</span> · ' + qo + " 根</h3>" + (lo.length ? side(lo, "o", tradeUnit) : '<p class="hint">还没选，回去在「我给他的」里点口味。</p>') +
+      '<h3 class="sw-h"><span class="xw">合伙人</span> 给我 · ' + qi + " 根</h3>" + (li.length ? side(li, "i", tradeUnit) : '<p class="hint">还没选，回去在「他给我的」里点口味。</p>') +
+      tradeHint(lo.concat(li).map((l) => l.sku)) +
       '<details class="more"><summary>按系列一起改单价</summary><div class="more-body serp">' + serp(lo, "o", "我给") + serp(li, "i", "他给") + "</div></details>" +
       '<p class="callout xsum" id="f-xsum">–</p>' +
       '<div id="f-xpaidbox" hidden><label class="check"><input type="checkbox" id="f-xpaid"> <span id="f-xpaidt">差价当场付了</span></label><div id="f-xpaywrap" hidden>' + payPick(null) + "</div></div>" +
@@ -5769,7 +5786,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
 
   }
   function renderSetDot() { const s0 = S.sync, at = s0 && (s0.synced_at || (s0.history && s0.history[0] && s0.history[0].at)); const old = !at || Date.now() - new Date(at).getTime() > 7 * 864e5; $("set-dot").hidden = !S.loaded || !old; }
-  function render() { CONS = null; renderSetDot(); renderFuResv(); if (view === "finance") renderOrderSearch(); renderHealth(); resolveNames(); if (view === "inventory" && !STANDALONE) renderLog(); if (view === "finance") renderFinance(); else if (view === "customers") renderCustomers(); else if (view === "partner") renderPartnerPage(); else if (view === "purchases") renderPurchases(); else renderInventory(); renderBackup(); renderCart(); }
+  function render() { CONS = null; LASTBUY = null; renderSetDot(); renderFuResv(); if (view === "finance") renderOrderSearch(); renderHealth(); resolveNames(); if (view === "inventory" && !STANDALONE) renderLog(); if (view === "finance") renderFinance(); else if (view === "customers") renderCustomers(); else if (view === "partner") renderPartnerPage(); else if (view === "purchases") renderPurchases(); else renderInventory(); renderBackup(); renderCart(); }
   const VIEWS = { inventory: ["inv-view", "nav-inv", "库存"], purchases: ["po-view", "nav-po", "订货"], finance: ["fin-view", "nav-fin", "财务"], customers: ["cu-view", "nav-cu", "今天"], partner: ["ptx-view", "nav-ptx", "合伙人"], settings: ["set-view", "nav-set", "设置"] };
   function route() {
     window.scrollTo(0, 0); // 换页从顶上开始看

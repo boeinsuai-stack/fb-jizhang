@@ -15,8 +15,9 @@ D = lambda n: (datetime.date.fromisoformat(TODAY) - datetime.timedelta(days=n)).
 IT = lambda sku, ser, v, n, c: {"sku": sku, "series": ser, "variant": v, "name": n, "price_aud": 60, "cost_aud": c, "status": "在售"}
 nmz = {"XF-01": "香蕉", "XF-02": "葡萄冰", "XF-03": "粉柠檬", "XF-04": "芒果"}
 IN = lambda k, q, c: {"type": "in", "sku": k, "name": nmz[k], "qty": q, "date": D(20), "at": D(20) + "T01:00:00Z", "note": "进货", "cost": q * c}
-V1 = {"items": {"XF-01": IT("XF-01", "Bar Pro", "Banana Buzz", "香蕉", 30), "XF-02": IT("XF-02", "Bar Pro", "Grape Ice", "葡萄冰", 30),
-                "XF-03": IT("XF-03", "Ali", "Pink Lemon", "粉柠檬", 40), "XF-04": IT("XF-04", "Ali", "Mango", "芒果", 40)},
+# 系列价格里的拿货价故意跟进货价不一样（Bar Pro 36 / 进货 30，Ali 45 / 进货 40）：跟合伙人之间默认都按进货价（2026-11-24 Bowen）
+V1 = {"items": {"XF-01": IT("XF-01", "Bar Pro", "Banana Buzz", "香蕉", 36), "XF-02": IT("XF-02", "Bar Pro", "Grape Ice", "葡萄冰", 36),
+                "XF-03": IT("XF-03", "Ali", "Pink Lemon", "粉柠檬", 45), "XF-04": IT("XF-04", "Ali", "Mango", "芒果", 45)},
       "movements": {"in-01": IN("XF-01", 20, 30), "in-03": IN("XF-03", 20, 40),
                     # 以前记过一笔两清的换货（让「合伙人甲」出现在名字里）
                     "t-old-out-XF-01": {"type": "adjust", "sku": "XF-01", "name": "香蕉", "qty": -1, "date": D(10), "at": D(10) + "T02:00:00Z", "transfer_id": "t-old", "note": "合伙人往来：给 合伙人甲"},
@@ -93,7 +94,8 @@ with sync_playwright() as p:
         sm = pg.inner_text("#f-xsum")
         check("表单：合伙人默认合伙人甲；同系列一根抵一根 Bar Pro 2 根、Ali 1 根 → 两边抵平，这笔两清", pg.input_value("#f-xwho") == "合伙人甲" and "Bar Pro 2 根" in sm and "Ali 1 根" in sm and "两清" in sm and pg.is_hidden("#f-xpaidbox"), sm)
         check("合伙人名字按钮只出现一次", pg.locator('#sheet [data-pname="合伙人甲"]').count() == 1, pg.locator('#sheet [data-pname="合伙人甲"]').count())
-        check("单价默认：我给的按进价（香蕉 $30、粉柠檬 $40），他给的按他的价（葡萄冰 $30、芒果 $40）", [pg.input_value(f"#f-unit-{x}") for x in ("o0", "o1", "i0", "i1")] == ["30", "40", "30", "40"])
+        check("单价默认两边都按你的进货价（Bar Pro $30、Ali $40；不是系列价格里的 36 / 45）", [pg.input_value(f"#f-unit-{x}") for x in ("o0", "o1", "i0", "i1")] == ["30", "40", "30", "40"], [pg.input_value(f"#f-unit-{x}") for x in ("o0", "o1", "i0", "i1")])
+        check("表单写明：单价默认按你的进货价（两边一样）：Bar Pro $30（… 进货）· Ali $40", "单价默认按你的进货价（两边一样）：Bar Pro $30（" in pg.inner_text("#f-trhint") and "Ali $40（" in pg.inner_text("#f-trhint"), pg.inner_text("#f-trhint"))
         b0 = bal(pg); save(pg)
         t = newest(pg)
         check("存成一笔往来：out 香蕉×2 粉柠檬×1、in 葡萄冰×2 芒果×1，两清（closed）", sorted((l["sku"], l["qty"]) for l in t.get("out", [])) == [("XF-01", 2), ("XF-03", 1)] and sorted((l["sku"], l["qty"]) for l in t.get("in", [])) == [("XF-02", 2), ("XF-04", 1)] and t.get("closed") is True, t)
@@ -133,6 +135,18 @@ with sync_playwright() as p:
         pg.click('#f-paychips label:has(input[value="现金"])'); save(pg)
         t = newest(pg); st0 = next((x for x in S(pg, "settles") if x["id"] == t.get("partner_settlement_id")), {})
         check("差价当场付清：记一笔结账 合伙人甲 付你 $20（现金），这笔往来挂在那次结账上，账上两清", st0.get("amount") == -20 and st0.get("payment") == "现金" and st0.get("transfer_ids") == [t["id"]] and bal(pg) == 0, (st0, bal(pg)))
+
+        # 4b. 「我跟合伙人拿货」「合伙人拿我的货」也按进货价（以前：我拿他的按系列价格 36，他拿我的按手上货的成本）
+        go(pg, "partner"); pg.evaluate("document.getElementById('ptx-rec').open = true"); pg.click('#ptx-dir [data-pd="give"]'); pg.wait_for_timeout(200)
+        tap(pg, "XF-02"); pg.click("#cb-go"); pg.wait_for_selector("#f-unit-0")
+        check("我跟合伙人拿货：葡萄冰默认 $30（进货价）", pg.input_value("#f-unit-0") == "30", pg.input_value("#f-unit-0"))
+        pg.click("#sheet-close"); pg.wait_for_timeout(200); pg.click("#cb-clear"); pg.click("#cb-clear"); pg.wait_for_timeout(200)
+        pg.click('#ptx-dir [data-pd="take"]'); pg.wait_for_timeout(200); tap(pg, "XF-03"); pg.click("#cb-go"); pg.wait_for_selector("#f-unit-0")
+        check("合伙人拿我的货：粉柠檬默认 $40（进货价）", pg.input_value("#f-unit-0") == "40", pg.input_value("#f-unit-0"))
+        pg.click("#sheet-close"); pg.wait_for_timeout(200); pg.click("#cb-clear"); pg.click("#cb-clear"); pg.wait_for_timeout(200)
+        go(pg, "inventory"); pg.click("#inv-serprice"); pg.wait_for_selector("#sheet .sp-last")
+        check("系列价格里写最近进货：Bar Pro $30、Ali $40", pg.locator("#sheet .sp-last").all_inner_texts()[:2] == [f"最近进货 $30（{int(D(20)[5:7])}月{int(D(20)[8:])}日）", f"最近进货 $40（{int(D(20)[5:7])}月{int(D(20)[8:])}日）"], pg.locator("#sheet .sp-last").all_inner_texts())
+        pg.click("#sheet-close"); pg.wait_for_timeout(200)
 
         # 5. 拦住：一边没选 / 给的比手上多
         swap_mode(pg); tap(pg, "XF-03")
