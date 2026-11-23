@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-23 线上 fb-app-v33）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-23 线上 fb-app-v33，分支 feat-consign 是 v34）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -353,6 +353,21 @@
 - 订货单卡片（renderPurchases）：标题 = 每个系列几盒；`details.po-items`（没完成的默认展开）里按系列 `.po-sg` 往下排，每种 `× N 盒`（成本一样的写在系列头上）、右边「已到 x · 差 y / 到齐」；最后 `.po-tot` 合计；
   到货记录一笔一行「X月X日 到货 N 盒（M 根）」点开看口味；修了「现金 · 现金」重复；只知道系列的写「口味到货再分」
 - 测试 `tests/test_po_tidy.py` 28/28；test_pay_mix 改成按系列的框
+
+## 代销（feat-consign，2026-11-23）
+- Bowen：合伙人 / 供货商把货放这里代卖，不用先付钱，卖出一根付一根的钱，一部分一部分结。名字用生意上的叫法「代销（卖了再付）」
+- Bowen 定的：同一个口味自己的货和代销的货都有时，**按到货先后**算卖掉的是哪一批（FIFO）；欠的钱**并进对账单**跟合伙人结账一起结
+- 存法：还是 purchases，`consign: true`、`paid: false`、供货人必填；**不记进货支出**（卖出的成本照样从到货流水的 cost 算，profit 不变）；
+  结账时记 `consign_settles: [{sid, date, amt, qty:{sku:根}}]`（结了卖出的那几根，单子留着），settlements 文档里代销单放 `consign_ids`（不放 po_ids：新结构会把 po_ids 当成付清）；撤销结账去掉那一笔
+- 卖了几根：`fifoBook` 的批次带 cs（代销单 id），卖出 / DEF 补上时记 CS[单][口味]；退回 = adjust（负）+ `ret_po` + `ret_id`，只从那一批扣（RT），**不算损耗**。
+  `consignAll()` 一次渲染算一次（render() 开头清 CONS）：到货 / 卖出 / 退回 / 在你这、还没结的根数 unset、owed = Σ unset × 那批的单价、已结 paid
+- poUnpaid / poOweAmt 对代销 = 还没结的钱；ledgerFrom 的订货项换成「代销卖出 系列 口味 ×n」；对账单 / 复制文字 / 结账框的标题按有没有代销写「代销卖出 · 还没付」
+- 订货表单「付款」第三个「代销（卖了再付）」+ 说明；卡片：代销 · 卖了再付给 X：到货 / 卖出 / 退回 / 在你这，还欠多少（几根）· 已结；每种「卖了 x · 退 y · 剩 z」；
+  「去对账单结」（ledgerSheet）、「退回给他」（consignReturnForm，只能退在你这的）、退回记录一行一笔能撤销；没卖完 / 没结清的一直展开
+- 没填单价的代销单：卖出的那几根算不出钱 → 不进对账单、结账不结它们（`unit(k)` = null），卡片红字「N 根卖出了但没填单价」，「编辑」填上就进来
+- 对账单里代销那一项没有「结款」（poPayForm 对代销直接打开对账单）；合伙人页往来记录标「代销」+ 货值 / 卖出 / 在你这；财务「现有库存」下多一行「其中代销（他的货，卖了才付）」
+- 现金：代销单不算进货付款，结账时才算「和合伙人结账」流出
+- 测试 `tests/test_consign.py` 60/60（编的数据，旧/新结构）
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超
