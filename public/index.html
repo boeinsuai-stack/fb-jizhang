@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v35"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v36"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -754,6 +754,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
 #ptx-sec .t-n { background: var(--warn); }
 #ptx-sec.give .tile.on .t-main { border-color: var(--ser-bp); background: var(--hover); }
 #ptx-sec.give .t-n { background: var(--ser-bp); color: var(--surface); }
+#ptx-side { margin-top: 8px; } .sw-h { margin: 14px 0 6px; font-size: .95rem; }
 .cartbar.partner { border-top: 2px solid var(--warn); }
 .cartbar.partner #cb-go { background: var(--warn); border-color: var(--warn); color: var(--surface); }
 .cartbar.partner.give { border-top-color: var(--ser-bp); }
@@ -956,17 +957,19 @@ details.restock > summary::-webkit-details-marker { display: none; }
   <main id="ptx-view" hidden>
     <div class="ptx-bal" id="ptx-bal"></div>
     <details class="fold" id="ptx-rec">
-      <summary>记往来 · 点口味（他拿我的 / 我拿他的）</summary>
+      <summary>记往来 · 点口味（他拿我的 / 我拿他的 / 换货）</summary>
     <section class="qo" id="ptx-sec" aria-label="合伙人往来">
       <div class="chips seg" id="ptx-dir" role="group" aria-label="哪个方向">
         <button class="chip" type="button" data-pd="take" aria-pressed="true">合伙人拿我的货</button>
         <button class="chip" type="button" data-pd="give" aria-pressed="false">我跟合伙人拿货</button>
+        <button class="chip" type="button" data-pd="swap" aria-pressed="false">换货</button>
       </div>
+      <div class="chips seg" id="ptx-side" role="group" aria-label="换货：点的是哪一边" hidden></div>
       <div class="qo-top"><h2 id="ptx-h">点口味加一根</h2><div class="chips" id="ptx-tabs" role="group" aria-label="筛选口味"></div></div>
       <input id="ptx-q" type="search" placeholder="搜口味（英文、中文都行）" aria-label="搜口味">
       <div class="tiles" id="ptx-tiles"><div class="empty">正在读取…</div></div>
     </section>
-      <div class="actions" style="margin-top:10px"><button class="btn ghost" id="ptx-xfer" type="button">换货 / 其他往来</button></div>
+      <div class="actions" style="margin-top:10px"><button class="btn ghost" id="ptx-xfer" type="button">其他往来（一个个选口味）</button></div>
     </details>
     <section>
       <div class="qo-top"><h2>往来记录</h2><div class="chips" id="ptx-logwho" role="group" aria-label="看谁的记录"></div></div>
@@ -4718,15 +4721,17 @@ details.restock > summary::-webkit-details-marker { display: none; }
   /* ---------- quick order: tap flavour tiles to build one customer order ---------- */
   const CART_KEY = "mk-cart-v1", QT_KEY = "mk-qo-tab";
   /* two carts: what a buyer takes, and what a partner takes from my stock */
-  const CARTP_KEY = "mk-cartp-v1", CARTG_KEY = "mk-cartg-v1", PD_KEY = "mk-pt-dir";
+  const CARTP_KEY = "mk-cartp-v1", CARTG_KEY = "mk-cartg-v1", CARTXO_KEY = "mk-cartxo-v1", CARTXI_KEY = "mk-cartxi-v1", PD_KEY = "mk-pt-dir";
   const loadCart = (k) => { try { const c = JSON.parse(sessionStorage.getItem(k) || "{}"); return c && typeof c === "object" ? c : {}; } catch (_) { return {}; } };
-  let cartS = loadCart(CART_KEY), cartP = loadCart(CARTP_KEY), cartG = loadCart(CARTG_KEY);
-  /* partner page: "take" = a partner takes my stock, "give" = I take stock from a partner */
-  let ptDir = (() => { try { return localStorage.getItem(PD_KEY) === "give" ? "give" : "take"; } catch (_) { return "take"; } })(), ptTab = "live", ptQuery = "", ptLogN = 15;
+  let cartS = loadCart(CART_KEY), cartP = loadCart(CARTP_KEY), cartG = loadCart(CARTG_KEY), cartXo = loadCart(CARTXO_KEY), cartXi = loadCart(CARTXI_KEY);
+  /* partner page: "take" = a partner takes my stock, "give" = I take stock from a partner, "swap" = 换货（ptSide "o" 我给他的 / "i" 他给我的，各一个购物车） */
+  let ptDir = (() => { try { const v = localStorage.getItem(PD_KEY); return v === "give" || v === "swap" ? v : "take"; } catch (_) { return "take"; } })(), ptSide = "o", ptTab = "live", ptQuery = "", ptLogN = 15;
   let cart = cartS;
-  const ptCart = () => (ptDir === "take" ? cartP : cartG);
+  const ptCart = () => (ptDir === "take" ? cartP : ptDir === "give" ? cartG : ptSide === "o" ? cartXo : cartXi);
+  const ptMine = () => ptDir === "take" || (ptDir === "swap" && ptSide === "o"); // 点的是我手上的货（要有库存）
+  const linesOf = (c) => Object.entries(c).filter(([sku, q]) => q > 0 && itemBy(sku)).map(([sku, qty]) => ({ sku, qty }));
   let qoTab = (() => { try { return localStorage.getItem(QT_KEY) || "live"; } catch (_) { return "live"; } })(), qoQuery = "";
-  const saveCart = () => { try { [[CART_KEY, cartS], [CARTP_KEY, cartP], [CARTG_KEY, cartG]].forEach(([k, v]) => sessionStorage.setItem(k, JSON.stringify(v))); } catch (_) {} };
+  const saveCart = () => { try { [[CART_KEY, cartS], [CARTP_KEY, cartP], [CARTG_KEY, cartG], [CARTXO_KEY, cartXo], [CARTXI_KEY, cartXi]].forEach(([k, v]) => sessionStorage.setItem(k, JSON.stringify(v))); } catch (_) {} };
   const cartLines = () => Object.entries(view === "partner" ? ptCart() : cart).filter(([sku, q]) => q > 0 && itemBy(sku)).map(([sku, qty]) => ({ sku, qty }));
   function syncSeriesChips() {
     const sers = allSeries(), key = sers.join("|");
@@ -4784,14 +4789,20 @@ details.restock > summary::-webkit-details-marker { display: none; }
     renderCart();
   }
   function renderCart() {
-    const ls = cartLines(), n = ls.reduce((a, l) => a + l.qty, 0), bar = $("cartbar");
+    const ls = cartLines(), sw = view === "partner" && ptDir === "swap", xo = sw ? linesOf(cartXo) : [], xi = sw ? linesOf(cartXi) : [], cnt = (a) => a.reduce((s, l) => s + l.qty, 0);
+    const n = sw ? cnt(xo) + cnt(xi) : cnt(ls), bar = $("cartbar");
     bar.hidden = !n || (view !== "inventory" && view !== "partner");
     document.body.classList.toggle("has-cart", !bar.hidden);
     const pt = view === "partner";
     bar.classList.toggle("partner", pt); bar.classList.toggle("give", pt && ptDir === "give");
     $("cb-resv").hidden = pt;
-    $("cb-go").textContent = pt ? (ptDir === "take" ? "记合伙人拿货" : "记我拿的货") : "下单";
+    $("cb-go").textContent = pt ? (sw ? "记换货" : ptDir === "take" ? "记合伙人拿货" : "记我拿的货") : "下单";
     if (!n) return;
+    if (sw) {
+      $("cb-text").innerHTML = "换货 · 我给 <b>" + cnt(xo) + "</b> 根 ↔ 他给 <b>" + cnt(xi) + "</b> 根";
+      $("cb-list").textContent = ["我给：" + (xo.map((l) => enOf(itemBy(l.sku)) + " ×" + l.qty).join("、") || "还没选"), "他给：" + (xi.map((l) => enOf(itemBy(l.sku)) + " ×" + l.qty).join("、") || "还没选")].join(" · ");
+      return;
+    }
     if (pt) {
       const u = ptDir === "take" ? ptUnit : giveUnit;
       $("cb-text").innerHTML = (ptDir === "take" ? "合伙人拿 " : "我拿 ") + "<b>" + n + "</b> 根 · " + money(r2(ls.reduce((a, l) => a + l.qty * (Number(u(l.sku)) || 0), 0)));
@@ -4823,10 +4834,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
   });
   $("qo-q").addEventListener("input", (e) => { qoQuery = e.target.value; renderQuick(derive()); });
   const doneCart = () => {
-    if (view === "partner") { if (ptDir === "take") cartP = {}; else cartG = {}; saveCart(); renderPartnerPage(); return; }
+    if (view === "partner") { if (ptDir === "take") cartP = {}; else if (ptDir === "give") cartG = {}; else { cartXo = {}; cartXi = {}; ptSide = "o"; } saveCart(); renderPartnerPage(); return; }
     cartS = cart = {}; saveCart(); renderQuick(derive());
   };
-  $("cb-go").addEventListener("click", () => (view === "partner" ? (ptDir === "take" ? partnerTakeForm : partnerGiveForm)(cartLines(), doneCart) : saleForm(cartLines(), false, doneCart)));
+  $("cb-go").addEventListener("click", () => (view === "partner" ? (ptDir === "swap" ? partnerSwapForm(linesOf(cartXo), linesOf(cartXi), doneCart) : (ptDir === "take" ? partnerTakeForm : partnerGiveForm)(cartLines(), doneCart)) : saleForm(cartLines(), false, doneCart)));
   /* price for a stick I take from a partner: his price to me */
   const giveUnit = (sku) => { const it = itemBy(sku), v = numOrNull(it && it.cost_aud); return v != null ? r2(v) : ptUnit(sku); };
   /* default price for a stick a partner takes: what it cost me */
@@ -4838,14 +4849,17 @@ details.restock > summary::-webkit-details-marker { display: none; }
   });
   const ptBal = (w) => r2(-ledgerNet(w)); // 跟对账单同一个算法（含互抵）
   function renderPartnerPage() {
-    const D = derive(), RV = reservedQty(), st = (i) => Math.max(0, D.st[i.sku] || 0) - (RV[i.sku] || 0), take = ptDir === "take";
+    const D = derive(), RV = reservedQty(), st = (i) => Math.max(0, D.st[i.sku] || 0) - (RV[i.sku] || 0), take = ptMine();
     /* who owes whom, only where it isn't settled */
     /* 余额是 0 但有预定还没拿的人也列出来（不然「已拿到」只能从财务页进），写法跟财务页应付行一样 */
     const rows = S.loaded ? partnerNames().map((w) => [w, ptBal(w), pendingPicks(w).length]).filter((x) => Math.abs(x[1]) >= 0.01 || x[2]) : [];
     $("ptx-bal").innerHTML = !S.loaded ? "" : rows.length ? rows.map(([w, b, pn]) => '<div class="ptx-b"><button class="owe-line" type="button" data-lg-open="' + esc(w) + '"><span>' + esc(owedTxt(w, -b)) + (Math.abs(b) >= 0.01 ? " <b>" + money(Math.abs(b)) + "</b>" : "") + (pn ? ' <small class="pend-n">· ' + pn + " 笔预定还没拿</small>" : "") + '</span><span class="pt-more">看账 ›</span></button><button class="btn small" type="button" data-ptx-settle="' + esc(w) + '">结账</button></div>').join("") : '<div class="ptx-b"><span>跟合伙人都两清了。</span></div>';
     $("ptx-dir").querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.pd === ptDir)));
     $("ptx-sec").classList.toggle("give", !take);
-    $("ptx-h").textContent = take ? "点他拿走的口味" : "点你拿的口味";
+    $("ptx-side").hidden = ptDir !== "swap";
+    if (ptDir === "swap") { const n = (c) => Object.values(c).reduce((a, q) => a + (q > 0 ? q : 0), 0);
+      $("ptx-side").innerHTML = [["o", "我给他的", n(cartXo)], ["i", "他给我的", n(cartXi)]].map(([k, l, q]) => '<button class="chip" type="button" data-ps="' + k + '" aria-pressed="' + (ptSide === k) + '">' + l + (q ? " · " + q : "") + "</button>").join(""); }
+    $("ptx-h").textContent = ptDir === "swap" ? (ptSide === "o" ? "点你给他的口味" : "点他给你的口味") : take ? "点他拿走的口味" : "点你拿的口味";
     $("ptx-tabs").innerHTML = [["live", take ? "手上有货" : "在售"]].concat(allSeries().map((x) => [x, x])).map(([k, l]) => '<button class="chip" type="button" data-pt-tab="' + esc(k) + '" aria-pressed="' + (ptTab === k && !ptQuery.trim()) + '">' + esc(l) + "</button>").join("");
     const all = S.items.filter((i) => !isGeneric(i)), ql = ptQuery.trim().toLowerCase();
     let list = ql ? all.filter((i) => ql.split(/\s+/).every((t) => [i.sku, i.variant, i.name, i.series].join(" ").toLowerCase().includes(t)))
@@ -4906,7 +4920,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const again = document.querySelector('#ptx-tiles [data-padd="' + CSS.escape(sku) + '"]'); if (again) again.focus({ preventScroll: true });
   }
   $("ptx-tiles").addEventListener("click", (e) => { const m = e.target.closest("[data-psub]"); if (m) { bumpPt(m.dataset.psub, -1); return; } const a = e.target.closest("[data-padd]"); if (a) bumpPt(a.dataset.padd, 1); });
-  $("ptx-dir").addEventListener("click", (e) => { const c = e.target.closest("[data-pd]"); if (!c || c.dataset.pd === ptDir) return; ptDir = c.dataset.pd; try { localStorage.setItem(PD_KEY, ptDir); } catch (_) {} renderPartnerPage(); });
+  $("ptx-dir").addEventListener("click", (e) => { const c = e.target.closest("[data-pd]"); if (!c || c.dataset.pd === ptDir) return; ptDir = c.dataset.pd; ptSide = "o"; try { localStorage.setItem(PD_KEY, ptDir); } catch (_) {} renderPartnerPage(); });
+  $("ptx-side").addEventListener("click", (e) => { const c = e.target.closest("[data-ps]"); if (!c || c.dataset.ps === ptSide) return; ptSide = c.dataset.ps; ptTab = "live"; ptQuery = ""; $("ptx-q").value = ""; renderPartnerPage(); });
   $("ptx-tabs").addEventListener("click", (e) => { const c = e.target.closest("[data-pt-tab]"); if (!c) return; ptTab = c.dataset.ptTab; ptQuery = ""; $("ptx-q").value = ""; renderPartnerPage(); });
   $("ptx-q").addEventListener("input", (e) => { ptQuery = e.target.value; renderPartnerPage(); });
   $("ptx-bal").addEventListener("click", (e) => { const lo = e.target.closest("[data-lg-open]"); if (lo) { ledgerSheet(lo.dataset.lgOpen); return; } const b = e.target.closest("[data-ptx-settle]"); if (b) partnerSettleForm(b.dataset.ptxSettle); });
@@ -5007,6 +5022,64 @@ details.restock > summary::-webkit-details-marker { display: none; }
       wirePtSerp(lines);
       sheetOn("input", recalc); sheetOn("change", recalc); wirePay(() => xLineVal(read()));
       /* 名字按钮由 enhancePartnerInputs 统一加（2026-11-20：以前这里又自己加了一排，合伙人名字出现两次） */
+      recalc();
+    });
+  }
+  /* 换货（2026-11-24 Bowen：合伙人往来要有直接换货，不能每次拆成「他拿我的」+「我拿他的」两笔）
+     真实数据（11-23）：38 笔往来只有 2 笔用「记往来 · 当场换货」记，另外 3 天同一个人又给又拿、拆成 2–4 笔记 → 点口味那里加第三个方向「换货」。
+     存法跟 xferForm 的当场换货一样：一笔 transfers {out, in}，流水 t-…-out-SKU（adjust 负）/ t-…-in-SKU（in，cost = 根数 × 单价）；
+     同系列一根抵一根（xOffset），抵完是 0 → closed（两清）；不是 0 → 挂在对账单上，或者勾「差价当场付了」记一笔结账 */
+  function partnerSwapForm(lo, li, onDone) {
+    const D = derive(), names = partnerNames(), qo = lo.reduce((a, l) => a + l.qty, 0), qi = li.reduce((a, l) => a + l.qty, 0);
+    const sers = (ls) => [...new Set(ls.map((l) => seriesOf(itemBy(l.sku))))];
+    const side = (ls, sd, unit) => '<div class="pt-lines">' + ls.map((l, k) => '<div class="pt-line"><span class="pt-name">' + esc(nm(l.sku)) + '</span><span class="pt-q">×' + l.qty + '</span><label class="pt-u"><span>$</span><input id="f-unit-' + sd + k + '" type="number" min="0" step="0.01" inputmode="decimal" value="' + unit(l.sku) + '" aria-label="' + esc(nm(l.sku)) + ' 每根"></label></div>').join("") + "</div>";
+    const serp = (ls, sd, who) => sers(ls).map((sr) => '<label class="serp-i"><span>' + who + " 的 " + esc(sr) + ' 每根 $</span><input type="number" min="0" step="0.01" inputmode="decimal" data-srx="' + sd + '" data-sr="' + esc(sr) + '" placeholder="同一个价"></label>').join("");
+    const html =
+      '<div class="field"><label for="f-xwho">跟谁换</label><input id="f-xwho" list="f-pnames" autocomplete="off" placeholder="例如 小王" value="' + esc(names[0] || "") + '"><datalist id="f-pnames">' + names.map((x) => '<option value="' + esc(x) + '">').join("") + "</datalist></div>" +
+      '<h3 class="sw-h">我给 <span class="xw">合伙人</span> · ' + qo + " 根</h3>" + (lo.length ? side(lo, "o", ptUnit) : '<p class="hint">还没选，回去在「我给他的」里点口味。</p>') +
+      '<h3 class="sw-h"><span class="xw">合伙人</span> 给我 · ' + qi + " 根</h3>" + (li.length ? side(li, "i", giveUnit) : '<p class="hint">还没选，回去在「他给我的」里点口味。</p>') +
+      '<details class="more"><summary>按系列一起改单价</summary><div class="more-body serp">' + serp(lo, "o", "我给") + serp(li, "i", "他给") + "</div></details>" +
+      '<p class="callout xsum" id="f-xsum">–</p>' +
+      '<div id="f-xpaidbox" hidden><label class="check"><input type="checkbox" id="f-xpaid"> <span id="f-xpaidt">差价当场付了</span></label><div id="f-xpaywrap" hidden>' + payPick(null) + "</div></div>" +
+      '<details class="more"><summary>更多：日期、备注</summary><div class="more-body"><div class="field"><label for="f-date">日期</label><input id="f-date" type="date" value="' + today() + '"></div>' +
+      '<div class="field"><label for="f-note">备注</label><input id="f-note" placeholder="例如 换他的 Ali"></div></div></details>';
+    const read = (ls, sd) => ls.map((l, k) => ({ sku: l.sku, name: (itemBy(l.sku) || {}).name || l.sku, qty: l.qty, unit: numOrNull($("f-unit-" + sd + k).value) }));
+    function recalc() {
+      const wRaw = $("f-xwho").value.trim(), w = esc(wRaw || "合伙人"), o = read(lo, "o"), i = read(li, "i");
+      document.querySelectorAll(".xw").forEach((e) => { e.textContent = wRaw || "合伙人"; });
+      const X = xOffset([], [{ out: o, in: i }]), eff = xferEff({ out: o, in: i }), paid = $("f-xpaid").checked;
+      const pos = (v) => (v > 0 ? w + " 欠你 " + money(v) : v < 0 ? "你欠 " + w + " " + money(-v) : "你们两清");
+      $("f-xpaidbox").hidden = !eff; $("f-xpaywrap").hidden = !eff || !paid;
+      $("f-xpaidt").textContent = eff > 0 ? (wRaw || "合伙人") + " 当场把差价 " + money(eff) + " 给你了" : "你当场把差价 " + money(-eff) + " 给 " + (wRaw || "合伙人") + " 了";
+      const before = wRaw ? ptBal(wRaw) : 0, after = r2(before + eff);
+      $("f-xsum").innerHTML = (X.list.length ? "同系列一根抵一根：" + esc(offTxt(X.list)) + "（不算钱）<br>" : "") +
+        (!eff ? "<b>两边抵平 → 这笔两清</b>" : (X.list.length ? "剩下的按单价算 → " : "你给 " + money(xLineVal(o)) + " ↔ " + w + " 给你 " + money(xLineVal(i)) + " → ") + "<b>" + (paid ? "差价当场付清" : pos(eff)) + "</b>") +
+        (wRaw && eff && !paid ? "<br><small>算上之前没结的账：现在" + pos(before) + "，记完后" + pos(after) + "</small>" : "");
+      if ($("f-xwho").__syncChips) $("f-xwho").__syncChips();
+    }
+    openSheet("换货", html, async () => {
+      needDb();
+      const w = $("f-xwho").value.trim(); if (!w) throw userError("填一下跟谁换的。");
+      if (!lo.length || !li.length) throw userError(!lo.length ? "还没选你给他的口味。" : "还没选他给你的口味。");
+      const o = read(lo, "o"), i = read(li, "i");
+      for (const l of o.concat(i)) if (l.unit == null || l.unit < 0) throw userError("填一下 " + nm(l.sku) + " 每根多少钱。");
+      for (const l of o) haveCheck(D, l);
+      const eff = xferEff({ out: o, in: i }), paidNow = !!eff && $("f-xpaid").checked; if (paidNow && !curPay()) throw userError("选一下差价是怎么付的。");
+      const tid = rid("t"), date = $("f-date").value || today(), at = new Date().toISOString();
+      const doc = { date, at, partner: w, out: o, in: i, note: $("f-note").value.trim() };
+      if (!eff) doc.closed = true;
+      if (paidNow) { const sid = rid("s"); await db.collection("settlements").doc(sid).set(Object.assign({ date, at, order_ids: [], transfer_ids: [tid], qty: {}, amount: -eff, paid: -eff, partner: w }, readPay(true, Math.abs(eff)), { note: "换货差价当场付清" })); doc.partner_settlement_id = sid; }
+      await db.collection("transfers").doc(tid).set(doc);
+      await Promise.all(o.map((l) => db.collection("movements").doc(tid + "-out-" + l.sku).set({ type: "adjust", sku: l.sku, name: l.name, qty: -l.qty, date, at, transfer_id: tid, note: "合伙人往来：给 " + w }))
+        .concat(i.map((l) => db.collection("movements").doc(tid + "-in-" + l.sku).set({ type: "in", sku: l.sku, name: l.name, qty: l.qty, cost: r2(l.qty * l.unit), date, at, transfer_id: tid, note: "合伙人往来：" + w + " 给的" }))));
+      await wakeItems(i.map((l) => l.sku));
+      if (onDone) onDone();
+      return "已记换货：给 " + w + " " + qo + " 根、他给你 " + qi + " 根" + (!eff ? "，两清。" : paidNow ? "，差价 " + money(Math.abs(eff)) + " 当场付清。" : "，" + (eff > 0 ? w + " 欠你 " : "你欠 " + w + " ") + money(Math.abs(eff)) + "。");
+    }, () => {
+      $("sheet-save").textContent = "记下来";
+      sheetOn("input", (e) => { const sr = e.target.dataset && e.target.dataset.sr, sd = e.target.dataset && e.target.dataset.srx; if (!sr || !sd) return;
+        (sd === "o" ? lo : li).forEach((l, k) => { if (seriesOf(itemBy(l.sku)) === sr) $("f-unit-" + sd + k).value = e.target.value; }); });
+      sheetOn("input", recalc); sheetOn("change", recalc); wirePay(() => Math.abs(xferEff({ out: read(lo, "o"), in: read(li, "i") })));
       recalc();
     });
   }

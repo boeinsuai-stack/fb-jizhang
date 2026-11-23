@@ -117,8 +117,9 @@ def run(seed, label):
         v2src = pg.evaluate(f"""() => ({{ order: (__server('v2_orders')['{od_id}'] || {{}}).note, moveDeleted: !!((__server('v2_movements')['{mv_id}'] || {{}})._deleted), exp: !!__server('v2_expenses')['e-20261110-claude1'],
               oldOrder: (__server('orders')['{od_id}'] || {{}}).note }})""")
         # ③ 撤销
-        pg.click("[data-ib=undo]"); pg.wait_for_timeout(300)
-        if pg.is_visible("[data-ib=undo]"): pg.click("[data-ib=undo]")
+        # 撤销点一下就做（没有「再点一下确认」）。以前这里「0.3 秒后按钮还在就再点一下」：撤销慢于 0.3 秒时第二下点到正在收起的提示条，等 30 秒超时（2026-11-24 查清的偶发失败）
+        pg.click("[data-ib=undo]")
+        pg.wait_for_selector("[data-ib=undo]", state="hidden", timeout=15000)
         pg.wait_for_timeout(1500)
         s2 = state()
         br.close()

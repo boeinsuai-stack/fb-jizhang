@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-23 线上 fb-app-v34，分支 feat-today 是 v35）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-23 线上 fb-app-v34，分支 feat-today 是 v35、feat-xswap（在 feat-today 上面）是 v36）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -386,6 +386,19 @@
 - 导航「客户」改叫「今天」（图标日历），页面标题「今天」：预定（交货）→ 今天找谁 →「＋ 记一个要找的人」→ 全部客户。角标 = 今天 / 已过交货的预定 + 今天找谁人数
 - 库存页快速下单上面一行 `#td-strip`「今天 交货 N 单 · 找 N 个人 ›」，点了到「今天」；没事就不显示（**快速下单上面只多这一行，别再往上加东西**）
 - 测试 `tests/test_today.py` 54/54（编的数据，旧/新结构）；test_followup、test_place_fu、test_meet、test_resv_note、test_gift、test_cust_bal 跟着改成新规则
+
+## 合伙人换货（feat-xswap，2026-11-24）
+- Bowen：合伙人往来要有直接换货，不能每次都拆成「我找合伙人拿」+「合伙人找我拿」。以前只有「记往来 → 其他往来 → 当场换货」能记，口味要一个个下拉选、每行填价；
+  真实数据（11-23）38 笔往来只有 2 笔这样记，另有 3 天同一个人又给又拿、拆成 2–4 笔单向记
+- 合伙人页「记往来 · 点口味」第三个方向 `data-pd="swap"`「换货」（ptDir 存 localStorage mk-pt-dir）：下面 `#ptx-side`「我给他的 · N / 他给我的 · N」（ptSide o / i，`ptMine()` = 点的是我手上的货 → 只列有库存的），
+  两个购物车 cartXo / cartXi（sessionStorage mk-cartxo-v1 / mk-cartxi-v1），跟「他拿 / 我拿」的购物车分开。底下一条「换货 · 我给 N 根 ↔ 他给 M 根」+「记换货」
+- `partnerSwapForm(lo, li, onDone)`：跟谁换（list="f-pnames"，名字按钮由 enhancePartnerInputs 加）、两边口味 ×根数 + 每根 $（我给的默认 ptUnit 进价，他给的 giveUnit）、「按系列一起改单价」收着（data-srx o/i + data-sr）、
+  `#f-xsum`：同系列一根抵一根（xOffset，不算钱）→ 抵平写「两清」；不平写谁欠谁 + 算上之前没结的；`#f-xpaidbox`「差价当场付了」（只在有差价时出现）→ 记一笔 settlements（amount = −eff）挂上 partner_settlement_id；更多：日期、备注
+- 存法跟 xferForm 当场换货完全一样：transfers {out, in, closed: eff == 0} + 流水 t-…-out-SKU（adjust 负）/ t-…-in-SKU（in，cost = 根数 × 单价）；新结构由翻译层收进 v2_transfers。往来记录里标「换货」，没结的能「撤销这笔」
+- 原来的「换货 / 其他往来」按钮改叫「其他往来（一个个选口味）」（xferForm 照旧有当场换货）
+- 测试 `tests/test_xswap.py` 48/48（编的数据，旧/新结构）
+- 顺手查清 test_v2_relay 偶尔超时：撤销是点一下就做，测试却在 0.3 秒后「按钮还在就再点一下」，撤销慢一点时第二下点到正在收起的提示条、等 30 秒。改成点一下等提示条收起（main / 这版各跑 5 遍对照；修后 5/5）。
+  同时量过重画速度（降速 4 倍）：main 89–96 ms、这版 94–97 ms，todayPicks 8–10 ms
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超
