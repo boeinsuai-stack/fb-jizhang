@@ -68,8 +68,12 @@ MOCK = r"""
   const user = Object.freeze({ id: async () => "u_owner", me: async () => ({ id: "u_owner" }), isOwner: async () => true, canEdit: async () => true, can: async () => true, profiles: async (ids) => Object.fromEntries(ids.map((i) => [i, { name: "" }])) });
   const mcp = Object.freeze({ callTool: async (server, tool, input) => {
     const R = window.__relay;
-    if (tool === "search_files") return { payload: { files: [{ id: "f1", title: "最新数据.json", mimeType: "application/json", modifiedTime: R.mod }] } };
-    if (tool === "download_file_content") { window.__downloads++; const bytes = new TextEncoder().encode(JSON.stringify(R.body)); let s = ""; bytes.forEach((b) => s += String.fromCharCode(b)); return { payload: { content: btoa(s) } }; }
+    // 2026-11-25 起 App 传压缩的 最新数据.json.gz；旧的 最新数据.json 留在那里不再更新（R.gz 有了就两个都列出来）
+    if (tool === "search_files") return { payload: { files: [{ id: "f1", title: "最新数据.json", mimeType: "application/json", modifiedTime: R.mod }].concat(R.gz ? [{ id: "f2", title: "最新数据.json.gz", mimeType: "application/gzip", modifiedTime: R.gz.mod }] : []) } };
+    if (tool === "download_file_content") { window.__downloads++; window.__dlIds = (window.__dlIds || []).concat(input.fileId);
+      let bytes = new TextEncoder().encode(JSON.stringify(input.fileId === "f2" ? R.gz.body : R.body));
+      if (input.fileId === "f2") bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer());
+      let s = ""; bytes.forEach((b) => s += String.fromCharCode(b)); return { payload: { content: btoa(s) } }; }
     throw { code: "tool_error" };
   } });
   const caps = { db, user, mcp };
@@ -141,6 +145,17 @@ with sync_playwright() as p:
     try: pg.wait_for_function("document.getElementById('mb-text').textContent.includes('刚更新')", timeout=10000)
     except Exception: pass
     check("④ 顶上显示新数据的时间", "刚更新" in pg.inner_text("#mirror-bar"), pg.inner_text("#mirror-bar")[:60])
+
+    # ④b App 改传压缩的 最新数据.json.gz（旧的 .json 还在、时间更早）：镜像读新的那份、解压，只写变了的
+    fx3 = json.loads(json.dumps(fx2)); oid3 = "o-20261125-mirgz1"
+    fx3["orders"][oid3] = dict(fx2["orders"][oid], at="2026-11-25T01:30:00.000Z", date="2026-11-25", customer="压缩测试")
+    w2 = len(pg.evaluate("window.__writes"))
+    pg.evaluate("(g) => { window.__relay.gz = g; }", {"mod": "2026-11-25T01:31:00.000Z", "body": relay_of(fx3, "2026-11-25T01:31:00.000Z")})
+    pg.click("#mb-go", force=True)
+    try: pg.wait_for_function(f"window.__GM.S.orders.some((o) => o.id === '{oid3}')", timeout=15000)
+    except Exception: pass
+    new_w = [x for x in pg.evaluate("window.__writes")[w2:] if not x.startswith("meta/")]
+    check("④b 读的是更新的 最新数据.json.gz（解压），只写新的那一单", pg.evaluate("window.__dlIds.slice(-1)[0]") == "f2" and new_w == ["orders/" + oid3], (pg.evaluate("window.__dlIds"), new_w, errs[:2]))
 
     pg.evaluate("location.hash = '#shezhi'"); pg.wait_for_timeout(400)
     check("⑤ 设置页能打开；备份、数据结构升级隐藏", pg.is_visible("#set-view") and not pg.is_visible("#mig-sec") and not pg.is_visible("#bk-btn"))

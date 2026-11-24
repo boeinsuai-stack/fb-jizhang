@@ -91,8 +91,9 @@
     try {
       if (!meta) { const s = await real.db.doc("meta/mirror").get(); meta = s.exists ? s.data() : null; }
       if (opts.loud || !meta) show("busy", meta ? asof(meta) + " · 正在检查…" : "正在从中转站读取…");
-      const sr = await real.mcp.callTool("Google Drive", "search_files", { query: "title = '最新数据.json'", excludeContentSnippets: true, pageSize: 10 }, { cache: false });
-      const files = ((sr && sr.payload && sr.payload.files) || []).filter((f) => f.title === "最新数据.json" && /json/.test(f.mimeType || "")).sort((a, b) => (a.modifiedTime < b.modifiedTime ? 1 : -1));
+      // 2026-11-25 起 App 传压缩的 最新数据.json.gz（手机不支持压缩时照旧传 最新数据.json）：两个都找，用最新改过的那份
+      const sr = await real.mcp.callTool("Google Drive", "search_files", { query: "title contains '最新数据.json'", excludeContentSnippets: true, pageSize: 10 }, { cache: false });
+      const files = ((sr && sr.payload && sr.payload.files) || []).filter((f) => f.title === "最新数据.json" || f.title === "最新数据.json.gz").sort((a, b) => (a.modifiedTime < b.modifiedTime ? 1 : -1));
       if (!files.length) { show("warn", "Google Drive 里还没有中转站文件。在 App 里记一笔，或点 App 右上角「中转站待更新」", true); return; }
       const f = files[0];
       if (!opts.force && meta && meta.file_id === f.id && meta.file_modified === f.modifiedTime) { show("ok", asof(meta), true); return; }
@@ -101,7 +102,12 @@
       const dr = await real.mcp.callTool("Google Drive", "download_file_content", { fileId: f.id }, { cache: false });
       const b64 = dr && dr.payload && dr.payload.content;
       if (!b64) throw { userMsg: "中转站文件下载下来是空的" };
-      const relay = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))));
+      let bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      if (bytes[0] === 0x1f && bytes[1] === 0x8b) { // gzip
+        if (typeof DecompressionStream !== "function") throw { userMsg: "这个浏览器解不开压缩的中转站文件" };
+        bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
+      }
+      const relay = JSON.parse(new TextDecoder().decode(bytes));
       if (!relay || relay.format !== "fb-jizhang-relay/1" || !relay.data) throw { userMsg: "中转站文件格式不对，没有更新" };
       for (const c of COLS) if (relay.counts && relay.counts[c] != null && relay.data[c] && Object.keys(relay.data[c]).length !== relay.counts[c]) throw { userMsg: "中转站文件不完整（" + NAMES[c] + "条数对不上），没有更新" };
       if (!opts.force && meta && meta.uploaded_at && relay.uploaded_at < meta.uploaded_at) { show("warn", "中转站里的数据（" + fmt(relay.uploaded_at) + "）比镜像里的还旧，没有更新", true); return; }

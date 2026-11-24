@@ -44,6 +44,7 @@ run python3 tests/test_po_quick.py
 run python3 tests/test_sheet.py
 run node tests/v2_cases.js
 run python3 tests/test_mirror.py
+run python3 tests/test_relay_lite.py
 if [ -n "$F" ]; then
   [ -n "$S" ] || { S=$(mktemp --suffix=.json); node tests/v2_seed.js "$F" "$S" > /dev/null; }
   run node tests/v2_roundtrip.js "$F"

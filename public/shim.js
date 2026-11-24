@@ -401,7 +401,12 @@
 
   /* ---------- 中转站：把 Firebase 的完整数据拷贝一份到 Google Drive，给 Claude 版读取 ---------- */
   // 不是一条条攒改动，而是每次上传「当前全部数据」的完整拷贝，覆盖旧的那份；所以晚传、漏传都不会乱。
-  const RELAY_FOLDER = "FB 记账中转站", RELAY_FILE = "最新数据.json";
+  const RELAY_FOLDER = "FB 记账中转站", RELAY_FILE = "最新数据.json", RELAY_GZ = "最新数据.json.gz";
+  /* 省流量（2026-11-25）：以前每记一笔 4 秒后就把整份数据（11-24 已 663KB）传一次，一天 30 多次 ≈ 20MB。现在：
+     ① 压缩成 最新数据.json.gz（里面还是同一份 fb-jizhang-relay/1，约小 8 倍；手机不支持压缩时照旧传 最新数据.json）
+     ② 两次上传至少隔 10 分钟（连续记的几笔一起带上）；切出 App 时有没传的就马上传
+     ③ 跟上次传上去的一模一样就不传（每次打开 App 那一次多半是这种） */
+  const RELAY_GAP = () => (typeof window.__relayGap === "number" ? window.__relayGap : 10 * 60e3); // 测试可以改短
   const COLLS = ["items", "movements", "orders", "expenses", "purchases", "settlements", "transfers", "customers", "followups", "log", "meta"];
   /* v2（每件事只记一次）：订单/流水/支出/订货/往来/结账 在库里只存源头，旧样子由页面的翻译层（window.__fbV2store）现算。
      中转站照旧收发旧样子：上传用现算结果，写入 Claude 改动、撤销都交给翻译层。 */
@@ -413,27 +418,41 @@
     if (v2s() && V1COL[col]) return v2clean(v2view(col).find((x) => x.id === id));
     try { return live(await fs.doc(col + "/" + id).get()); } catch (_) { return live(await fs.doc(col + "/" + id).get({ source: "cache" }).catch(() => null)); }
   }
-  let relayAt = null, relayState = "idle", relayTimer = null, relayBusy = false, relayAgain = false;
+  let relayAt = null, relayState = "idle", relayTimer = null, relayDue = 0, relayBusy = false, relayAgain = false;
   try { relayAt = localStorage.getItem("fb-relay-at"); if (localStorage.getItem("fb-relay-stale")) relayState = "stale"; } catch (_) {}
   const relayOn = () => window.__fbOwner === true && !!CFG.googleClientId;
   function markStale() { relayState = "stale"; try { localStorage.setItem("fb-relay-stale", "1"); } catch (_) {} paintBadge(); }
   function scheduleRelay(ms) {
     if (!relayOn()) return;
     if (!tokenOk()) { markStale(); return; } // 授权过期：只记一个「待更新」标记，等你点一下再传
-    clearTimeout(relayTimer);
-    relayTimer = setTimeout(uploadRelay, ms == null ? 4000 : ms); // 连续记几笔只传一次
+    const now = Date.now(), last = relayAt ? new Date(relayAt).getTime() || 0 : 0;
+    const due = ms != null ? now + ms : Math.max(now + 4000, last + RELAY_GAP()); // 平时：离上次上传满 10 分钟才传
+    if (relayTimer && relayDue <= due) return; // 已经排了更早的一次，这次的改动到时一起带上
+    relayLater(due - now);
+  }
+  function relayLater(ms) { clearTimeout(relayTimer); relayDue = Date.now() + ms; relayTimer = setTimeout(() => { relayTimer = null; uploadRelay(); }, ms); }
+  // 切出 App（回微信、锁屏）：有排着没传的就马上传，Claude 那边读到的是你刚记完的
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") { if (relayTimer) { clearTimeout(relayTimer); relayTimer = null; uploadRelay(); } }
+    else if (relayState === "error" && !relayTimer) scheduleRelay(3000); // 切出去时传到一半被手机停掉了：回来补传
+  });
+  async function gzipBlob(text) {
+    if (typeof CompressionStream !== "function") return null;
+    try { return await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"))).blob(); } catch (_) { return null; }
   }
   async function relayIds() {
     let ids = {};
     try { ids = JSON.parse(localStorage.getItem("fb-relay-ids") || "{}"); } catch (_) {}
-    if (ids.folder && ids.file) return ids;
+    if (ids.folder && ids.file !== undefined && ids.gz !== undefined) return ids;
     const q = (x) => encodeURIComponent(x);
     const fl = await gfetch("https://www.googleapis.com/drive/v3/files?fields=files(id)&q=" + q("name='" + RELAY_FOLDER + "' and mimeType='application/vnd.google-apps.folder' and trashed=false"));
     ids.folder = fl.files && fl.files[0] ? fl.files[0].id : (await gfetch("https://www.googleapis.com/drive/v3/files?fields=id", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: RELAY_FOLDER, mimeType: "application/vnd.google-apps.folder" }),
     })).id;
-    const ff = await gfetch("https://www.googleapis.com/drive/v3/files?fields=files(id)&q=" + q("name='" + RELAY_FILE + "' and '" + ids.folder + "' in parents and trashed=false"));
-    ids.file = ff.files && ff.files[0] ? ff.files[0].id : null;
+    for (const [k, name] of [["file", RELAY_FILE], ["gz", RELAY_GZ]]) {
+      const ff = await gfetch("https://www.googleapis.com/drive/v3/files?fields=files(id)&q=" + q("name='" + name + "' and '" + ids.folder + "' in parents and trashed=false"));
+      ids[k] = ff.files && ff.files[0] ? ff.files[0].id : null;
+    }
     try { localStorage.setItem("fb-relay-ids", JSON.stringify(ids)); } catch (_) {}
     return ids;
   }
@@ -461,31 +480,39 @@
   async function uploadRelay() {
     if (!relayOn() || !tokenOk()) { if (relayOn()) markStale(); return; }
     if (relayBusy) { relayAgain = true; return; }
-    if (pending > 0) { relayTimer = setTimeout(uploadRelay, 2000); return; } // 等云端确认保存后再拷贝
+    if (pending > 0) { relayLater(2000); return; } // 等云端确认保存后再拷贝
     relayBusy = true; relayState = "uploading"; paintBadge();
     try {
-      if (v2s() && !v2s().ready()) { relayBusy = false; relayTimer = setTimeout(uploadRelay, 2000); return; } // 新结构还没读完，别传半份
+      if (v2s() && !v2s().ready()) { relayBusy = false; relayLater(2000); return; } // 新结构还没读完，别传半份
       const data = await snapshotAll();
       const counts = {}; for (const c of COLLS) counts[c] = Object.keys(data[c]).length;
-      const body = JSON.stringify({ format: "fb-jizhang-relay/1", uploaded_at: new Date().toISOString(), saved_at: lastSaved, uploaded_by: "Bowen 的手机", counts, last_record: lastRecord(data), data });
-      let ids = await relayIds();
-      const put = (id) => id
-        ? gfetch("https://www.googleapis.com/upload/drive/v3/files/" + id + "?uploadType=media&fields=id", { method: "PATCH", headers: { "Content-Type": "application/json" }, body })
-        : (() => { const f = new FormData();
-            f.append("metadata", new Blob([JSON.stringify({ name: RELAY_FILE, parents: [ids.folder], mimeType: "application/json" })], { type: "application/json" }));
-            f.append("file", new Blob([body], { type: "application/json" }));
-            return gfetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", { method: "POST", body: f }); })();
-      let r;
-      try { r = await put(ids.file); }
-      catch (e) { if (!ids.file || !/404/.test(e && e.message)) throw e; try { localStorage.removeItem("fb-relay-ids"); } catch (_) {} ids = await relayIds(); r = await put(ids.file); } // 文件被删了就重建
-      if (!ids.file) { ids.file = r.id; try { localStorage.setItem("fb-relay-ids", JSON.stringify(ids)); } catch (_) {} }
+      const dataJson = JSON.stringify(data);
+      const hash = await sha256(dataJson); // 算不出来（""）就照传
+      let prevHash = null; try { prevHash = localStorage.getItem("fb-relay-hash"); } catch (_) {}
+      if (!hash || hash !== prevHash) { // 跟上次传上去的一样就不传
+        const body = JSON.stringify({ format: "fb-jizhang-relay/1", uploaded_at: new Date().toISOString(), saved_at: lastSaved, uploaded_by: "Bowen 的手机", counts, last_record: lastRecord(data), data });
+        const gz = await gzipBlob(body);
+        const key = gz ? "gz" : "file", name = gz ? RELAY_GZ : RELAY_FILE, mime = gz ? "application/gzip" : "application/json", blob = gz || new Blob([body], { type: mime });
+        let ids = await relayIds();
+        const put = (id) => id
+          ? gfetch("https://www.googleapis.com/upload/drive/v3/files/" + id + "?uploadType=media&fields=id", { method: "PATCH", headers: { "Content-Type": mime }, body: blob })
+          : (() => { const f = new FormData();
+              f.append("metadata", new Blob([JSON.stringify({ name, parents: [ids.folder], mimeType: mime })], { type: "application/json" }));
+              f.append("file", blob, name);
+              return gfetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", { method: "POST", body: f }); })();
+        let r;
+        try { r = await put(ids[key]); }
+        catch (e) { if (!ids[key] || !/404/.test(e && e.message)) throw e; try { localStorage.removeItem("fb-relay-ids"); } catch (_) {} ids = await relayIds(); r = await put(ids[key]); } // 文件被删了就重建
+        if (!ids[key]) { ids[key] = r.id; try { localStorage.setItem("fb-relay-ids", JSON.stringify(ids)); } catch (_) {} }
+        try { if (hash) localStorage.setItem("fb-relay-hash", hash); } catch (_) {}
+      }
       relayAt = new Date().toISOString(); relayState = "ok";
       try { localStorage.setItem("fb-relay-at", relayAt); localStorage.removeItem("fb-relay-stale"); } catch (_) {}
     } catch (e) {
       relayState = "error"; try { localStorage.setItem("fb-relay-stale", "1"); } catch (_) {}
     } finally {
       relayBusy = false; paintBadge();
-      if (relayAgain) { relayAgain = false; scheduleRelay(1000); }
+      if (relayAgain) { relayAgain = false; scheduleRelay(); }
     }
   }
   // 点「中转站待更新 ↻」：在点的那一刻弹授权（iPhone 要求），然后马上上传
@@ -493,9 +520,11 @@
     const b = e.target && e.target.closest && e.target.closest("#sync-badge");
     if (!b || !relayOn() || relayState === "uploading") return;
     if (relayState !== "stale" && relayState !== "error" && relayAt && canRead()) return;
-    askToken().then(() => { scheduleRelay(0); checkInbox(); }, () => {});
+    askToken().then(() => { relayForce(); checkInbox(); }, () => {});
   }, true);
-  window.__fbRelayNow = () => scheduleRelay(0);
+  // 手动点的：不管跟上次是不是一样都传（万一 Drive 里的文件被删了 / 被改了）
+  function relayForce() { try { localStorage.removeItem("fb-relay-hash"); localStorage.removeItem("fb-relay-ids"); } catch (_) {} scheduleRelay(0); }
+  window.__fbRelayNow = relayForce;
 
   /* ---------- 中转站 → App：Claude 版发来的「改动清单」 ----------
      Claude 版点「同步到 App」后，在中转站文件夹新建 Claude改动-*.json（格式 fb-jizhang-changes/1）。

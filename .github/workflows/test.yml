@@ -31,6 +31,8 @@ jobs:
         run: node tests/v2_cases.js
       - name: 镜像页（Claude 里看 App 界面）：数字跟手机 App 一样、只读、增量同步
         run: python tests/test_mirror.py
+      - name: 中转站省流量（压缩、隔 10 分钟、没变不传、切出去马上传）
+        run: python tests/test_relay_lite.py
       - name: 对账单改往来单价（旧结构 / 新结构）
         run: python tests/test_xfer_price.py
       - name: 合伙人对账同系列互抵（旧结构 / 新结构）

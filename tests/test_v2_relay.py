@@ -1,10 +1,10 @@
 """中转站差分测试：同一份数据、同一份「Claude改动」文件，旧版（v1）和新版（v2）各走一遍
-  ① App 自动上传 最新数据.json → 两边上传的旧样子数据必须一样（by_at 不比）
+  ① App 自动上传 最新数据.json.gz（压缩）→ 两边上传的旧样子数据必须一样（by_at 不比）
   ② 提示条「查看并确认」→ 写入 → App 里全部记录两边一样；v2 只写了源头
   ③ 撤销 → 两边都回到原样
 Google Drive 用 page.route 在内存里模拟；授权：预先放一个没过期的 token（不用登录弹窗）。
 用法：python3 tests/test_v2_relay.py <旧 fixture.json> <v2 种子.json>（真实数据放仓库外面）"""
-import os, datetime, functools, hashlib, http.server, json, re, sys, threading, pathlib, urllib.parse
+import os, gzip, datetime, functools, hashlib, http.server, json, re, sys, threading, pathlib, urllib.parse
 from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -69,9 +69,9 @@ class Drive:
         if path == "/upload/drive/v3/files" and req.method == "POST":
             body = req.post_data_buffer; bd = re.search(rb"boundary=([^;]+)", req.headers.get("content-type", "").encode()).group(1)
             parts = [p.split(b"\r\n\r\n", 1)[1].rsplit(b"\r\n", 1)[0] for p in body.split(b"--" + bd) if b"\r\n\r\n" in p]
-            meta = json.loads(parts[0]); return js({"id": self.add(meta["name"], (meta.get("parents") or [None])[0], content=parts[1].decode("utf8"))})
+            meta = json.loads(parts[0]); return js({"id": self.add(meta["name"], (meta.get("parents") or [None])[0], content=parts[1])})
         m = re.match(r"^/upload/drive/v3/files/([^/]+)$", path)
-        if m and req.method == "PATCH": self.files[m.group(1)]["content"] = req.post_data; return js({"id": m.group(1)})
+        if m and req.method == "PATCH": self.files[m.group(1)]["content"] = req.post_data_buffer; return js({"id": m.group(1)})  # 2026-11-25 起可能是 gzip，存原始字节
         return route.fulfill(status=404, body="{}")
 
 
@@ -104,8 +104,8 @@ def run(seed, label):
         s0 = state()
         # ① 自动上传（店主打开 6 秒后）
         pg.wait_for_timeout(9000)
-        f = next((x for x in D.files.values() if x["name"] == "最新数据.json"), None)
-        up = json.loads(f["content"])["data"] if f else None
+        f = next((x for x in D.files.values() if x["name"] in ("最新数据.json.gz", "最新数据.json")), None)  # 2026-11-25 起传压缩的 .gz
+        up = json.loads(gzip.decompress(f["content"]) if f["content"][:2] == b"\x1f\x8b" else f["content"])["data"] if f else None
         # ② 查看并确认 → 写入
         try: pg.wait_for_selector("[data-ib=open]", timeout=8000)
         except Exception:
@@ -128,7 +128,7 @@ def run(seed, label):
 
 A, B = run(FIX1, "旧版"), run(FIX2, "新版")
 strip = lambda d: {c: {i: {k: v for k, v in x.items() if k not in ("by_at",)} for i, x in m.items()} for c, m in (d or {}).items() if c in ("orders", "movements", "expenses", "purchases", "transfers", "settlements", "items")}
-check("① 两边都自动上传了 最新数据.json", bool(A["up"]) and bool(B["up"]))
+check("① 两边都自动上传了 最新数据.json.gz", bool(A["up"]) and bool(B["up"]))
 ua, ub = strip(A["up"]), strip(B["up"])
 bad = [f"{c}/{i}" for c in ua for i in set(ua[c]) | set(ub.get(c, {})) if ua[c].get(i) != ub.get(c, {}).get(i)]
 check("① 新版上传的旧样子数据 == 旧版上传的（订单/流水/支出/订货/往来/结账/口味）", not bad, f"{len(bad)} 处：{bad[:4]}" if bad else f"{sum(len(m) for m in ua.values())} 条")
