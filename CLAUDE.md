@@ -26,7 +26,7 @@
   **不要改回 CDN**：<script> 跨域加载是不透明响应，Service Worker 存不住，没网时 App 会空白
 - `public/sw.js`：安装时预存 App + vendor；**SHELL 里的文件（App 本身）先用存的**（2026-11-16，以前网络优先 3 秒超时，信号差白屏 3 秒 × 2）；带 `cache:"reload"/"no-store"` 的照旧走网络；其他本站文件网络优先 3 秒；vendor 缓存优先；字体先用缓存。
   新版只靠 CACHE 版本号：不加一，手机就一直用存的旧版
-- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-24 线上 fb-app-v37）
+- 推送到 main 自动发布到 GitHub Pages；改动后把 `public/sw.js` 的 CACHE 版本号加一，**`public/index.html` 开头的 `<meta name="app-version">` 改成一样的**（test_update 会查；2026-11-25 线上 fb-app-v38）
 
 ## v2 数据结构：每件事只记一次（分支 v2，2026-11-10；上线 = 店主在设置页迁移后 meta/schema.version = 2）
 - `public/v2.js`：`migrate(旧各集合)` → v2；`project(v2)` → App 原来的样子（流水、支出、结账反向指针），**内存里现算，不存**；`createStore(db, getItems, onChange)` = 读写翻译层
@@ -45,7 +45,8 @@
 
 ## 中转站（App ↔ Claude 版 的同步，2026-11 起）
 - Claude 版不能直连 Firebase（artifact 网络被拦，已实测），所以用 Google Drive 当中转站
-- App → 中转站：只有 owner 的手机上传；每次云端确认保存后 4 秒，把所有集合（读手机缓存，不耗额度）打包成
+- **2026-11-25（v38）起省流量：传压缩的 `最新数据.json.gz`（里面格式不变，fb-jizhang-relay/1）；两次上传至少隔 10 分钟（`window.__relayGap` 测试可改）；跟上次一样（sha256，localStorage `fb-relay-hash`）不传；切出 App 有排着的马上传；手动点「中转站」照传；手机没有 CompressionStream 才传 `最新数据.json`。旧的 `最新数据.json` 停在 v38 上线那一刻。测试 tests/test_relay_lite.py**
+- App → 中转站：只有 owner 的手机上传；（以下是 v38 以前的写法）每次云端确认保存后 4 秒，把所有集合（读手机缓存，不耗额度）打包成
   `FB 记账中转站/最新数据.json`（格式 fb-jizhang-relay/1，整份覆盖，不是增量）；授权过期则标记「中转站待更新 ↻」，点一下补传
 - Google token 存在 localStorage 到过期为止（约 1 小时）
 - 中转站 → Claude 版（已完成，代码在 Claude artifact 里，不在本仓库）：Claude 版每次打开用 Google Drive 连接器读 `最新数据.json`，
