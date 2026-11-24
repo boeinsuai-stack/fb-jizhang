@@ -57,8 +57,8 @@ def mix(pg, cash, other=None):
 def order(pg, oid): return next((x for x in S(pg, "orders") if x["id"] == oid), {})
 def card(pg, oid): return pg.evaluate(f"""document.querySelector('[data-settle="{oid}"]').closest('details').innerText""")
 def vis(pg, sel): return pg.evaluate(f"""(() => {{ const e = document.querySelector('{sel}'); return !!e && !e.hidden && e.offsetParent !== null; }})()""")
-def edit(pg, oid): go(pg, "customers"); pg.evaluate(f"""() => document.querySelector('[data-edit-order="{oid}"]').click()"""); pg.wait_for_selector("#f-diff-open", state="attached"); pg.wait_for_timeout(200)
-def settle(pg, oid): go(pg, "customers"); pg.evaluate(f"""() => document.querySelector('[data-settle="{oid}"]').click()"""); pg.wait_for_timeout(600); save(pg)
+def edit(pg, oid): go(pg, "reserve"); pg.evaluate(f"""() => document.querySelector('[data-edit-order="{oid}"]').click()"""); pg.wait_for_selector("#f-diff-open", state="attached"); pg.wait_for_timeout(200)
+def settle(pg, oid): go(pg, "reserve"); pg.evaluate(f"""() => document.querySelector('[data-settle="{oid}"]').click()"""); pg.wait_for_timeout(600); save(pg)
 def new_sale(pg, who):
     go(pg, "finance"); pg.click("#fin-sale"); pg.wait_for_selector("#f-skuq-0")
     pg.fill("#f-skuq-0", "香蕉"); pg.press("#f-skuq-0", "Enter"); pg.fill("#f-qty-0", "1"); pg.locator("#f-cust").press_sequentially(who); pg.wait_for_timeout(200)
@@ -100,8 +100,8 @@ with sync_playwright() as p:
         go(pg, "customers"); pg.fill("#cq", "amy"); pg.wait_for_timeout(250)
         check("客户页 Amy 那行不标「多给了」", "多给了" not in pg.inner_text("#c-list"))
         pg.evaluate("""() => { const b = [...document.querySelectorAll('[data-cu]')].find((x) => /Amy/.test(x.innerText)); b.click(); }"""); pg.wait_for_timeout(250)
-        check("点开 Amy：买过什么里写「多给 $10」", "多给 $10" in pg.inner_text("#c-list") and "下次核对" not in pg.inner_text("#c-list"))
-        pg.fill("#cq", ""); pg.wait_for_timeout(200)
+        check("点开 Amy：买过什么里写「多给 $10」", "多给 $10" in pg.inner_text("#sheet") and "下次核对" not in pg.inner_text("#sheet"))
+        pg.click("#sheet-close"); pg.wait_for_timeout(250); pg.fill("#cq", ""); pg.wait_for_timeout(200)
 
         # 点亮「下次核对」：照旧提醒
         edit(pg, "r-bob"); pg.click("#f-diff-open"); pg.click('#f-diff label:has(input[value="-1"])'); pg.fill("#f-diffamt", "5"); pg.click('#f-diff [data-for="-1"] [data-diffwhy="转多了"]'); pg.check("#f-track"); save(pg)

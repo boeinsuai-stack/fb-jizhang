@@ -78,7 +78,7 @@ with sync_playwright() as p:
         print("== " + mode)
 
         # 1. 预定概览上看得到备注
-        go(pg, "customers")
+        go(pg, "reserve")
         c1 = card(pg, "o-r1")
         check("Bob 的预定没点开：备注「周三 6pm Coles 门口见」看得到", c1.locator("summary .rv-note").is_visible() and c1.locator("summary .rv-note").inner_text() == "周三 6pm Coles 门口见" and not c1.evaluate("(d) => d.open"))
         c1.locator("summary").click(); pg.wait_for_timeout(200)
@@ -92,7 +92,7 @@ with sync_playwright() as p:
         check("编辑有备注的预定：「更多」直接展开，备注看得到", pg.is_visible("#f-note") and pg.input_value("#f-note") == "周三 6pm Coles 门口见")
         check("没有「区」「从哪来的」了", pg.locator("#sheet #f-sub, #sheet #f-src").count() == 0)
         pg.fill("#f-note", "周四 7pm 改到 Rockingham 火车站"); save(pg)
-        go(pg, "customers")
+        go(pg, "reserve")
         check("改了备注：概览上马上是新的", card(pg, "o-r1").locator("summary .rv-note").inner_text() == "周四 7pm 改到 Rockingham 火车站")
 
         # 3. 编辑以前填过区 / 来源的单：不会被清掉
@@ -121,9 +121,10 @@ with sync_playwright() as p:
             check(f"{who} 存好：来源 = {want}", len(new) == 1 and new[0].get("source") == want and not new[0].get("suburb"), new and {k: new[0].get(k) for k in ("customer", "source", "suburb")})
 
         # 5. 跟进、客户资料：没有区；客户资料里以前的区不会被清掉
-        go(pg, "customers"); pg.click("#cu-fu-new"); pg.wait_for_selector("#f-cust")
+        go(pg, "customers"); pg.click("#hd-fu"); pg.wait_for_selector("#f-cust")
         check("记跟进：没有「区」", pg.locator("#sheet #f-sub").count() == 0 and "区" not in pg.inner_text("#sheet .sheet-card, #sheet"))
         close(pg)
+        pg.fill("#cq", "Amy"); pg.wait_for_timeout(250)
         pg.evaluate("""() => { const b = [...document.querySelectorAll('[data-cu]')].find((x) => /Amy/.test(x.innerText)); b.click(); }"""); pg.wait_for_timeout(300)
         pg.evaluate("""() => document.querySelector('[data-cu-edit]').click()"""); pg.wait_for_selector("#f-ccontact")
         check("客户资料：没有「区」框", pg.locator("#sheet #f-csub").count() == 0)

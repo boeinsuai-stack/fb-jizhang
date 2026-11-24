@@ -69,7 +69,7 @@ with sync_playwright() as p:
         pg.route("**/firebase-firestore-compat.js", lambda r: r.fulfill(body="", content_type="text/javascript"))
         pg.goto(URL); pg.wait_for_function("window.__GM && window.__GM.S.loaded", timeout=15000); pg.wait_for_timeout(500)
         print("== " + mode)
-        go(pg, "customers")
+        go(pg, "reserve")
         got = {o: tag(pg, o).inner_text() for o in ("o-fee", "o-self", "o-send", "o-unk")}
         check("有配送费 → 配送，没有 → 自取（备注里写什么不管）", got == {"o-fee": "配送", "o-self": "自取", "o-send": "自取", "o-unk": "自取"}, got)
         check("标签在客人名字旁边，只是显示（不是按钮）", tag(pg, "o-unk").is_visible() and tag(pg, "o-unk").evaluate("(e) => e.tagName") == "SPAN")

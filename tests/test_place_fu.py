@@ -1,4 +1,4 @@
-"""要联系的客户重排 + 重点客户 + 见面地点（2026-11-21 Bowen）
+"""要联系的客户重排 + 重点客户 + 见面地点（2026-11-21 Bowen；2026-11-24 客户页重做后改成 要找 / 约好以后 标签）
 - 要联系的客户：手动跟进和自动提醒合成一个列表，按日子从早到晚（过了的最上面），没定日子的在后面，三天以后的收进「以后」；有预定 / 记跟进以后又买过的不列
 - 每条默认收起（哪天 · 谁 · 为什么），点开才有四个按钮：记预定 / 联系过了 / 不用跟了 / 改；「联系过了」有常用说法一点就填
 - 重点客户：一次买过 8 根以上的零售客（批发不算），客户资料可以手动勾 / 取消；没有自己节奏的买完两周提醒；客户页「重点客户」最久没买的在上面
@@ -53,9 +53,12 @@ def save(pg):
 def close(pg): pg.click("#sheet-close"); pg.wait_for_timeout(250)
 def cust(pg, n): return next((c for c in S(pg, "customers") if c.get("name") == n), {})
 def order(pg, oid): return next((x for x in S(pg, "orders") if x["id"] == oid), {})
-def fu_names(pg): return pg.evaluate("[...document.querySelectorAll('#fu-list > .fu2 > summary .fu-l1 b')].map((b) => b.innerText)")
-def fold_names(pg): return pg.evaluate("[...document.querySelectorAll('#fu-list .fu-later .fu2 > summary .fu-l1 b')].map((b) => b.textContent)")
-def row(pg, n): return pg.locator("#fu-list .fu2").filter(has=pg.locator(f'.fu-l1 b:text-is("{n}")'))
+# 2026-11-24 客户页重做：要找 / 等回复 / 约好以后 三个标签
+def tab(pg, t): pg.click(f'#cx-tabs [data-cx="{t}"]'); pg.wait_for_timeout(200)
+def _names(pg, t): tab(pg, t); return pg.evaluate("[...document.querySelectorAll('#fu-list .cx-row .cx-who')].map((b) => b.textContent)")
+def fu_names(pg): return _names(pg, "find")
+def fold_names(pg): return _names(pg, "later")
+def row(pg, n): return pg.locator("#fu-list .cx-row").filter(has=pg.locator(f'.cx-who:text-is("{n}")'))
 def resv(pg, who, extra=None):
     go(pg, "finance"); pg.click("#fin-sale"); pg.wait_for_selector("#f-skuq-0"); pg.check("#f-resv")
     pg.fill("#f-skuq-0", "香蕉"); pg.press("#f-skuq-0", "Enter"); pg.fill("#f-qty-0", "1")
@@ -79,47 +82,36 @@ with sync_playwright() as p:
         print("== " + mode)
         go(pg, "customers"); pg.wait_for_timeout(300)
         names = fu_names(pg)
-        # 2026-11-23 起「今天找谁」：按 可能性 × 平时一单 排（Hal 批发 50 根 0.04×3000=120 · Amy 跟进到日子 0.5×140 · Dan 没定日子 0.3×140 · Ben 5 天一次 0.5×60 · Cat 一次 10 根 0.04×600）
-        check("今天找谁：Hal、Amy、Dan、Ben、Cat（按可能带来的钱）", names == ["Hal", "Amy", "Dan", "Ben", "Cat"], names)
-        check("还没到日子的收进「以后要找的」：Kit（明天）、Lou（后天）、Eve", fold_names(pg) == ["Kit", "Lou", "Eve"] and "以后要找的 · 3 个" in pg.inner_text("#fu-list .fu-later > summary"), fold_names(pg))
-        check("有预定的 Fay、记跟进以后又买了的 Gus 不列", "Fay" not in names and "Gus" not in names)
-        lbl = pg.evaluate("[...document.querySelectorAll('#fu-list .fu-later .fu2 .fu-when')].map((x) => x.textContent)")
-        check("「以后」里写哪天：明天 / 后天 / 日期", lbl[:2] == ["明天", "后天"] and len(lbl) == 3, lbl)
-        c1 = row(pg, "Cat").first
-        check("Cat 不再标「重点」，写「买过一次 10 根 · 20 天前」", c1.locator(".tag-vip").count() == 0 and "买过一次 10 根 · 20 天前" in c1.locator(".fu-why").inner_text(), c1.inner_text())
-        check("收起时看不到按钮", not c1.locator("[data-au-resv]").is_visible())
-        c1.locator("summary").click(); pg.wait_for_timeout(200)
-        bt = c1.locator(".l-actions button").all_inner_texts()
-        check("点开：记预定 / 联系过了 / 不用跟了 / 改", bt == ["记预定", "联系过了", "不用跟了", "改"], bt)
-        ab = row(pg, "Amy").first; ab.locator("summary").click(); pg.wait_for_timeout(150)
-        bt2 = ab.locator(".l-actions button").all_inner_texts()
-        check("手动记的跟进也是这四个", bt2 == ["记预定", "联系过了", "不用跟了", "改"], bt2)
+        check("要找：Amy（约好的日子过了）、Dan（你记的）、Ben（老客 5 天一次）", names == ["Amy", "Dan", "Ben"], names)
+        check("还没到日子的在「约好以后」：Kit（明天）、Lou（后天）、Eve", fold_names(pg) == ["Kit", "Lou", "Eve"] and pg.inner_text("#cx-n-later") == "3", fold_names(pg))
+        lbl = pg.evaluate("[...document.querySelectorAll('#fu-list .cx-tag')].map((x) => x.textContent)")
+        check("「约好以后」写哪天：明天 / 后天 / 日期", lbl[:2] == ["明天", "后天"] and len(lbl) == 3, lbl)
+        names = fu_names(pg)
+        check("有预定的 Fay、记跟进以后又买了的 Gus、只买过一次的 Cat / Hal 不列", not ({"Fay", "Gus", "Cat", "Hal"} & set(names + fold_names(pg))))
+        tab(pg, "find"); bt = row(pg, "Ben").first.locator(".cx-btns button").all_inner_texts()
+        check("按钮直接摆出来：复制消息 / 发了 / 过几天 / 不跟了", bt == ["复制消息", "发了", "过几天", "不跟了"], bt)
+        bt2 = row(pg, "Amy").first.locator(".cx-btns button").all_inner_texts()
+        check("手动记的也是这四个", bt2 == bt, bt2)
 
-        # 联系过了：常用说法一点就填，3 天后再提醒
-        c1.locator("[data-au-later]").click(); pg.wait_for_selector("#f-lwq")
-        pg.click('#f-lwq [data-lw="发了信息没回"]'); pg.check('input[name="f-whenr"][value="3"]'); save(pg)
-        cp = cust(pg, "Cat")
-        check("Cat：下次 3 天后，记一笔「发了信息没回」", cp.get("next") == D(3) and (cp.get("touches") or [{}])[-1].get("what") == "发了信息没回", (cp.get("next"), cp.get("touches")))
-        check("Cat 挪到「以后」（约好 3 天后）", fu_names(pg) == ["Hal", "Amy", "Dan", "Ben"] and fold_names(pg) == ["Kit", "Lou", "Cat", "Eve"], (fu_names(pg), fold_names(pg)))
-        row(pg, "Amy").first.locator("summary").click(); pg.wait_for_timeout(150)
-        row(pg, "Amy").first.locator("[data-fu-done]").click(); pg.wait_for_timeout(500)
+        # 过几天：他怎么说的一点就填，3 天后再提醒
+        row(pg, "Ben").first.locator("[data-td-later]").click(); pg.wait_for_selector("#f-lwq")
+        pg.click('#f-lwq [data-lw="没回"]'); pg.check('input[name="f-whenr"][value="3"]'); save(pg)
+        cp = cust(pg, "Ben")
+        check("Ben：下次 3 天后，记一笔「没回」", cp.get("next") == D(3) and (cp.get("touches") or [{}])[-1].get("what") == "没回", (cp.get("next"), cp.get("touches")))
+        check("Ben 挪到「约好以后」（3 天后）", fu_names(pg) == ["Amy", "Dan"] and fold_names(pg) == ["Kit", "Lou", "Ben", "Eve"], (fu_names(pg), fold_names(pg)))
+        tab(pg, "find"); b = row(pg, "Amy").first.locator("[data-td-off]"); b.click(); pg.wait_for_timeout(150); b.click(); pg.wait_for_timeout(500)
         fa = next(x for x in S(pg, "followups") if x["id"] == "fu-a")
-        check("Amy 不用跟了 → 这条关掉", fa.get("done") is True and fu_names(pg) == ["Hal", "Dan", "Ben"], (fa.get("done"), fu_names(pg)))
-        # 「以后」里的到了日子自己出来：把 Eve 改成今天
+        check("Amy 不跟了（点两下）→ 这条关掉", fa.get("done") is True and fu_names(pg) == ["Dan"], (fa.get("done"), fu_names(pg)))
+        # 「约好以后」里的到了日子自己出来：把 Eve 改成今天
         pg.evaluate("window.__GM.S.followups.find((f) => f.id === 'fu-e').date = '" + D(0) + "'"); go(pg, "inventory"); go(pg, "customers")
-        check("「以后」里的 Eve 到了日子，出来到今天找谁", "Eve" in fu_names(pg) and "Eve" not in fold_names(pg), (fu_names(pg), fold_names(pg)))
+        check("「约好以后」里的 Eve 到了日子，出来到要找", "Eve" in fu_names(pg) and "Eve" not in fold_names(pg), (fu_names(pg), fold_names(pg)))
 
-        # 重点客户
-        pg.click('[data-cs="vip"]'); pg.wait_for_timeout(250)
-        vn = pg.evaluate("[...document.querySelectorAll('#c-list .cu-name .name')].map((x) => x.innerText)")
-        check("「重点客户」：只有 Cat（Hal 是批发、Ben 每次 1 根都不算）", vn == ["Cat"], vn)
-        check("写「一次最多 10 根」", "一次最多 10 根" in pg.inner_text("#c-list"))
-        pg.click('#c-list [data-cu]'); pg.wait_for_timeout(200); pg.click('#c-list [data-cu-edit]'); pg.wait_for_selector("#f-cvip")
+        # 重点客户：资料里照旧能勾 / 取消（客户页不再有「重点客户」筛选）
+        pg.fill("#cq", "Cat"); pg.wait_for_timeout(250); pg.click('#c-list [data-cu]'); pg.wait_for_timeout(200); pg.click('#sheet [data-cu-edit]'); pg.wait_for_selector("#f-cvip")
         check("客户资料：「重点客户」已勾（一次买过 10 根）", pg.is_checked("#f-cvip") and "一次买过 10 根" in pg.inner_text("#sheet-form"))
         pg.uncheck("#f-cvip"); save(pg)
-        check("取消勾选 → 存 vip:false，不在重点客户里", cust(pg, "Cat").get("vip") is False and "还没有重点客户" in pg.inner_text("#c-list"), (cust(pg, "Cat").get("vip"), pg.inner_text("#c-list")[:80]))
-        check("「今天找谁」不看重点标记：Cat 照旧在「以后」（约好 3 天后）", "Cat" in fold_names(pg), fold_names(pg))
-        pg.click('[data-cs="recent"]'); pg.wait_for_timeout(200)
+        check("取消勾选 → 存 vip:false", cust(pg, "Cat").get("vip") is False, cust(pg, "Cat").get("vip"))
+        pg.fill("#cq", ""); pg.wait_for_timeout(150)
 
         # 地点
         check("客户页标题右边有「地点」", pg.is_visible("#hd-place"))
@@ -136,14 +128,15 @@ with sync_playwright() as p:
         close(pg)
 
         # 客户资料：一般在哪见面、几点方便联系
-        pg.fill("#cq", "Ben"); pg.wait_for_timeout(250); pg.click('#c-list [data-cu]'); pg.wait_for_timeout(200); pg.click('#c-list [data-cu-edit]'); pg.wait_for_selector("#f-cpl")
+        pg.fill("#cq", "Ben"); pg.wait_for_timeout(250); pg.click('#c-list [data-cu]'); pg.wait_for_timeout(200); pg.click('#sheet [data-cu-edit]'); pg.wait_for_selector("#f-cpl")
         pg.check('input[name="f-cplr"][value="Coles 停车场"]'); pg.fill("#f-cfrom", "16:00"); pg.fill("#f-cto", "18:00"); save(pg)
         bp = cust(pg, "Ben")
         check("Ben 打上地点、联系时间", bp.get("place") == "Coles 停车场" and bp.get("call") == "16:00-18:00", bp)
-        check("Ben 在客户列表上有地点标签、点开写「一般 下午 4–6 点 联系」", "Coles 停车场" in pg.inner_text("#c-list") and "下午 4–6 点" in pg.inner_text("#c-list"), pg.inner_text("#c-list")[:200])
-        pg.fill("#cq", ""); pg.wait_for_timeout(200)
-        br_ = row(pg, "Ben").first
-        check("跟进列表里 Ben 也写着地点和「下午 4–6 点联系」", "Coles 停车场" in br_.inner_text() and "下午 4–6 点联系" in br_.inner_text(), br_.inner_text())
+        pg.click('#c-list [data-cu]'); pg.wait_for_timeout(200)
+        check("Ben 的资料里有地点标签、写「一般 下午 4–6 点 联系」", "Coles 停车场" in pg.inner_text("#sheet") and "下午 4–6 点" in pg.inner_text("#sheet"), pg.inner_text("#sheet")[:200])
+        close(pg); pg.fill("#cq", ""); pg.wait_for_timeout(200)
+        tab(pg, "later"); br_ = row(pg, "Ben").first
+        check("约好以后里 Ben 也写着地点和「下午 4–6 点联系」", "Coles 停车场" in br_.inner_text() and "下午 4–6 点联系" in br_.inner_text(), br_.inner_text())
 
         # 记预定：写了 Ben 自动带上
         resv(pg, "Ben")
@@ -152,7 +145,7 @@ with sync_playwright() as p:
         save(pg)
         ob = next(o for o in S(pg, "orders") if o.get("customer") == "Ben" and o.get("status") == "reserved")
         check("预定上存了地点、联系时间，没有几点", ob.get("place") == "Coles 停车场" and ob.get("call_win") == "16:00-18:00" and not ob.get("meet_time"), ob)
-        go(pg, "customers")
+        go(pg, "reserve")
         card = pg.locator("#resv details.rv").filter(has=pg.locator('b:text-is("Ben")')).first
         ct = card.inner_text()
         check("预定卡片：「今天 · 暂未确定时间」「下午 4–6 点联系」「Coles 停车场」", "今天 · 暂未确定时间" in ct and "下午 4–6 点联系" in ct and "Coles 停车场" in ct, ct)
@@ -167,7 +160,7 @@ with sync_playwright() as p:
         resv(pg, "Ivy", newpl); save(pg)
         check("新地点进地点库（还没写地址）", [x["name"] for x in S(pg, "places")] == ["Coles 停车场", "Murdoch 站"], S(pg, "places"))
         check("新客人 Ivy 自动打上「Murdoch 站」", cust(pg, "Ivy").get("place") == "Murdoch 站", cust(pg, "Ivy"))
-        go(pg, "customers")
+        go(pg, "reserve")
         ci = pg.locator("#resv details.rv").filter(has=pg.locator('b:text-is("Ivy")')).first.inner_text()
         check("定了几点的卡片写「今天 15:30」，不写「暂未确定」", "今天 15:30" in ci and "暂未确定" not in ci, ci)
 

@@ -137,7 +137,7 @@ with sync_playwright() as p:
 
     # 4 编辑预定：换口味 + 加一行
     def edit_resv(pg):
-        pg.evaluate("location.hash = '#customers'"); pg.wait_for_timeout(200)
+        pg.evaluate("location.hash = '#reserve'"); pg.wait_for_timeout(200)
         pg.evaluate(f"""() => document.querySelector('[data-edit-order="{r1}"]').click()""")
         pg.fill("#f-skuq-0", have); pg.press("#f-skuq-0", "Enter"); pg.click("#f-addline"); pg.fill("#f-skuq-1", none); pg.press("#f-skuq-1", "Enter")
         if pg.is_visible("#f-pfrom"): pg.fill("#f-pfrom", partner)
@@ -157,7 +157,7 @@ with sync_playwright() as p:
     both(A, B, reserve); r2 = new_ids(ids0, A)[0]
     def void(pg, oid):
         pg.evaluate(f"""() => {{ const b = [...document.querySelectorAll('[data-void-order="{oid}"]')][0]; b.click(); b.click(); }}""")
-    both(A, B, lambda pg: (pg.evaluate("location.hash = '#customers'"), pg.wait_for_timeout(200), void(pg, r2)))
+    both(A, B, lambda pg: (pg.evaluate("location.hash = '#reserve'"), pg.wait_for_timeout(200), void(pg, r2)))
     compare("6 取消预定", A, B)
 
     # 7 撤销刚才那笔卖出

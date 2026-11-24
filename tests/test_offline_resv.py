@@ -65,9 +65,9 @@ def pick(pg, k, text):
 
 
 def open_resv(pg, oid):
-    """客户页顶部的预定卡：先点开那一单，再点「编辑」"""
-    pg.evaluate("location.hash = '#customers'"); pg.wait_for_timeout(300)
-    btn = pg.locator(f'#cu-view details.rv:has([data-edit-order="{oid}"])').first
+    """预定页的预定卡：先点开那一单，再点「编辑」"""
+    pg.evaluate("location.hash = '#reserve'"); pg.wait_for_timeout(300)
+    btn = pg.locator(f'#rv-view details.rv:has([data-edit-order="{oid}"])').first
     btn.locator("summary").click()
     btn.locator(f'[data-edit-order="{oid}"]').click()
 

@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v36"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v37"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -684,7 +684,7 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 .cu-fu { padding: 10px 12px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: .88rem; display: grid; gap: 8px; }
 .cu-fu.wait { background: var(--bg); color: var(--muted); }
 .cu-hist li { align-items: baseline; }
-.cu-h { margin: 18px 0 2px; } .cu-stat { margin: 0 0 8px; }
+.cu-h { margin: 18px 0 2px; }
 .cu-hist2 { display: grid; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; font-size: .88rem; }
 .ch-o + .ch-o { border-top: 1px solid var(--line); }
 .ch-d { display: flex; justify-content: space-between; gap: 12px; padding: 6px 12px; background: var(--bg); font-size: .8rem; font-weight: 700; color: var(--muted); }
@@ -785,24 +785,30 @@ details.restock > summary::-webkit-details-marker { display: none; }
 .fu.due .l-date { color: var(--warn); font-weight: 600; }
 .fu.auto .l-date { color: var(--accent); }
 .fu-pnote { color: var(--fg); background: var(--hover); border-radius: 6px; padding: 2px 6px; justify-self: start; }
-/* 要联系的客户（2026-11-21）：收起来两行，点开出按钮 */
-.fu2 { border-top: 1px solid var(--line); } .fu2:first-child { border-top: 0; }
-.fu2 > summary { list-style: none; cursor: pointer; display: grid; gap: 2px; padding: 11px 16px; } .fu2 > summary::-webkit-details-marker { display: none; }
-.fu-l1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .fu-l1 b { font-weight: 600; }
-.fu-when { font-size: .82rem; font-weight: 600; color: var(--muted); min-width: 3.6em; font-variant-numeric: tabular-nums; } .fu-when.late { color: var(--warn); } .fu-when.now { color: var(--accent); }
-.fu-why { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; } .fu2[open] .fu-why { display: block; } /* 最多两行（2026-11-24：一行时日期被截掉） */
-.fu-call { color: var(--accent); }
-.fu-body { display: grid; gap: 4px; padding: 0 16px 14px; } .fu-body .l-actions { margin-top: 6px; }
-.fu2[open] > summary { padding-bottom: 6px; }
-.fu-later { border-top: 1px solid var(--line); } .fu-later > summary { cursor: pointer; padding: 11px 16px; color: var(--muted); font-size: .88rem; }
-/* 今天找谁（2026-11-23）：名字 · 平时一单多少；为什么找他；复制消息 / 发了 不用点开 */
-.fu-more, .fu-wait { border-top: 1px solid var(--line); } .fu-more > summary, .fu-wait > summary { cursor: pointer; padding: 11px 16px; color: var(--muted); font-size: .88rem; }
-.fu-amt { margin-left: auto; font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.fu-q { display: flex; gap: 8px; margin-top: 6px; }
-.td-none { padding: 11px 16px; margin: 0; }
-.td-stat { margin: 10px 2px 0; }
-.td-strip { display: flex; align-items: center; gap: 8px; width: 100%; margin: -4px 0 10px; padding: 7px 12px; font-size: .92rem; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font: inherit; color: inherit; text-align: left; cursor: pointer; }
-.td-strip[hidden] { display: none; } .td-strip b { color: var(--accent); } .td-strip .pt-more { margin-left: auto; color: var(--muted); }
+/* 库存页最上面一行（2026-11-24 客户页重做）：「交货 N 单 ›」到预定页，「要找 N 个人 ›」到客户页 */
+.td-strip { display: flex; gap: 8px; margin: -4px 0 10px; } .td-strip[hidden] { display: none; }
+.td-strip a { flex: 1; display: flex; align-items: center; gap: 6px; padding: 7px 12px; font-size: .92rem; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: inherit; text-decoration: none; }
+.td-strip a b { color: var(--accent); } .td-strip a .pt-more { margin-left: auto; color: var(--muted); }
+/* 设置挪到标题右上角（底部导航换成 预定） */
+.hd-set { position: relative; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; color: var(--muted); border: 1px solid var(--line); background: var(--surface); }
+.hd-set svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.hd-set[aria-current="page"] { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
+.hd-set .nav-dot { top: 5px; right: 5px; }
+/* 客户页：要找 / 等回复 / 约好以后，一次看一个，按钮直接摆出来 */
+.cx-tabs { display: flex; gap: 6px; margin: 0; } .cx-tabs .chip { padding: 7px 14px; font-size: .9rem; } .cx-tabs .chip b { margin-left: 5px; font-variant-numeric: tabular-nums; }
+.cx-row { display: grid; gap: 3px; padding: 13px 16px; border-top: 1px solid var(--line); } .cx-row:first-child { border-top: 0; }
+.cx-top { display: flex; gap: 8px; align-items: center; min-width: 0; } .cx-top .cx-who { font: inherit; font-weight: 700; font-size: 1.02rem; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-amt { margin-left: auto; color: var(--muted); font-size: .82rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cx-tag { flex: none; font-size: .74rem; padding: 2px 8px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
+.t-arr { background: var(--accent-soft); color: var(--accent); } .t-due { background: var(--warn-soft); color: var(--warn); } .t-buy { background: var(--pay-payid-bg); color: var(--pay-payid-fg); } .t-mine { background: var(--line); color: var(--muted); }
+.cx-why { font-size: .92rem; overflow-wrap: anywhere; } .cx-last { font-size: .82rem; color: var(--muted); }
+.cx-btns { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+.cx-none { padding: 18px 16px; color: var(--muted); }
+.cx-find .cu-h { margin: 6px 0 8px; } #cq { width: 100%; margin-bottom: 8px; }
+.cx-c { display: flex; gap: 10px; align-items: center; width: 100%; padding: 12px 16px; border: 0; border-top: 1px solid var(--line); background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; } .cx-c:first-child { border-top: 0; }
+.cx-c b { white-space: nowrap; } .cx-c span { color: var(--muted); font-size: .85rem; min-width: 0; } .cx-c i { margin-left: auto; color: var(--muted); font-style: normal; }
+.cs-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+#rv-view .resv-card { border: 1px solid var(--line); } #rv-view .rc-head { background: none; color: var(--muted); font-weight: 500; padding-bottom: 4px; }
 .hero-oc { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; margin-top: 10px; padding: 10px 0 0; border: 0; border-top: 1px solid var(--line); background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .hero-oc b { font-weight: 700; } .hero-oc small { color: var(--muted); font-size: .8rem; }
 .cb-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; } .cb-top .k { display: block; font-size: .8rem; color: var(--muted); } .cb-tot { font-size: 1.6rem; font-weight: 700; }
@@ -831,14 +837,14 @@ details.restock > summary::-webkit-details-marker { display: none; }
       <p class="eyebrow">BOWEN · 香氛棒</p>
       <h1 id="view-title">库存</h1>
     </div>
-    <div class="hd-btns"><button class="btn hd-copy" id="hd-place" type="button">地点</button><button class="btn primary hd-copy" id="inv-copy" type="button">复制口味</button></div>
+    <div class="hd-btns"><button class="btn hd-copy" id="hd-place" type="button">地点</button><button class="btn primary hd-copy" id="inv-copy" type="button">复制口味</button><button class="btn hd-copy" id="hd-fu" type="button" hidden>＋ 记要找的人</button><a class="hd-set" id="nav-set" href="#settings" aria-label="设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.1"/><circle cx="9" cy="17" r="2.1"/></svg><i class="nav-dot" id="set-dot" hidden></i></a></div>
     <nav class="switch" aria-label="切换系统">
       <a id="nav-inv" href="#inventory" aria-current="page"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.6 12 3.4l8.5 4.2v8.8L12 20.6l-8.5-4.2z"/><path d="M3.5 7.6 12 11.8l8.5-4.2M12 11.8v8.8"/></svg></span>库存</a>
+      <a id="nav-rv" href="#reserve"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4M8.8 15l2.2 2 4.2-4.2"/></svg><i class="nav-badge" id="rv-badge" hidden></i></span>预定</a>
       <a id="nav-po" href="#purchases"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h10.5v9H3zM13.5 9.5h3.8l3.2 3.3v2.7h-7"/><circle cx="7" cy="17.6" r="1.8"/><circle cx="17" cy="17.6" r="1.8"/></svg></span>订货</a>
       <a id="nav-fin" href="#finance"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20h17"/><rect x="5" y="11" width="3.4" height="6" rx="1"/><rect x="10.3" y="5" width="3.4" height="12" rx="1"/><rect x="15.6" y="13.5" width="3.4" height="3.5" rx="1"/></svg></span>财务</a>
-      <a id="nav-cu" href="#customers"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4M8.8 15l2.2 2 4.2-4.2"/></svg><i class="nav-badge" id="cu-badge" hidden></i></span>今天</a>
+      <a id="nav-cu" href="#customers"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.7"/><path d="M4.8 20c.8-3.9 3.6-6 7.2-6s6.4 2.1 7.2 6"/></svg><i class="nav-badge" id="cu-badge" hidden></i></span>客户</a>
       <a id="nav-ptx" href="#partner"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h15M15.5 5 19 8.5 15.5 12M20 15.5H5M8.5 12 5 15.5 8.5 19"/></svg></span>合伙人</a>
-      <a id="nav-set" href="#settings"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.1"/><circle cx="9" cy="17" r="2.1"/></svg><i class="nav-dot" id="set-dot" hidden></i></span>设置</a>
     </nav>
   </header>
 
@@ -846,7 +852,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   <div class="health" id="health" hidden><span id="health-text"></span><button class="btn small" id="health-open" type="button">查看</button></div>
 
   <main id="inv-view">
-    <button class="td-strip" id="td-strip" type="button" hidden></button>
+    <div class="td-strip" id="td-strip" hidden></div>
     <section class="qo" id="qo-sec" aria-label="快速下单">
       <div class="qo-top">
         <h2 id="qo-h">快速下单 · 点口味加一根</h2>
@@ -1009,32 +1015,27 @@ details.restock > summary::-webkit-details-marker { display: none; }
     </section>
   </main>
 
-  <main id="cu-view" hidden>
-    <section class="resv-card" id="resv-sec" hidden aria-label="预定">
-      <div class="rc-head"><span>预定 · 还没交付</span><span class="rc-n" id="resv-n"></span></div>
+  <main id="rv-view" hidden>
+    <section class="resv-card" id="resv-sec" aria-label="预定">
+      <div class="rc-head"><span>还没交货</span><span class="rc-n" id="resv-n"></span></div>
       <div class="owe" id="resv-pick" hidden></div>
       <div class="list" id="resv"></div>
     </section>
-    <section id="fu-sec" hidden>
-      <h2>今天找谁 <small class="rc-n" id="fu-n"></small></h2>
-      <div class="list" id="fu-list"></div>
-      <p class="hint td-stat" id="td-stat" hidden></p>
-    </section>
-    <div class="actions"><button class="btn ghost small" id="cu-fu-new" type="button">＋ 记一个要找的人</button></div>
-    <h2 class="cu-h">全部客户</h2>
-    <p class="hint cu-stat" aria-label="客户概览"><b id="c-n">–</b> 个客户 · 回头客 <b id="c-rep">–</b>（<span id="c-rate">–</span>）· 平均每人 <b id="c-avg">–</b></p>
-    <p class="hint" id="c-noname" hidden></p>
-    <div class="toolbar">
-      <input id="cq" type="search" placeholder="搜名字、口味、备注" aria-label="搜客户">
-      <div class="chips" id="c-sort" role="group" aria-label="排序">
-        <button class="chip" type="button" data-cs="recent" aria-pressed="true">最近买的</button>
-        <button class="chip" type="button" data-cs="spent" aria-pressed="false">花得最多</button>
-        <button class="chip" type="button" data-cs="vip" aria-pressed="false">重点客户</button>
-        <button class="chip" type="button" data-cs="fu" aria-pressed="false">要跟进</button>
-        <button class="chip" type="button" data-cs="ws" aria-pressed="false">批发客户</button>
-      </div>
+    <p class="empty" id="rv-empty" hidden>没有还没交货的预定。</p>
+  </main>
+
+  <main id="cu-view" hidden>
+    <div class="chips cx-tabs" id="cx-tabs" role="group" aria-label="客户">
+      <button class="chip" type="button" data-cx="find" aria-pressed="true">要找<b id="cx-n-find"></b></button>
+      <button class="chip" type="button" data-cx="wait" aria-pressed="false">等回复<b id="cx-n-wait"></b></button>
+      <button class="chip" type="button" data-cx="later" aria-pressed="false">约好以后<b id="cx-n-later"></b></button>
     </div>
-    <div class="list" id="c-list"><div class="empty">正在读取…</div></div>
+    <div class="list cx-list" id="fu-list"></div>
+    <section class="cx-find">
+      <h2 class="cu-h">找客人</h2>
+      <input id="cq" type="search" placeholder="打名字找客人" aria-label="找客人" autocomplete="off" autocorrect="off" spellcheck="false">
+      <div class="list" id="c-list"><div class="empty">正在读取…</div></div>
+    </section>
   </main>
 
   <main id="fin-view" hidden>
@@ -3103,7 +3104,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   /* 「什么时候」：不知道哪天就不定（2026-11-18 Bowen：有的客人不知道几号跟进）；常用的几个一点就行，选日期才弹日历 */
   const WHEN = [["", "不定"], ["1", "明天"], ["3", "3 天后"], ["7", "一周后"], ["14", "两周后"]];
   function whenHtml(cur, opts) {
-    const o = opts || {}, list = (o.rhythm ? [["r", "按他的节奏（" + o.rhythm + " 天后）"]] : []).concat(WHEN.filter((w) => !(o.noNone && w[0] === "")));
+    const o = opts || {}, list = o.only || (o.rhythm ? [["r", "按他的节奏（" + o.rhythm + " 天后）"]] : []).concat(WHEN.filter((w) => !(o.noNone && w[0] === "")));
     const pick = cur ? "d" : o.def != null ? o.def : "";
     return '<div class="field"><span class="lbl">' + (o.label || "什么时候再找他") + '</span><div class="chips" id="f-when" role="radiogroup" aria-label="什么时候">' +
       list.map(([v, t]) => '<label class="chip"><input type="radio" name="f-whenr" value="' + v + '"' + (pick === v ? " checked" : "") + "> " + t + "</label>").join("") +
@@ -3120,10 +3121,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
   }
   /* 跟进的四个按钮（2026-11-21 Bowen：跟进很难用 → 每一条点开才出按钮，就这四个；「已发信息」并进「联系过了」） */
   const fuButtons = (x) => x.src === "a"
-    ? '<button class="btn small primary" type="button" data-au-resv="' + esc(x.id) + '">记预定</button><button class="btn small" type="button" data-au-later="' + esc(x.id) + '">联系过了</button>' +
-      '<button class="btn small" type="button" data-au-off="' + esc(x.id) + '">不用跟了</button><button class="btn small ghost" type="button" data-cu-edit="' + esc(x.id) + '">改</button>'
-    : '<button class="btn small primary" type="button" data-fu-resv="' + esc(x.id) + '">记预定</button><button class="btn small" type="button" data-fu-later="' + esc(x.id) + '" data-k="' + x.src + '">联系过了</button>' +
-      '<button class="btn small" type="button" data-fu-done="' + esc(x.id) + '">不用跟了</button>' + (x.src === "f" ? '<button class="btn small ghost" type="button" data-fu-edit="' + esc(x.id) + '">改</button>' : '<button class="btn small ghost" type="button" data-edit-order="' + esc(x.id) + '">改</button>');
+    ? '<button class="btn small primary" type="button" data-au-resv="' + esc(x.id) + '">记预定</button><button class="btn small" type="button" data-au-later="' + esc(x.id) + '">过几天</button>' +
+      '<button class="btn small" type="button" data-au-off="' + esc(x.id) + '">不跟了</button><button class="btn small ghost" type="button" data-cu-edit="' + esc(x.id) + '">改</button>'
+    : '<button class="btn small primary" type="button" data-fu-resv="' + esc(x.id) + '">记预定</button><button class="btn small" type="button" data-fu-later="' + esc(x.id) + '" data-k="' + x.src + '">过几天</button>' +
+      '<button class="btn small" type="button" data-fu-done="' + esc(x.id) + '">不跟了</button>' + (x.src === "f" ? '<button class="btn small ghost" type="button" data-fu-edit="' + esc(x.id) + '">改</button>' : '<button class="btn small ghost" type="button" data-edit-order="' + esc(x.id) + '">改</button>');
   /* ---------- 按客人的节奏自动提醒（2026-11-18 Bowen：「这个客人很热情，每几天来一次」——时间到了 App 自己提醒我）----------
      节奏 = 你在客户资料里设的「大概多久买一次」，没设就按他自己的记录：买过 2 天以上的，相邻两次隔几天取中位数（最少 3 天）。
      拿真实记录回测（11-18）：照每个人自己的中位数猜下一次，10 次里 6 次差 2 天以内；照所有人的平均（8 天）只有 4 次。
@@ -3172,17 +3173,17 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const o = kind === "o" ? S.orders.find((x) => x.id === id) : null, f = kind === "f" ? S.followups.find((x) => x.id === id) : null;
     const c = kind === "a" ? customerBook().find((x) => x.id === id) : null, r = c ? rhythmOf(c) : null;
     const who = (o || f || c || {}).customer || (c && c.name) || "这位客人", prev = (o ? o.follow_up.touches : f ? f.touches : c && c.p.touches) || [];
-    openSheet("联系过了 · " + who,
-      '<div class="field"><label for="f-lwhat">这次怎么说的（可不填）</label><div class="chips" id="f-lwq">' + ["发了信息没回", "他说过几天", "他说下周", "现在不要"].map((t) => '<button type="button" class="chip" data-lw="' + t + '">' + t + "</button>").join("") + '</div><input id="f-lwhat" placeholder="或者自己写"></div>' +
-      whenHtml("", r ? { rhythm: r.every, def: "r", noNone: true, label: "下次哪天再找他" } : { def: "3", label: "下次哪天再找他" }) +
+    openSheet("过几天 · " + who,
+      '<div class="field"><label for="f-lwhat">他怎么说的（可不填）</label><div class="chips" id="f-lwq">' + ["他说过几天", "他说下周", "现在不要", "没回"].map((t) => '<button type="button" class="chip" data-lw="' + t + '">' + t + "</button>").join("") + '</div><input id="f-lwhat" placeholder="或者自己写"></div>' +
+      whenHtml("", { only: WHEN_SHORT, def: "3", label: "哪天再找他" }) +
       (prev.length ? '<p class="hint">之前：' + prev.slice(-3).reverse().map((t) => esc(fmtD(t.date) + (t.what ? " " + t.what : ""))).join("；") + "</p>" : ""),
       async () => {
         needDb();
-        const date = readWhen(r && r.every), touch = { date: today(), what: $("f-lwhat").value.trim() || "联系过了" }, touches = prev.concat([touch]).slice(-20);
+        const date = readWhen(), touch = { date: today(), what: $("f-lwhat").value.trim() || "联系过了" }, touches = prev.concat([touch]).slice(-20);
         if (o) await db.doc("orders/" + id).update({ follow_up: Object.assign({}, o.follow_up, { date, contacted_at: null, touches }) });
         else if (f) await db.doc("followups/" + id).update({ date, contacted_at: null, touches });
         else await custPatch(c, { next: date, touches });
-        return "好，" + (date ? fmtD(date) + " 再提醒你找 " + who : "先不定日期，" + who + " 留在跟进列表里") + "。";
+        return "好，" + (date ? fmtD(date) + " 再提醒你找 " + who : "先不定日期") + "。";
       }, () => { wireWhen(); $("f-lwq").addEventListener("click", (e) => { const b = e.target.closest("[data-lw]"); if (!b) return; $("f-lwhat").value = b.dataset.lw; $("f-lwq").querySelectorAll(".chip").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); }); }, { focus: false });
   }
   function followUpForm(id, preName) {
@@ -3194,16 +3195,16 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<p class="hint" id="f-cust-hint" hidden></p>' +
       '<div class="field"><label>想要的口味（可以不选）</label></div><div id="f-lines"></div>' +
       '<div><button type="button" class="btn ghost small" id="f-addline">+ 再加一种</button></div>' +
-      '<div class="field"><label for="f-funote">跟进什么</label><input id="f-funote" placeholder="比如：葡萄冰没货了，到货告诉他" value="' + esc((f && f.note) || "") + '"></div>' +
-      whenHtml((f && f.date) || "", { def: "", label: "哪天跟进（不知道就不定）" }) +
-      '<p class="hint">口味到货后，跟进列表会显示「到货了」，提醒你去找他。不定日期的一直留在列表里。</p>';
+      '<div class="field"><label for="f-funote">备注（可不填）</label><input id="f-funote" placeholder="比如：他要两盒" value="' + esc((f && f.note) || "") + '"></div>' +
+      whenHtml((f && f.date) || "", { def: "", label: "哪天找他（等到货就不定）" }) +
+      '<p class="hint">想要的口味都到货那天，他会出现在「客户 · 要找」里。</p>';
     function addLine(sku, qty) {
       const k = n++, row = document.createElement("div");
       row.className = "line"; row.dataset.line = k;
       row.innerHTML = pickerHtml(k, sku) + '<input id="f-qty-' + k + '" type="number" min="1" step="1" inputmode="numeric" value="' + (qty || 1) + '" aria-label="数量"><span></span><button type="button" class="btn ghost small" data-rm="' + k + '" aria-label="删掉这一行">×</button>';
       $("f-lines").append(row);
     }
-    openSheet(f ? "改跟进" : "记跟进", html, async () => {
+    openSheet(f ? "改要找的人" : "记要找的人", html, async () => {
       needDb();
       const name = $("f-cust").value.trim(); if (!name) throw userError("写一下客户名字。");
       const wants = [];
@@ -3213,10 +3214,10 @@ details.restock > summary::-webkit-details-marker { display: none; }
         if (ex) ex.qty += q; else wants.push({ sku, name: (itemBy(sku) || {}).name || sku, qty: q });
       }
       const note = $("f-funote").value.trim();
-      if (!wants.length && !note) throw userError("选一下他想要的口味，或者写一下要跟进什么。");
+      if (!wants.length && !note) throw userError("选一下他想要的口味，或者写一句备注。");
       const fid = f ? f.id : rid("fu");
       await db.collection("followups").doc(fid).set(Object.assign({ customer: name, wants, note, date: readWhen(), suburb: (f && f.suburb) || null, done: false, created_at: (f && f.created_at) || new Date().toISOString() }, f && f.contacted_at ? { contacted_at: f.contacted_at } : {}, f && f.touches ? { touches: f.touches } : {}));
-      return f ? "跟进已更新。" : "已记下：" + name + (wants.length ? " 想要 " + wantsText(wants) : "") + "。在「客户」和「财务」的跟进列表里都能看到。";
+      return f ? "已更新。" : "已记下：" + name + (wants.length ? " 想要 " + wantsText(wants) : "") + "。" + (wants.length && !wantsStock(wants).every((w) => w.ok) ? "到货那天会出现在「要找」里。" : "");
     }, () => {
       const pre = (f && f.wants) || [];
       if (pre.length) pre.forEach((w) => addLine(w.sku, w.qty)); else addLine("");
@@ -3226,7 +3227,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       wireCust(null); wireWhen();
     });
   }
-  $("cu-fu-new").addEventListener("click", () => followUpForm(null, ""));
+  $("hd-fu").addEventListener("click", () => followUpForm(null, ""));
 
   /* follow-up buttons, shared by the finance list and the customer page */
   function followUpClick(e) {
@@ -3249,14 +3250,20 @@ details.restock > summary::-webkit-details-marker { display: none; }
     };
     const x = o || f, who = x.customer || "这位客人";
     if (t.dataset.fuSent) patch({ contacted_at: today(), touches: ((x.follow_up || x).touches || []).concat([{ date: today(), what: "发了信息" }]).slice(-20) }, "已记下：给" + who + "发过信息了，等他回复。");
-    else if (t.dataset.fuDone) patch({ done: true, done_at: new Date().toISOString() }, who + " 不在跟进列表里了。");
+    else if (t.dataset.fuDone) patch({ done: true, done_at: new Date().toISOString() }, "好，不跟 " + who + " 了。");
     else saleForm(f ? (f.wants || []).map((w) => ({ sku: w.sku, qty: w.qty })) : [], true, () => patch({ done: true, done_at: new Date().toISOString() }, ""), { customer: x.customer, suburb: x.suburb, source: o ? "回头客" : "" });
     return true;
   }
-  $("td-strip").addEventListener("click", () => { location.hash = "#customers"; });
   $("fu-list").addEventListener("click", (e) => {
-    const q = e.target.closest("[data-td-copy],[data-td-sent],[data-td-unsent]");
-    if (q) { e.preventDefault(); if (q.dataset.tdCopy) tdCopy(q.dataset.tdCopy); else if (q.dataset.tdSent) tdSent(q.dataset.tdSent); else tdSent(q.dataset.tdUnsent, true); return; }
+    const q = e.target.closest("button"); if (!q) return;
+    const d = q.dataset, x = TD[d.tdCopy || d.tdSent || d.tdUnsent || d.tdLater || d.tdDate || d.tdOff || d.tdWho];
+    if (d.tdCopy) { tdCopy(d.tdCopy); return; }
+    if (d.tdSent) { tdSent(d.tdSent); return; }
+    if (d.tdUnsent) { tdSent(d.tdUnsent, true); return; }
+    if (d.tdLater) { if (x) laterForm(x.src, x.id); return; }
+    if (d.tdDate) { tdDate(d.tdDate); return; }
+    if (d.tdOff) { arm(q, "确定不跟了？", () => tdOff(d.tdOff)); return; }
+    if (d.tdWho) { if (x && x.c) custSheet(x.c.id); else if (x && x.src === "f") followUpForm(x.id); return; }
     if (followUpClick(e)) return;
     const t = e.target.closest("[data-edit-order]"); if (t) orderEditForm(t.dataset.editOrder);
   });
@@ -5506,7 +5513,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   const custId = (name) => "c_" + Array.from(normName(name)).map((ch) => (/[a-z0-9]/.test(ch) ? ch : "-" + ch.codePointAt(0).toString(16) + "-")).join("");
   const daysAgo = (d) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || ""); if (!m) return null; const t = new Date(); return Math.round((new Date(t.getFullYear(), t.getMonth(), t.getDate()) - new Date(+m[1], +m[2] - 1, +m[3])) / 864e5); };
   const agoText = (d) => { const n = daysAgo(d); return n == null ? "" : n <= 0 ? "今天" : n === 1 ? "昨天" : n + " 天前"; };
-  let custSort = "recent", custQuery = "", openCust = null;
+  let custQuery = "";
   const BOX_MIN = 8, BOX_EVERY = 14; // 一单 8 根以上算重点；没有自己的节奏的，买完两周后提醒（真实记录：用得最快的一天 0.5 根左右，一盒 3 周左右用完）
   function customerBook() {
     const P = {}; for (const p of S.customers) P[p.id] = p;
@@ -5528,55 +5535,50 @@ details.restock > summary::-webkit-details-marker { display: none; }
         enq: S.followups.filter((x) => x.kind !== "ask" && x.customer && custId(x.customer) === c.id).sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")) };
     });
   }
+  /* 找客人（2026-11-24 客户页重做）：没打字时列最近的 8 个，打字就搜；点一下弹出他的资料（以前整页列出所有客户、统计、5 个筛选标签） */
+  const CX_RECENT = 8;
   function renderCustomers() {
-    $("c-sort").querySelectorAll(".chip").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.cs === custSort)));
     if (!S.loaded) { $("c-list").innerHTML = '<div class="empty">正在读取…</div>'; return; }
-    const all = customerBook(), buyers = all.filter((c) => c.paid.length), rep = buyers.filter((c) => c.paid.length >= 2).length;
-    $("c-n").textContent = buyers.length; $("c-rep").textContent = rep;
-    $("c-rate").textContent = buyers.length ? Math.round((rep / buyers.length) * 100) + "%" : "–";
-    $("c-avg").textContent = buyers.length ? money(r2(buyers.reduce((a, c) => a + c.spent, 0) / buyers.length)) : "–";
-    const noName = S.orders.filter((o) => !isReserved(o) && (o.lines || []).length && !String(o.customer || "").trim() && !isPartner(o)).length;
-    $("c-noname").hidden = !noName;
-    $("c-noname").textContent = "还有 " + noName + " 单没写客户名字，没算进来。到财务里点那一单的「编辑」可以补上。";
-    const ql = custQuery.trim().toLowerCase();
-    let list = all.filter((c) => !ql || [c.name, c.suburb, c.source, c.p.contact, c.p.note, c.flavours.map((f) => f[0]).join(" "), c.orders.map((o) => o.note).join(" ")].join(" ").toLowerCase().includes(ql));
-    if (custSort === "fu") list = list.filter((c) => c.fu);
-    if (custSort === "ws") list = list.filter((c) => c.p.type === "wholesale");
-    if (custSort === "vip") list = list.filter((c) => c.vip);
+    const all = customerBook(), ql = custQuery.trim().toLowerCase();
     const lastAct = (c) => [c.last || "", ((c.enq[0] || {}).created_at || "").slice(0, 10)].sort().pop();
-    /* 重点客户：最久没买的在最上面（该去问了） */
-    list.sort(custSort === "spent" ? (a, b) => b.spent - a.spent || lastAct(b).localeCompare(lastAct(a)) : custSort === "vip" ? (a, b) => (a.last || "").localeCompare(b.last || "") || b.box - a.box : (a, b) => lastAct(b).localeCompare(lastAct(a)) || b.spent - a.spent);
-    if (!list.length) { $("c-list").innerHTML = '<div class="empty">' + (custSort === "ws" && !ql ? "还没有批发客户。点开一个客户，在「编辑资料」里选「批发」。" : custSort === "fu" && !ql ? "现在没有要跟进的客户。" : custSort === "vip" && !ql ? "还没有重点客户：一次买过 " + BOX_MIN + " 根以上的零售客会自动算进来，也可以在客户资料里勾「重点客户」。" : all.length ? "没有符合的客户。" : "还没有客户。记单时在「客户」一栏写上名字，这里就会出现。") + "</div>"; return; }
-    $("c-list").innerHTML = list.map((c) => {
-      const open = openCust === c.id, f = c.fu, n = c.paid.length, cb = custBal(c.name);
-      const pills = (c.p.type === "wholesale" ? '<span class="tag">批发</span>' : c.vip ? '<span class="tag tag-vip">重点</span>' : '<span class="tag" style="background:var(--line);color:var(--muted)">零售</span>') + (c.place ? '<span class="tag-pl">' + esc(c.place) + "</span>" : "") + (cb.amt ? '<span class="pill ' + (cb.amt > 0 ? "warn" : "ok") + '">' + (cb.amt > 0 ? "少给你 " : "多给了 ") + money(Math.abs(cb.amt)) + "</span>" : "") + (n >= 2 ? '<span class="pill">回头客 · ' + n + " 次</span>" : "") + (c.resv.length ? '<span class="pill warn">有预定</span>' : "") + (f ? '<span class="pill ' + (f.restocked ? "" : f.contacted_at ? "na" : "warn") + '">' + (f.restocked ? "到货了" : f.contacted_at ? "等回复" : "要跟进") + "</span>" : "");
-      const sub = [custSort === "vip" && c.box ? "一次最多 " + c.box + " 根" : "", n ? "买过 " + n + " 次、" + c.qty + " 根" : c.enq.length ? "问过 " + c.enq.length + " 次，还没成交" : "还没成交", c.last ? "上次 " + fmtD(c.last) + "（" + agoText(c.last) + "）" : ""].filter(Boolean).join(" · ");
-      const balNote = (o) => balOf(o).map((e) => (e.kind === "diff" ? (e.amt > 0 ? "少给 " : "多给 ") + money(Math.abs(e.amt)) + (e.gift ? "" : "（下次核对）") : e.kind === "back" ? (e.amt < 0 ? "收回 " : "抵掉 ") + money(Math.abs(e.amt)) : "不追了 " + money(Math.abs(e.amt))) + (e.why && e.kind === "diff" ? "：" + e.why : "")).join("；");
-      /* 买过什么（2026-11-18 Bowen：格式太乱）→ 跟合伙人对账单一样：日期一行，下面每个系列几根，再下面每个口味竖着排 */
-      const hist = c.orders.map((o) => { const t = orderTotal(o), g = {};
-        for (const l of o.lines || []) { const it = itemBy(l.sku), sr = seriesOf(it); (g[sr] = g[sr] || []).push({ k: isGeneric(it) ? "（口味没记）" : nm(l.sku, l.name), q: Number(l.qty) || 0 }); }
-        const srs = Object.keys(g).sort((a, b) => serRank(a) - serRank(b) || a.localeCompare(b));
-        return '<div class="ch-o"><div class="ch-d"><span>' + fmtD(o.date) + (isReserved(o) ? ' <span class="tag-resv">预定</span>' : "") + "</span><b>" + (t == null ? "未填价" : money(t)) + "</b></div>" +
-          srs.map((sr) => { const ls = g[sr], n = ls.reduce((a, x) => a + x.q, 0); return '<div class="ch-s"><b>' + esc(sr) + "</b><b>" + n + " 根</b></div>" + ls.map((x) => '<div class="ch-l"><span>' + esc(x.k) + "</span><span>×" + x.q + "</span></div>").join(""); }).join("") +
-          (!(o.lines || []).length && o.delivery_fee ? '<div class="ch-l"><span>只收配送费</span><span></span></div>' : "") +
-          (o.note ? '<p class="ch-n">' + esc(o.note) + "</p>" : "") + (balOf(o).length ? '<p class="ch-n bal-note">' + esc(balNote(o)) + "</p>" : "") + "</div>"; }).join("");
-      const rh = rhythmOf(c), serAll = serTxt(serQty(c.paid));
-      return '<div class="row"><div class="row-top cu-top">' +
-        '<button class="row-main" type="button" data-cu="' + esc(c.id) + '" aria-expanded="' + open + '"><span class="cu-name"><span class="name">' + esc(c.name) + "</span>" + pills + "</span>" +
-          '<span class="dates">' + esc(sub) + "</span>" + (c.p.note ? '<span class="notes">' + esc(c.p.note) + "</span>" : "") + "</button>" +
-        '<span class="cu-side"><span class="cu-amt">' + (n ? money(c.spent) : "–") + "</span></span></div>" +
-        '<div class="detail"' + (open ? "" : " hidden") + ">" +
-          '<div class="meta">' + (c.p.contact ? "<span>联系 <b>" + esc(c.p.contact) + "</b></span>" : "") + (callTxt(c.call) ? "<span>一般 <b>" + esc(callTxt(c.call)) + "</b> 联系</span>" : "") +
-            (serAll ? "<span>一共 <b>" + esc(serAll) + "</b></span>" : "") + (n ? "<span>平均每次 <b>" + money(r2(c.spent / n)) + "</b></span>" : "") +
-            (rhythmTxt(rh) ? "<span>" + esc(rh.off ? "不自动提醒" : rhythmTxt(rh)) + (rh.every && !rh.off && rh.last ? "，下次大概 <b>" + fmtD(addDays(rh.last, rh.every)) + "</b>" : "") + "</span>" : "") + "</div>" +
-          (cb.amt ? '<div class="bal-old' + (cb.amt > 0 ? "" : " due") + '"><p><b>' + (cb.amt > 0 ? "上次少给你 " : "上次多给了你 ") + money(Math.abs(cb.amt)) + "</b>：" + esc(balWhy(cb)) + '</p><p><small>下次跟 ' + esc(c.name) + " 记单时会提醒你" + (cb.amt > 0 ? "收回来" : "少收") + '。</small> <button class="linkbtn" type="button" data-cu-waive="' + esc(c.id) + '">不追了</button></p></div>' : "") +
-          (f ? '<div class="cu-fu' + (f.contacted_at && !f.restocked ? " wait" : "") + '"><span>' + (f.restocked ? "到货了 · " : "") + fuWhen(f) + (f.note ? "：" + esc(f.note) : "") + "</span>" +
-            (f.wants.length ? "<span>想要：" + wantsHtml(f.wants) + "</span>" : "") +
-            '<span class="row-actions">' + fuButtons(f) + "</span></div>" : "") +
-          '<div class="row-actions"><button class="btn small primary" type="button" data-cu-sale="' + esc(c.id) + '">记一单</button><button class="btn small" type="button" data-cu-resv="' + esc(c.id) + '">记预定</button><button class="btn small" type="button" data-cu-fu="' + esc(c.id) + '">记跟进</button><button class="btn small ghost" type="button" data-cu-edit="' + esc(c.id) + '">编辑资料</button></div>' +
-          (hist ? '<div class="cu-hist2">' + hist + "</div>" : "") +
-        "</div></div>";
-    }).join("");
+    let list = all.filter((c) => !ql || [c.name, c.suburb, c.place, c.p.contact, c.p.note, c.flavours.map((f) => f[0]).join(" ")].join(" ").toLowerCase().includes(ql));
+    list.sort((a, b) => lastAct(b).localeCompare(lastAct(a)) || b.spent - a.spent);
+    const more = ql ? Math.max(0, list.length - 40) : Math.max(0, list.length - CX_RECENT);
+    list = list.slice(0, ql ? 40 : CX_RECENT);
+    if (!list.length) { $("c-list").innerHTML = '<div class="empty">' + (all.length ? "没找到。" : "还没有客户。记单时写上客户名字，这里就会出现。") + "</div>"; return; }
+    $("c-list").innerHTML = list.map((c) => { const n = c.paid.length, cb = custBal(c.name);
+      return '<button class="cx-c" type="button" data-cu="' + esc(c.id) + '"><b>' + esc(c.name) + "</b><span>" + esc([c.last ? "上次 " + fmtD(c.last) : "", n ? "买过 " + n + " 次" : c.enq.length ? "问过，还没成交" : ""].filter(Boolean).join(" · ")) + "</span>" +
+        (c.resv.length ? '<span class="pill warn">有预定</span>' : "") + (cb.amt ? '<span class="pill ' + (cb.amt > 0 ? "warn" : "ok") + '">' + (cb.amt > 0 ? "少给你 " : "多给了 ") + money(Math.abs(cb.amt)) + "</span>" : "") + "<i>›</i></button>"; }).join("") +
+      (more ? '<p class="cx-none">' + (ql ? "还有 " + more + " 个，再多打几个字。" : "还有 " + more + " 个客户，打名字找。") + "</p>" : "");
+  }
+  /* 一个客人的资料：买过什么、记一单 / 记预定 / 记跟进 / 编辑资料（以前在客户列表里点开） */
+  function custSheet(id) {
+    const c = customerBook().find((x) => x.id === id); if (!c) return;
+    const f = c.fu, n = c.paid.length, cb = custBal(c.name);
+    const pills = (c.p.type === "wholesale" ? '<span class="tag">批发</span>' : "") + (c.place ? '<span class="tag-pl">' + esc(c.place) + "</span>" : "") + (n >= 2 ? '<span class="pill">回头客 · ' + n + " 次</span>" : "") + (c.resv.length ? '<span class="pill warn">有预定</span>' : "");
+    const balNote = (o) => balOf(o).map((e) => (e.kind === "diff" ? (e.amt > 0 ? "少给 " : "多给 ") + money(Math.abs(e.amt)) + (e.gift ? "" : "（下次核对）") : e.kind === "back" ? (e.amt < 0 ? "收回 " : "抵掉 ") + money(Math.abs(e.amt)) : "不追了 " + money(Math.abs(e.amt))) + (e.why && e.kind === "diff" ? "：" + e.why : "")).join("；");
+    /* 买过什么：跟合伙人对账单一样，日期一行，下面每个系列几根，再下面每个口味竖着排 */
+    const hist = c.orders.map((o) => { const t = orderTotal(o), g = {};
+      for (const l of o.lines || []) { const it = itemBy(l.sku), sr = seriesOf(it); (g[sr] = g[sr] || []).push({ k: isGeneric(it) ? "（口味没记）" : nm(l.sku, l.name), q: Number(l.qty) || 0 }); }
+      const srs = Object.keys(g).sort((a, b) => serRank(a) - serRank(b) || a.localeCompare(b));
+      return '<div class="ch-o"><div class="ch-d"><span>' + fmtD(o.date) + (isReserved(o) ? ' <span class="tag-resv">预定</span>' : "") + "</span><b>" + (t == null ? "未填价" : money(t)) + "</b></div>" +
+        srs.map((sr) => { const ls = g[sr], q = ls.reduce((a, x) => a + x.q, 0); return '<div class="ch-s"><b>' + esc(sr) + "</b><b>" + q + " 根</b></div>" + ls.map((x) => '<div class="ch-l"><span>' + esc(x.k) + "</span><span>×" + x.q + "</span></div>").join(""); }).join("") +
+        (!(o.lines || []).length && o.delivery_fee ? '<div class="ch-l"><span>只收配送费</span><span></span></div>' : "") +
+        (o.note ? '<p class="ch-n">' + esc(o.note) + "</p>" : "") + (balOf(o).length ? '<p class="ch-n bal-note">' + esc(balNote(o)) + "</p>" : "") + "</div>"; }).join("");
+    const rh = rhythmOf(c), serAll = serTxt(serQty(c.paid));
+    const html = (pills ? '<div class="cs-pills">' + pills + "</div>" : "") + (c.p.note ? '<p class="notes">' + esc(c.p.note) + "</p>" : "") +
+      '<div class="meta">' + (c.p.contact ? "<span>联系 <b>" + esc(c.p.contact) + "</b></span>" : "") + (callTxt(c.call) ? "<span>一般 <b>" + esc(callTxt(c.call)) + "</b> 联系</span>" : "") +
+        (n ? "<span>买过 <b>" + n + " 次、" + c.qty + " 根</b>，一共 " + money(c.spent) + "</span>" : "<span>还没成交</span>") + (serAll ? "<span><b>" + esc(serAll) + "</b></span>" : "") +
+        (rh.every && !rh.off && !rh.boxDef ? "<span>" + esc(rhythmTxt(rh)) + "</span>" : rh.off ? "<span>不自动提醒</span>" : "") + "</div>" +
+      (cb.amt ? '<div class="bal-old' + (cb.amt > 0 ? "" : " due") + '"><p><b>' + (cb.amt > 0 ? "上次少给你 " : "上次多给了你 ") + money(Math.abs(cb.amt)) + "</b>：" + esc(balWhy(cb)) + '</p><p><small>下次跟 ' + esc(c.name) + " 记单时会提醒你" + (cb.amt > 0 ? "收回来" : "少收") + '。</small> <button class="linkbtn" type="button" data-cu-waive="' + esc(c.id) + '">不追了</button></p></div>' : "") +
+      (f ? '<div class="cu-fu' + (f.contacted_at && !f.restocked ? " wait" : "") + '"><span>' + (f.restocked ? "到货了 · " : "") + fuWhen(f) + (f.note ? "：" + esc(f.note) : "") + "</span>" +
+        (f.wants.length ? "<span>想要：" + wantsHtml(f.wants) + "</span>" : "") + '<span class="row-actions">' + fuButtons(f) + "</span></div>" : "") +
+      '<div class="row-actions"><button class="btn small primary" type="button" data-cu-sale="' + esc(c.id) + '">记一单</button><button class="btn small" type="button" data-cu-resv="' + esc(c.id) + '">记预定</button>' + (f ? "" : '<button class="btn small" type="button" data-cu-fu="' + esc(c.id) + '">记要找</button>') + '<button class="btn small ghost" type="button" data-cu-edit="' + esc(c.id) + '">编辑资料</button></div>' +
+      (hist ? '<div class="cu-hist2">' + hist + "</div>" : "");
+    openSheet(c.name, html, null, () => {
+      $("sheet-save").hidden = true; const cl = $("sheet-form").querySelector("[data-close]"); if (cl) cl.textContent = "关闭";
+      sheetOn("click", (e) => { if (followUpClick(e)) return; const b = e.target.closest("button"); if (b) custAct(b); });
+    }, { focus: false });
   }
   function customerForm(id) {
     const c = customerBook().find((x) => x.id === id); if (!c) return;
@@ -5592,7 +5594,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
       '<div class="field"><label for="f-cnote">关于这个人</label><textarea id="f-cnote" rows="3" placeholder="比如：很热情，买得多，只收现金">' + v("note") + "</textarea></div>" +
       (() => { const r = rhythmOf(c), cur = p.every == null ? "" : String(p.every), opts = [["", "按他的记录" + (r.med != null ? "（大概 " + Math.max(3, Math.round(r.med)) + " 天）" : "（还看不出来）")], ["3", "每 3 天"], ["7", "每周"], ["14", "每两周"], ["30", "每月"], ["0", "不用提醒"]];
         const known = opts.some((o) => o[0] === cur);
-        return '<div class="field"><span class="lbl">大概多久买一次（到时候在「要联系的客户」里提醒你）</span><div class="chips" id="f-every" role="radiogroup" aria-label="大概多久买一次">' +
+        return '<div class="field"><span class="lbl">大概多久买一次（到时候在「客户 · 要找」里提醒你）</span><div class="chips" id="f-every" role="radiogroup" aria-label="大概多久买一次">' +
           opts.map(([v2, t]) => '<label class="chip"><input type="radio" name="f-everyr" value="' + v2 + '"' + (cur === v2 ? " checked" : "") + "> " + t + "</label>").join("") +
           '<label class="chip"><input type="radio" name="f-everyr" value="n"' + (known ? "" : " checked") + '> 自己填</label></div>' +
           '<input id="f-everyn" type="number" min="1" step="1" inputmode="numeric" placeholder="几天" aria-label="每几天" value="' + (known ? "" : esc(cur)) + '"' + (known ? " hidden" : "") + "></div>"; })() +
@@ -5612,25 +5614,22 @@ details.restock > summary::-webkit-details-marker { display: none; }
         return "已保存 " + c.name + " 的资料。";
       }, () => { $("f-every").addEventListener("change", () => { const n = $("f-everyn"); n.hidden = (document.querySelector('input[name="f-everyr"]:checked') || {}).value !== "n"; if (!n.hidden) n.focus(); }); });
   }
-  $("c-list").addEventListener("click", (e) => {
-    if (followUpClick(e)) return;
-    const b = e.target.closest("button"); if (!b) return;
+  $("c-list").addEventListener("click", (e) => { const b = e.target.closest("[data-cu]"); if (b) custSheet(b.dataset.cu); });
+  function custAct(b) {
     const c = () => customerBook().find((x) => x.id === (b.dataset.cuSale || b.dataset.cuResv));
-    if (b.dataset.cu) { openCust = openCust === b.dataset.cu ? null : b.dataset.cu; renderCustomers(); const again = document.querySelector('[data-cu="' + CSS.escape(b.dataset.cu) + '"]'); if (again) again.focus(); }
-    else if (b.dataset.cuEdit) customerForm(b.dataset.cuEdit);
+    if (b.dataset.cuEdit) customerForm(b.dataset.cuEdit);
     else if (b.dataset.cuWaive) {
       /* 不追了：在他最后一单上记一笔 waive 把差额清掉（钱的数字不变） */
       const x = customerBook().find((y) => y.id === b.dataset.cuWaive), cb = x && custBal(x.name);
       if (!cb || !cb.amt || !cb.last) return;
       if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "确定不追了？再点一下"; setTimeout(() => { if (b.isConnected) { delete b.dataset.sure; b.textContent = "不追了"; } }, 4000); return; } // 不用浏览器的确认框（iPhone 上会卡住页面）
-      (async () => { try { needDb(); await db.doc("orders/" + cb.last.id).update({ bal: balOf(cb.last).concat([{ amt: r2(-cb.amt), why: "不追了", kind: "waive", date: today() }]) }); toast("好，" + x.name + " 的不再提醒。"); } catch (e) { toast(e.userMsg || errText(e)); } })();
+      (async () => { try { needDb(); await db.doc("orders/" + cb.last.id).update({ bal: balOf(cb.last).concat([{ amt: r2(-cb.amt), why: "不追了", kind: "waive", date: today() }]) }); closeSheet(); toast("好，" + x.name + " 的不再提醒。"); } catch (e) { toast(e.userMsg || errText(e)); } })();
     }
     else if (b.dataset.cuFu) { const x = customerBook().find((y) => y.id === b.dataset.cuFu); if (x) followUpForm(null, x.name); }
     else if (b.dataset.editOrder) orderEditForm(b.dataset.editOrder);
     else if (b.dataset.cuSale || b.dataset.cuResv) { const x = c(); if (x) saleForm([], !!b.dataset.cuResv, null, { customer: x.name, suburb: x.suburb, source: x.paid.length ? "回头客" : x.source }); }
-  });
+  }
   $("cq").addEventListener("input", (e) => { custQuery = e.target.value; renderCustomers(); });
-  $("c-sort").addEventListener("click", (e) => { const ch = e.target.closest("[data-cs]"); if (!ch) return; custSort = ch.dataset.cs; renderCustomers(); });
 
   /* ---------- data health check: records that should move together but don't (no transactions, so a write can half-finish) ---------- */
   function healthIssues() {
@@ -5709,79 +5708,73 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const g = dayGap(today(), d), WDN = "日一二三四五六";
     return g < 0 ? ["已过 " + -g + " 天", " late"] : g === 0 ? ["今天", " now"] : g === 1 ? ["明天", ""] : g === 2 ? ["后天", ""] : [fmtD(d) + " 周" + WDN[new Date(d + "T12:00:00").getDay()], ""];
   }
-  /* ---------- 今天找谁（2026-11-23 Bowen 同意「今天」首页）----------
-     以前「要联系的客户」按日期排、谁到日子就列谁，一天能冒出 30 个，重点标签人人都有等于没有。现在 App 自己挑最多 5 个，按「可能带来多少钱」排：
-     可能性 × 他平时一单多少钱。可能性拿真实记录回测（11-23 数据，154 个客人、205 单；每一天只用那天以前的记录，看之后 7 天有没有下单）：
-       只买过一次、买了 1–4 根：第 7–13 天 21%；5–7 根：9%（手上还有货，晚点再问：第 10–20 天）；8 根以上：0/33（第 14–28 天，4%）
-       买过 2 天：到他上次的间隔 24%；3 天以上：到他自己的节奏 50%；你在资料里设了多久一次：40%；约好今天再问：40%
-       手动记的跟进：到日子 50%、想要的口味到货了 60%、没定日子的 30%
-     发了 → 3 天内不再列（「等回复」）；3 天没下单再列一次（可能性减半）；问过两次还没买 → 这一轮不再列，等他下次买了重新算。
-     下单 / 有预定的不列。复制消息：英文（名字里有中文就写中文），写他常买、现在有货的口味和见面地点 */
-  const TD_MAX = 5, TD_SENT = "发了信息";
+  /* ---------- 客户页：今天要找谁（2026-11-24 Bowen：客户板块重做，只留三种情况）----------
+     要找 = 今天该联系的人，只有三种：
+       到货了：你记过他想要的口味，现在都有货了
+       约好今天：他说过几天再说 / 你记了哪天找他，到日子了（没定日子的手动跟进标「你记的」）
+       该补货：买过 2 天以上的老客，按他平时多久买一次（或你在资料里设的）差不多用完了；最多 5 个，按他平时一单多少钱排
+     新客回访（只买过一次的）、买过一盒两周提醒都去掉了（Bowen 只要这三种）。
+     等回复 = 点了「发了」3 天内的；3 天没下单回到「要找」，写「11月21日 发了信息没回」。老客问过两次没买 → 这一轮不再列，等他下次买了重新算。
+     约好以后 = 往后排到以后的，按日子排，到那天自己回到「要找」。
+     下单 / 有预定的不列。「不跟了」：手动跟进 = 关掉；老客 = 记一笔「不跟了」，这一轮不再列，他下次买了重新算 */
+  const TD_SENT = "发了信息", TD_OFF = "不跟了", TD_BUY = 5;
   const touchTxt = (t) => fmtD(t.date) + " " + (t.what || "联系过");
   const atDay = (at) => { const t = new Date(at || ""); return isNaN(t) ? "" : t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0"); };
+  const CX_KIND = { arr: ["到货了", "t-arr"], due: ["约好今天", "t-due"], mine: ["你记的", "t-mine"], buy: ["该补货", "t-buy"] }, CX_ORD = { arr: 0, due: 1, mine: 2, buy: 3 };
   let TD = {};
   function todayPicks() {
     const td = today(), book = customerBook(), CB = {}; for (const c of book) CB[c.id] = c;
     const valOf = (c) => { const vs = c ? c.paid.map(orderTotal).filter((v) => v > 0) : []; return vs.length ? r2(median(vs)) : 140; };
-    const cand = {}, wait = [], later = [], busy = new Set();
-    const put = (x) => { x.score = r2(x.p * x.v); const o = cand[x.key]; if (!o || x.score > o.score) cand[x.key] = x; };
+    const find = [], buy = [], wait = [], later = [], busy = new Set();
+    /* 上次联系：发了信息、3 天没回的写「11月21日 发了信息没回」 */
+    const lastOf = (ts, sentOn) => { const lt = (ts || [])[(ts || []).length - 1]; if (!lt || !lt.date) return ""; return lt.what === TD_SENT && (!sentOn || lt.date === sentOn) && dayGap(lt.date, td) >= 3 ? fmtD(lt.date) + " 发了信息没回" : touchTxt(lt); };
     for (const f of openFUs()) {
-      const c = f.customer ? CB[custId(f.customer)] || null : null, key = (f.src === "o" ? "o:" : "f:") + f.id;
+      const c = f.customer ? CB[custId(f.customer)] || null : null;
       if (c) busy.add(c.id);
+      const x = Object.assign({}, f, { key: (f.src === "o" ? "o:" : "f:") + f.id, c, v: valOf(c), sentOn: f.contacted_at });
+      x.why = [f.wants.length ? "想要 " + wantsText(f.wants) : "", f.note].filter(Boolean).join(" · ");
       const sentAgo = f.contacted_at ? dayGap(f.contacted_at, td) : null;
-      const x = Object.assign({}, f, { key, c, v: valOf(c), sentOn: f.contacted_at });
-      /* 2026-11-24 Bowen：发了信息没回要写几号发的，好追踪 → 一律写日期（以前写「3 天前发过」） */
-      const lt = (f.touches || [])[(f.touches || []).length - 1];
-      x.why = [f.restocked ? "想要的到货了：" + wantsText(f.wants) : f.wants.length ? "想要 " + wantsText(f.wants) : "", f.note].filter(Boolean).join(" · ") || "你记的跟进";
       if (sentAgo != null && sentAgo < 3) { wait.push(x); continue; }
-      if (lt && lt.date && !(sentAgo != null && lt.what === TD_SENT && lt.date === f.contacted_at)) x.why = touchTxt(lt) + " · " + x.why; // 上次联系的日子放最前面
       if (f.date && f.date > td) { later.push(x); continue; } // 往后排到以后的：到货了也等到那天
-      const p = f.restocked ? 0.6 : f.date ? 0.5 : 0.3;
-      if (sentAgo != null) x.why = fmtD(f.contacted_at) + " 发了信息没回 · " + x.why; // 日期放最前面，长了也看得到
-      x.p = sentAgo != null ? p / 2 : p; put(x);
+      if (!f.date && f.wants.length && !f.restocked) { x.noStock = true; later.push(x); continue; } // 想要的还没到货：等到货那天自己回到「要找」
+      x.kind = f.restocked ? "arr" : f.date ? "due" : "mine";
+      if (x.kind === "due" && f.date < td) x.dueTxt = "约好 " + fmtD(f.date);
+      x.last = lastOf(f.touches, f.contacted_at);
+      find.push(x);
     }
     for (const c of book) {
       if (!c.paid.length || c.resv.length || busy.has(c.id) || c.p.every === 0) continue;
       const days = [...new Set(c.paid.map((o) => o.date).filter(Boolean))].sort(), k = days.length, last = days[k - 1], since = dayGap(last, td);
       const ts = (c.p.touches || []).filter((t) => t.date > last), lt = ts[ts.length - 1];
+      if (ts.some((t) => t.what === TD_OFF)) continue; // 这一轮不跟了
       const x = { key: "a:" + c.id, src: "a", id: c.id, customer: c.name, c, v: valOf(c), wants: [], touches: c.p.touches || [] };
-      if (c.p.next && ts.length) { // 「联系过了 · 往后排」约好的日子
-        x.date = c.p.next;
-        x.why = (c.p.next === td ? "约好今天再问" : "约好 " + fmtD(c.p.next) + " 再问") + (lt ? " · " + touchTxt(lt) : "");
+      if (c.p.next && ts.length) { // 「过几天」约好的日子
+        x.date = c.p.next; x.why = ""; // 他怎么说的在「上次联系」那一行
         if (c.p.next > td) { later.push(x); continue; }
-        x.p = 0.4; put(x); continue;
+        x.kind = "due"; if (c.p.next < td) x.dueTxt = "约好 " + fmtD(c.p.next);
+        x.last = lastOf(ts); find.push(x); continue;
       }
       if (ts.length >= 2) continue; // 问过两次没买：这一轮不再列
-      const sentAgo = lt ? dayGap(lt.date, td) : null;
-      if (sentAgo != null && sentAgo < 3) { x.sentOn = lt.date; wait.push(x); continue; }
-      const gaps = days.slice(1).map((d, i) => dayGap(days[i], d)), q = c.paid.filter((o) => o.date === last).reduce((a, o) => a + (o.lines || []).reduce((b, l) => b + (Number(l.qty) || 0), 0), 0);
-      let p = 0;
-      if (c.p.every > 0) { if (since >= c.p.every - 1) { p = 0.4; x.why = "你设的每 " + c.p.every + " 天一次 · 上次 " + since + " 天前"; } }
-      else if (k >= 3) { const g = Math.max(3, Math.round(median(gaps))); if (since >= g - 1 && since <= Math.max(30, 3 * g)) { p = 0.5; x.why = "平时 " + g + " 天左右买一次 · 上次 " + since + " 天前"; } }
-      else if (k === 2) { const g = Math.max(3, gaps[0]); if (since >= g - 1 && since <= 30) { p = 0.24; x.why = "买过 2 次 · 上次 " + since + " 天前"; } }
-      else { const [lo, hi, pp] = q <= 4 ? [7, 13, 0.21] : q < 8 ? [10, 20, 0.09] : [14, 28, 0.04]; if (since >= lo && since <= hi) { p = pp; x.why = "买过一次 " + q + " 根 · " + since + " 天前"; } }
-      if (!p) continue;
-      if (sentAgo != null) { p /= 2; x.why = (lt.what === TD_SENT ? fmtD(lt.date) + " 发了信息没回" : touchTxt(lt)) + " · " + x.why; }
-      x.p = p; put(x);
+      if (lt && lt.what === TD_SENT && dayGap(lt.date, td) < 3) { x.sentOn = lt.date; x.why = rhythmLine(c, days, since); wait.push(x); continue; }
+      const gaps = days.slice(1).map((d, i) => dayGap(days[i], d));
+      let due = false;
+      if (c.p.every > 0) due = since >= c.p.every - 1;
+      else if (k >= 3) { const g = Math.max(3, Math.round(median(gaps))); due = since >= g - 1 && since <= Math.max(30, 3 * g); }
+      else if (k === 2) { const g = Math.max(3, gaps[0]); due = since >= g - 1 && since <= 30; }
+      if (!due) continue;
+      x.kind = "buy"; x.why = rhythmLine(c, days, since); x.last = lastOf(ts); buy.push(x);
     }
-    const all = Object.values(cand).sort((a, b) => b.score - a.score || String(a.customer || "").localeCompare(String(b.customer || "")));
-    later.sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
+    buy.sort((a, b) => b.v - a.v || String(a.customer).localeCompare(String(b.customer)));
+    const all = find.concat(buy.slice(0, TD_BUY)).sort((a, b) => CX_ORD[a.kind] - CX_ORD[b.kind] || b.v - a.v || String(a.customer || "").localeCompare(String(b.customer || "")));
+    later.sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999") || String(a.customer || "").localeCompare(String(b.customer || "")));
     wait.sort((a, b) => (b.sentOn || "").localeCompare(a.sentOn || ""));
     TD = {}; for (const x of all.concat(wait, later)) TD[x.key] = x;
-    return { pick: all.slice(0, TD_MAX), more: all.slice(TD_MAX), wait, later, stat: tdStat() };
+    return { find: all, wait, later };
   }
-  /* 发了以后 7 天内有没有下单（看这个功能有没有用；满 7 天的才算） */
-  function tdStat() {
-    const td = today(), sends = [], od = {};
-    const add = (name, ts) => { if (name) for (const t of ts || []) if (t.what === TD_SENT && t.date) sends.push({ k: normName(name), date: t.date }); };
-    for (const p of S.customers) add(p.name, p.touches);
-    for (const f of S.followups) add(f.customer, f.touches);
-    for (const o of S.orders) if (o.follow_up) add(o.customer, o.follow_up.touches);
-    for (const o of S.orders) { const k = normName(o.customer || ""); if (k) (od[k] = od[k] || []).push(atDay(o.at) || o.date); }
-    let n = 0, hit = 0, pend = 0;
-    for (const s of sends) { if (dayGap(s.date, td) < 7) { pend++; continue; } n++; if ((od[s.k] || []).some((d) => d >= s.date && dayGap(s.date, d) <= 7)) hit++; }
-    return { n, hit, pend };
+  function rhythmLine(c, days, since) {
+    const k = days.length, gaps = days.slice(1).map((d, i) => dayGap(days[i], d));
+    const every = c.p.every > 0 ? "你设的每 " + c.p.every + " 天一次" : k >= 3 ? "平时 " + Math.max(3, Math.round(median(gaps))) + " 天左右买一次" : "买过 2 次";
+    return every + " · 上次 " + (since <= 0 ? "今天" : since + " 天前");
   }
   const enName = (sku) => { const i = itemBy(sku) || {}; return [i.series, i.variant || i.name || sku].filter(Boolean).join(" "); };
   const enList = (a) => a.length <= 1 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
@@ -5801,30 +5794,52 @@ details.restock > summary::-webkit-details-marker { display: none; }
       (pl ? " Happy to meet at " + pl + " again." : "");
   }
   function tdRow(x, mode) {
-    const c = x.c, call = c ? callTxt(c.call) : "", pl = c && c.place, k = esc(x.key);
-    const lbl = mode === "later" ? fuWhenLbl(x.date) : mode === "wait" ? [fmtD(x.sentOn) + " 发的", ""] : null;
-    const quick = mode === "wait" ? '<span class="fu-q"><button class="btn small ghost" type="button" data-td-unsent="' + k + '">没发，撤销</button></span>'
-      : mode === "later" ? "" : '<span class="fu-q"><button class="btn small primary" type="button" data-td-copy="' + k + '">复制消息</button><button class="btn small" type="button" data-td-sent="' + k + '">发了</button></span>';
-    const favs = c ? favsOf(c) : [];
-    const body = (x.wants && x.wants.length ? '<span class="l-sub">想要：' + wantsHtml(x.wants) + "</span>" : favs.length ? '<span class="l-sub">常买：' + favs.map((f) => esc(nm(f.sku)) + " ×" + f.n + (f.have ? ' <b class="fu-ok">有 ' + f.have + "</b>" : ' <span class="fu-no">没货</span>')).join("、") + "</span>" : "") +
-      (c && c.p.note ? '<span class="l-sub fu-pnote">' + esc(c.p.note) + "</span>" : "") + (x.touches && x.touches.length ? '<span class="l-sub">' + esc(lastTouch(x.touches)) + "</span>" : "") +
-      (c && c.paid.length ? '<span class="l-sub">买过 ' + c.paid.length + " 次、" + c.qty + " 根</span>" : "") +
-      '<div class="l-actions">' + fuButtons(x) + "</div>";
-    return '<details class="fu2 td-' + mode + '" data-fu-row="' + esc(x.id) + '"><summary><span class="fu-l1">' + (lbl ? '<span class="fu-when' + lbl[1] + '">' + lbl[0] + "</span>" : "") + "<b>" + esc(x.customer || "（没写名字）") + "</b>" +
-      (pl ? '<span class="tag-pl">' + esc(pl) + "</span>" : "") + (x.restocked ? '<span class="pill ok">到货了</span>' : "") + (mode !== "later" && mode !== "wait" ? '<span class="fu-amt">平时一单 ' + money(x.v) + "</span>" : "") + "</span>" +
-      (x.why ? '<span class="l-sub fu-why">' + esc(x.why) + "</span>" : "") + (call && mode !== "wait" ? '<span class="l-sub fu-call">' + esc(call) + "联系</span>" : "") + quick + "</summary>" +
-      '<div class="fu-body">' + body + "</div></details>";
+    const c = x.c, k = esc(x.key), pl = c && c.place, call = c ? callTxt(c.call) : "";
+    const tag = mode === "find" ? '<span class="cx-tag ' + CX_KIND[x.kind][1] + '">' + esc(x.dueTxt || CX_KIND[x.kind][0]) + "</span>"
+      : mode === "later" ? (x.noStock ? '<span class="cx-tag t-mine">等到货</span>' : '<span class="cx-tag t-due">' + esc(fuWhenLbl(x.date)[0]) + "</span>") : "";
+    const right = mode === "wait" ? fmtD(x.sentOn) + " 发的" : mode === "find" ? "一单 " + money(x.v) : "";
+    const why = x.wants && x.wants.length ? "想要 " + wantsHtml(x.wants) + (x.note ? " · " + esc(x.note) : "") : esc(x.why || "");
+    const last = [mode === "find" ? (x.last ? "上次联系：" + x.last : "") : mode === "later" ? lastTouch(x.touches) : "", call && mode !== "wait" ? "一般" + call + "联系" : "", c && c.p.note && mode === "find" ? c.p.note : ""].filter(Boolean).join(" · ");
+    const b = (attr, txt, cls) => '<button class="btn small' + (cls ? " " + cls : "") + '" type="button" ' + attr + '="' + (attr === "data-au-resv" || attr === "data-fu-resv" ? esc(x.id) : k) + '">' + txt + "</button>";
+    const btns = mode === "find" ? b("data-td-copy", "复制消息", "primary") + b("data-td-sent", "发了") + b("data-td-later", "过几天") + b("data-td-off", "不跟了", "ghost")
+      : mode === "wait" ? b(x.src === "a" ? "data-au-resv" : "data-fu-resv", "他要了 · 记预定", "primary") + b("data-td-later", "过几天") + b("data-td-unsent", "没发", "ghost")
+      : b("data-td-date", "改日子") + b("data-td-off", "不跟了", "ghost");
+    return '<div class="cx-row" data-cx-row="' + k + '"><div class="cx-top">' + tag + '<button class="cx-who" type="button" data-td-who="' + k + '">' + esc(x.customer || "（没写名字）") + "</button>" +
+      (pl ? '<span class="tag-pl">' + esc(pl) + "</span>" : "") + (right ? '<span class="cx-amt">' + right + "</span>" : "") + "</div>" +
+      (why ? '<div class="cx-why">' + why + "</div>" : "") + (last ? '<div class="cx-last">' + esc(last) + "</div>" : "") +
+      '<div class="cx-btns">' + btns + "</div></div>";
   }
+  let cxTab = (() => { try { return sessionStorage.getItem("mk-cx") || "find"; } catch (_) { return "find"; } })();
   function renderToday() {
-    const T = todayPicks(), td = today();
-    const fold = (cls, title, xs, mode) => xs.length ? '<details class="' + cls + '"><summary>' + title + " · " + xs.length + " 个</summary>" + xs.map((x) => tdRow(x, mode)).join("") + "</details>" : "";
-    $("fu-sec").hidden = !(T.pick.length + T.wait.length + T.later.length);
-    $("fu-n").textContent = T.pick.length ? String(T.pick.length) : "";
-    $("fu-list").innerHTML = (T.pick.length ? T.pick.map((x) => tdRow(x, "pick")).join("") : '<p class="hint td-none">今天没有特别要找的人。</p>') +
-      fold("fu-more", "还可以找", T.more, "more") + fold("fu-wait", "等回复", T.wait, "wait") + fold("fu-later", "以后要找的", T.later, "later");
-    $("td-stat").hidden = !(T.stat.n || T.stat.pend);
-    $("td-stat").textContent = T.stat.n ? "发了信息的，7 天内下单 " + T.stat.hit + " / " + T.stat.n + " 次" + (T.stat.pend ? " · 还有 " + T.stat.pend + " 次没满 7 天" : "") : "发了 " + T.stat.pend + " 次信息，满 7 天后这里算有没有下单";
+    const T = todayPicks();
+    if (!T[cxTab]) cxTab = "find";
+    for (const t of ["find", "wait", "later"]) { $("cx-n-" + t).textContent = T[t].length ? String(T[t].length) : ""; $("cx-tabs").querySelector('[data-cx="' + t + '"]').setAttribute("aria-pressed", String(t === cxTab)); }
+    const none = { find: "今天没有要找的人。", wait: "没有在等回复的。", later: "没有约好以后的。" };
+    $("fu-list").innerHTML = T[cxTab].length ? T[cxTab].map((x) => tdRow(x, cxTab)).join("") : '<p class="cx-none">' + none[cxTab] + "</p>";
     return T;
+  }
+  $("cx-tabs").addEventListener("click", (e) => { const b = e.target.closest("[data-cx]"); if (!b) return; cxTab = b.dataset.cx; try { sessionStorage.setItem("mk-cx", cxTab); } catch (_) {} renderToday(); });
+  /* 过几天：明天 / 3 天后 / 一周后 / 选日期，顺手点一个他怎么说的 */
+  const WHEN_SHORT = [["1", "明天"], ["3", "3 天后"], ["7", "一周后"]];
+  function tdDate(key) { // 约好以后：只改哪天，不记联系
+    const x = TD[key]; if (!x) return;
+    openSheet("改日子 · " + (x.customer || "这位客人"), whenHtml(x.date || "", { only: WHEN_SHORT, def: "3", label: "哪天再找他" }), async () => {
+      needDb(); const date = readWhen();
+      if (x.src === "a") await custPatch(x.c, { next: date });
+      else if (x.src === "o") { const o = S.orders.find((y) => y.id === x.id); await db.doc("orders/" + x.id).update({ follow_up: Object.assign({}, o.follow_up, { date }) }); }
+      else await db.doc("followups/" + x.id).update({ date });
+      return "好，" + fmtD(date) + " 再提醒你找 " + (x.customer || "他") + "。";
+    }, wireWhen, { focus: false });
+  }
+  async function tdOff(key) {
+    const x = TD[key]; if (!x) return;
+    try {
+      needDb(); const who = x.customer || "这位客人";
+      if (x.src === "a") { await custPatch(x.c, { touches: (x.c.p.touches || []).concat([{ date: today(), what: TD_OFF }]).slice(-20), next: null }); toast("好，这次不找 " + who + " 了。他下次买了会重新算。"); return; }
+      if (x.src === "o") { const o = S.orders.find((y) => y.id === x.id); await db.doc("orders/" + x.id).update({ follow_up: Object.assign({}, o.follow_up, { done: true, done_at: new Date().toISOString() }) }); }
+      else await db.doc("followups/" + x.id).update({ done: true, done_at: new Date().toISOString() });
+      toast("好，不跟 " + who + " 了。");
+    } catch (e) { toast(e.userMsg || errText(e)); }
   }
   async function tdSent(key, undo) {
     const x = TD[key]; if (!x) return;
@@ -5857,14 +5872,14 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const resv = S.orders.filter(isReserved).sort((a, b) => { const x = meetKey(a), y = meetKey(b); return x && y ? x.localeCompare(y) || moveSort(a, b) : x ? -1 : y ? 1 : moveSort(a, b); });
     const RA = resvAlloc(), RS = RA.RS, RW = RA.RW, PKO = {}; for (const g of pickups()) (PKO[g.oid] = PKO[g.oid] || []).push(g);
     $("resv-pick").hidden = true;
-    $("resv-sec").hidden = !resv.length;
+    $("resv-sec").hidden = !resv.length; $("rv-empty").hidden = !!resv.length;
     const rvN = resv.reduce((a, o) => a + (o.lines || []).reduce((b, l) => b + (Number(l.qty) || 0), 0), 0);
     $("resv-n").textContent = resv.length + " 单 · " + rvN + " 根";
-    const dueN = resv.filter((o) => o.meet_date && o.meet_date <= today()).length, tdN = dueN + TDY.pick.length;
-    $("cu-badge").hidden = !tdN; $("cu-badge").textContent = tdN > 99 ? "99+" : String(tdN);
-    /* 库存页（打开 App 第一眼）快速下单上面一行：今天交货几单、找几个人，点一下到「今天」 */
-    $("td-strip").hidden = !tdN;
-    $("td-strip").innerHTML = '<b>今天</b>' + [dueN ? "交货 " + dueN + " 单" : "", TDY.pick.length ? "找 " + TDY.pick.length + " 个人" : ""].filter(Boolean).join(" · ") + '<span class="pt-more">›</span>';
+    const dueN = resv.filter((o) => o.meet_date && o.meet_date <= today()).length, fN = TDY.find.length, badge = (el, n) => { $(el).hidden = !n; $(el).textContent = n > 99 ? "99+" : String(n); };
+    badge("cu-badge", fN); badge("rv-badge", dueN);
+    /* 库存页（打开 App 第一眼）快速下单上面一行：今天交货几单 → 预定页，要找几个人 → 客户页 */
+    $("td-strip").hidden = !(dueN || fN);
+    $("td-strip").innerHTML = (dueN ? '<a href="#reserve"><b>交货</b> ' + dueN + ' 单<span class="pt-more">›</span></a>' : "") + (fN ? '<a href="#customers"><b>要找</b> ' + fN + ' 个人<span class="pt-more">›</span></a>' : "");
     const CB = {}; for (const c of customerBook()) CB[normName(c.name)] = c;
     $("resv").innerHTML = resv.map((o) => { const t = orderTotal(o), n = (o.lines || []).reduce((a, l) => a + (Number(l.qty) || 0), 0);
       const cc = CB[normName(o.customer || "")] || null, pl = o.place || (cc && cc.place) || "", call = !o.meet_time ? callTxt(o.call_win || (cc && cc.call) || "") : "";
@@ -5891,7 +5906,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   }
   function renderSetDot() { const s0 = S.sync, at = s0 && (s0.synced_at || (s0.history && s0.history[0] && s0.history[0].at)); const old = !at || Date.now() - new Date(at).getTime() > 7 * 864e5; $("set-dot").hidden = !S.loaded || !old; }
   function render() { CONS = null; LASTBUY = null; renderSetDot(); renderFuResv(); if (view === "finance") renderOrderSearch(); renderHealth(); resolveNames(); if (view === "inventory" && !STANDALONE) renderLog(); if (view === "finance") renderFinance(); else if (view === "customers") renderCustomers(); else if (view === "partner") renderPartnerPage(); else if (view === "purchases") renderPurchases(); else renderInventory(); renderBackup(); renderCart(); }
-  const VIEWS = { inventory: ["inv-view", "nav-inv", "库存"], purchases: ["po-view", "nav-po", "订货"], finance: ["fin-view", "nav-fin", "财务"], customers: ["cu-view", "nav-cu", "今天"], partner: ["ptx-view", "nav-ptx", "合伙人"], settings: ["set-view", "nav-set", "设置"] };
+  const VIEWS = { inventory: ["inv-view", "nav-inv", "库存"], purchases: ["po-view", "nav-po", "订货"], finance: ["fin-view", "nav-fin", "财务"], customers: ["cu-view", "nav-cu", "客户"], reserve: ["rv-view", "nav-rv", "预定"], partner: ["ptx-view", "nav-ptx", "合伙人"], settings: ["set-view", "nav-set", "设置"] };
   function route() {
     window.scrollTo(0, 0); // 换页从顶上开始看
     let h = location.hash.slice(1);
@@ -5899,7 +5914,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     view = VIEWS[h] ? h : "inventory";
     try { localStorage.setItem("mk-view", view); } catch (_) {}
     for (const [k, [vid, nid]] of Object.entries(VIEWS)) { $(vid).hidden = k !== view; if (k === view) $(nid).setAttribute("aria-current", "page"); else $(nid).removeAttribute("aria-current"); }
-    $("view-title").textContent = VIEWS[view][2]; $("inv-copy").hidden = view !== "inventory"; $("hd-place").hidden = view !== "inventory" && view !== "customers";
+    $("view-title").textContent = VIEWS[view][2]; $("inv-copy").hidden = view !== "inventory"; $("hd-place").hidden = !["inventory", "customers", "reserve"].includes(view); $("hd-fu").hidden = view !== "customers";
     render();
   }
   window.addEventListener("hashchange", route);

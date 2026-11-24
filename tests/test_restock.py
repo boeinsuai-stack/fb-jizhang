@@ -164,7 +164,7 @@ with sync_playwright() as p:
         pg.click('[data-ask-undo="XF-07"]'); pg.wait_for_timeout(400)
         check("撤销上一次：剩 1 笔", len([f for f in S(pg, "followups") if f.get("kind") == "ask"]) == 1)
         go(pg, "customers"); pg.wait_for_timeout(200)
-        check("「有人问」不出现在要联系的客户、客户名单里", pg.locator("#fu-list .fu2").count() == 0 and "断货莓" not in pg.inner_text("#c-list"), pg.inner_text("#c-list")[:100])
+        check("「有人问」不出现在要联系的客户、客户名单里", pg.locator("#fu-list .cx-row").count() == 0 and "断货莓" not in pg.inner_text("#c-list"), pg.inner_text("#c-list")[:100])
         ctx.close()
     br.close()
 print(f"\n{sum(results)}/{len(results)} 通过")

@@ -107,7 +107,7 @@ with sync_playwright() as p:
         close(pg)
 
         # 编辑已有的预定（定了 15:00）→「约好了」选着
-        go(pg, "customers"); card = pg.locator("#resv details.rv").filter(has=pg.locator('b:text-is("Bob")')).first
+        go(pg, "reserve"); card = pg.locator("#resv details.rv").filter(has=pg.locator('b:text-is("Bob")')).first
         card.locator("summary").click(); card.locator("[data-edit-order]").click(); pg.wait_for_selector("#f-mmode")
         check("编辑定了 15:00 的预定：「约好了」选着、15:00、明天", pg.get_attribute('#f-mmode [data-mm="set"]', "aria-pressed") == "true" and pg.input_value("#f-mtime") == "15:00" and pg.get_attribute('#f-mdays [data-md="1"]', "aria-pressed") == "true" and pg.input_value("#f-mdate") == DD(1))
         close(pg)
