@@ -61,6 +61,8 @@ jobs:
         run: python tests/test_followup.py
       - name: 预定卡片上配送 / 自取小标签
         run: python tests/test_handoff.py
+      - name: 结算那天 = 卖出那天（昨天记的预定今天结算）
+        run: python tests/test_settle_date.py
       - name: 预定交货时间、按时间排
         run: python tests/test_meet.py
       - name: 客人多给：原因、送我的不用还

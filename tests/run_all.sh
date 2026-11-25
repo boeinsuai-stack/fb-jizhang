@@ -24,6 +24,7 @@ run python3 tests/test_resv_note.py
 run python3 tests/test_snapshot.py
 run python3 tests/test_followup.py
 run python3 tests/test_handoff.py
+run python3 tests/test_settle_date.py
 run python3 tests/test_meet.py
 run python3 tests/test_gift.py
 run python3 tests/test_pnames.py

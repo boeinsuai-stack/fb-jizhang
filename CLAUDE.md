@@ -432,6 +432,10 @@
 - tdStat（发了以后 7 天内下单几次）去掉了
 - 测试 `tests/test_today.py` 88/88 重写；test_followup 42、test_place_fu 64、test_cust_bal、test_gift、test_resv_note、test_offline_resv、test_restock、test_v2_diff 跟着改（预定在 #reserve，客户资料在弹出页）
 
+## 结算那天 = 卖出那天（fix-settle-date，2026-11-25）
+- `settleNow`（一点结算、「客人怎么付的？」）以前用 `o.date`（记预定那天）当卖出日期 → 昨天记的预定今天结算，算成昨天卖的（11-24 真实数据 214 单里 11 单早了一天）。改成 `today()`；「结算」表单本来就默认今天。订单 date、扣库存流水、按单拿货流水和支出跟着
+- 测试 `tests/test_settle_date.py` 12/12（旧代码 2/12）
+
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超
 - 一单的几条写入还不是一个 batch（中途关掉 App 理论上可能只存一半）—— v2 下一单只写一条源头，基本解决
