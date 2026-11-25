@@ -95,8 +95,14 @@ with sync_playwright() as p:
         T = lambda sel: pg.evaluate(f"[...document.querySelectorAll('{sel}')].map((e) => e.innerText.replace(/\\s+/g, ' ').trim())")
         rows = T("#sheet .lg-sr")
         check("顶上一句话：甲 欠你 $30", pg.inner_text("#sheet .lg-sum").replace("\n", " ") == W + " 欠你 $30", pg.inner_text("#sheet .lg-sum"))
-        check("按系列 Ali：你拿他 3 根 · 他拿你 2 根 · 抵掉 2 根 →［你欠他］1 根 $60", any(r.startswith("Ali") and "你拿他 3 根 · 他拿你 2 根 · 抵掉 2 根" in r and "你欠他 1 根 $60" in r for r in rows), str(rows))
-        check("按系列 Bar Pro：你拿他 1 根 · 他拿你 4 根 · 抵掉 1 根 →［他欠你］3 根 $90", any(r.startswith("Bar Pro") and "你拿他 1 根 · 他拿你 4 根 · 抵掉 1 根" in r and "他欠你 3 根 $90" in r for r in rows), str(rows))
+        # 2026-11-25：按系列只写抵完还剩的；抵掉的在最下面「抵掉的」，明细里不再出现
+        check("按系列 Ali：只写抵完还剩［你欠他］1 根 $60", any(r.startswith("Ali") and "你欠他 1 根 $60" in r and "抵掉" not in r for r in rows), str(rows))
+        check("按系列 Bar Pro：只写抵完还剩［他欠你］3 根 $90", any(r.startswith("Bar Pro") and "他欠你 3 根 $90" in r and "抵掉" not in r for r in rows), str(rows))
+        mx = pg.evaluate("[...document.querySelectorAll('#sheet .lg-sec')].filter((e) => e.querySelector('.lg-sh .lg-k.k-in, .lg-sh .lg-k.k-out')).map((e) => e.innerText.replace(/\\s+/g, ' '))")
+        check("明细只剩没抵掉的：你拿他 Cool Mint ×1；他拿你 Banana Buzz ×3（FTP、Grape 都抵掉了）", len(mx) == 2 and "Cool Mint ×1" in mx[0] and "Grape" not in mx[0] and "Banana Buzz ×3" in mx[1] and "FTP" not in mx[1], str(mx))
+        off = T("#sheet .lg-off li")
+        check("最下面「抵掉的」：Ali 抵掉 2 根（你拿他 Cool Mint ×2 / 他拿你 FTP ×2）、Bar Pro 抵掉 1 根（Grape ×1 / Banana Buzz ×1）",
+              any("Bar Pro" in r and "抵掉 1 根" in r for r in off) and any("Ali" in r and "抵掉 2 根" in r for r in off) and "你拿他：Cool Mint ×2" in off and "他拿你：FTP ×2" in off and "你拿他：Grape ×1" in off and "他拿你：Banana Buzz ×1" in off, str(off))
         check("小标签带颜色（你欠他 = 橙、他欠你 = 绿），数字也带颜色，没有大色框", sorted(pg.evaluate("[...document.querySelectorAll('#sheet .lg-sr-r .lg-k')].map((e) => e.textContent + ':' + e.className)")) == ["他欠你:lg-k k-out", "你欠他:lg-k k-in"] and pg.locator("#sheet .lg-sr-r b.neg").count() == 1 and pg.locator("#sheet .lg-sr-r b.pos").count() == 1 and pg.locator("#sheet .lg-g").count() == 0)
         tot = pg.inner_text("#sheet .lg-tot").replace("\n", " ")
         check("合计：你欠他 · 拿的货 $60、他欠你 · 拿的货 $90 → 甲 欠你 $30", "你欠他 · 拿的货 $60" in tot and "他欠你 · 拿的货 $90" in tot and W + " 欠你 $30" in tot, tot)
@@ -105,7 +111,7 @@ with sync_playwright() as p:
         check("明细只记货（调入/调出下面不写钱）", pg.evaluate("[...document.querySelectorAll('#sheet .lg-sec')].filter((e) => e.querySelector('.lg-k.k-in, .lg-k.k-out')).every((e) => !e.querySelector('.lg-sh > b').textContent)"))
         if SHOT and mode == "新结构": pg.screenshot(path=SHOT + "-对账单.png", full_page=False)
         txt = pg.evaluate(f"window.__GM.statementText(window.__GM.partnerItems('{W}'), 'T', null, window.__GM.openXfers('{W}'), window.__GM.openPOs('{W}'), window.__GM.pendingPicks('{W}'))")
-        check("复制发给他的文字：用我/你，两组 + 两边一抵：你给我 $30", all(k in txt for k in ("我欠你 $60", "  Ali 1 根 $60（我拿你 3 根 · 你拿我 2 根 · 抵掉 2 根）", "你欠我 $90", "  Bar Pro 3 根 $90（我拿你 1 根 · 你拿我 4 根 · 抵掉 1 根）", "两边一抵：你给我 $30")) and "调入" not in txt and "应收" not in txt, txt)
+        check("复制发给他的文字：用我/你，两组 + 两边一抵：你给我 $30", all(k in txt for k in ("我欠你 $60", "  Ali 1 根 $60\n", "你欠我 $90", "  Bar Pro 3 根 $90\n", "两边一抵：你给我 $30", "【已经抵掉的 · 同系列一根抵一根，不算钱】", "Ali 抵掉 2 根\n  我拿你：Cool Mint ×2\n  你拿我：FTP ×2")) and "调入" not in txt and "应收" not in txt, txt)
 
         # 结账（默认全选）：金额按互抵后算
         pg.click("#sheet-save"); pg.wait_for_selector("#f-net", timeout=4000); pg.wait_for_timeout(300)

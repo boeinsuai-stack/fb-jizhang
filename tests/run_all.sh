@@ -12,6 +12,7 @@ run python3 tests/test_realsdk.py
 run python3 tests/test_v2_failsafe.py
 run python3 tests/test_xfer_price.py
 run python3 tests/test_offset.py
+run python3 tests/test_offset_fifo.py
 run python3 tests/test_restore.py
 run python3 tests/test_resv_release.py
 run python3 tests/test_update.py

@@ -37,6 +37,8 @@ jobs:
         run: python tests/test_xfer_price.py
       - name: 合伙人对账同系列互抵（旧结构 / 新结构）
         run: python tests/test_offset.py
+      - name: 合伙人对账：抵掉的下次不再出现（按日期先后抵）
+        run: python tests/test_offset_fifo.py
       - name: 备份 → 弄坏 → 从备份恢复 → 账一模一样（旧结构 / 新结构）
         run: python tests/test_restore.py
       - name: 预定的货拿到后改预定 / 取消预定，欠合伙人的不丢（旧结构 / 新结构）
