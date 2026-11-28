@@ -135,6 +135,63 @@
     return { lines: order.map((k) => res[k]).filter((l) => l.qty > 0), unknown, unit, bare };
   }
 
-  const api = { parseOrder };
+  /* 粘贴新口味（2026-11-28）：一段文字 → 要新增的口味 [{ series, variant, name, raw, have, like }]
+     - 每行（或逗号/顿号分开的每一段）= 一个口味；根数、盒数、价钱、前面的编号 / 符号都去掉
+     - 只写系列名的一行（已有的系列，或末尾带冒号的「Lost Mary:」）= 下面几行的系列；没有就用 opts.series
+     - 英文写在 variant（首字母大写），中文写在 name
+     - have = 这个系列里已经有的口味（逐词比，允许拼错一两个字母；多一个词、少一个词都不算有）
+       like = 不是已经有的，但很像某个已有的（只多一个词 / 少一个词），界面上提醒（照样勾上）
+     - 同一段里重复的只留一个 */
+  function parseNew(text, items, opts) {
+    opts = opts || {};
+    const sers = [...new Set(items.map((i) => i.series).filter(Boolean))].map((sr) => ({ sr, t: enToks(sr) })).sort((a, b) => b.t.length - a.t.length);
+    const serOf = (toks) => { const k = toks.join(" "); const h = sers.find((s) => s.t.join(" ") === k); return h ? h.sr : null; };
+    const title = (t) => t.replace(/\s+/g, " ").trim().split(" ").map((w) => (w.length > 1 && w === w.toUpperCase() && /[A-Z]/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())).join(" ");
+    let ctx = opts.series || null;
+    const out = [], seen = new Set(), skipped = [];
+    for (const line of String(text || "").replace(/\r/g, "").split("\n")) {
+      if (/合计|总计|共计|小计|总共/.test(line)) continue;
+      const head = line.replace(/^[\s\-–—•·*#>]+/, "").trim();
+      // 「Lost Mary:」「新系列：One」这种：系列
+      const hm = /^(?:系列|series)?\s*[:：]?\s*([A-Za-z0-9][A-Za-z0-9 .'&+-]*?)\s*[:：]\s*$/i.exec(head);
+      if (hm && !cjkOf(head)) { ctx = serOf(enToks(hm[1])) || title(hm[1]); continue; }
+      for (const piece of cnDigits(line).split(/[,，、;；|\/]/)) {
+        let rest = qtyOf(piece).rest;
+        rest = rest.replace(/\$\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?\s*(?:刀|块|元|aud\b)/gi, " ")         // 价钱
+          .replace(/^[\s\-–—•·*#>]*(?:\d{1,3}\s*[.)、．:：]\s*)?/, " ")                                   // 1. / 2) / - / •
+          .replace(/[\u{1F300}-\u{1FAFF}☀-➿️✅❌✔️]/gu, " ")                             // 表情
+          .replace(/\b(?:new|新品|新款|新口味|上新)\b|新品|新款|新口味|上新/gi, " ")
+          .replace(/[()（）\[\]【】"“”]/g, " ").replace(/\s+/g, " ").trim();
+        if (!rest) continue;
+        const cj = cjkOf(rest), en = rest.replace(/[㐀-鿿]+/g, " ").replace(/[^A-Za-z0-9 .'&+-]/g, " ").replace(/\s+/g, " ").trim().replace(/^[.'&+-]+|[.'&+-]+$/g, "").trim();
+        let toks = enToks(en), enTxt = en;
+        if (!toks.length && !cj) continue;
+        // 只有系列名 = 下面几行的系列（「Bar Pro 2盒」这种也算系列）
+        const sr0 = serOf(toks);
+        if (sr0 && !cj) { ctx = sr0; continue; }
+        // 开头是系列名（「Bar Pro: Lemon Lime」「Ali 葡萄冰」）：这个系列，后面是口味
+        const pre = sers.find((x) => x.t.length <= toks.length && x.t.every((t, j) => toks[j] === t));
+        if (pre) { ctx = pre.sr; toks = toks.slice(pre.t.length); enTxt = en.split(/\s+/).slice(pre.t.length).join(" ").replace(/^[\s:：.-]+/, ""); if (!toks.length && !cj) continue; }
+        if (!ctx) { skipped.push(piece.trim()); continue; }
+        const key = ctx + "|" + (toks.join(" ") || cj);
+        if (seen.has(key)) continue; seen.add(key);
+        const seg = { toks, cjk: cj };
+        const pool = items.filter((i) => i.series === ctx);
+        let have = null, like = null;
+        for (const it of pool) {
+          const sc = score(seg, it);
+          const vt = enToks(it.variant || "");
+          if (toks.length && vt.length) {
+            if (sc[0] === 1 && sc[2] === 0 && sc[5].length === vt.length && vt.length === toks.length) { have = it; break; }
+            // 很像：只差一个词（Strawberry Kiwi ↔ Strawberry Kiwi Ice），而且对上的不只是 ice / mist 这种
+            if (!like && Math.abs(vt.length - toks.length) === 1 && sc[5].length === Math.min(vt.length, toks.length) && sc[5].some((t) => !WEAK.has(t))) like = it;
+          } else if (!toks.length && cj && it.name && (it.name === cj)) { have = it; break; }
+        }
+        out.push({ series: ctx, variant: toks.length ? title(enTxt) : "", name: cj, raw: piece.trim(), have: have ? have.sku : null, like: !have && like ? like.sku : null });
+      }
+    }
+    return { list: out, skipped };
+  }
+  const api = { parseOrder, parseNew };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.FBParse = api;
 })(typeof window !== "undefined" ? window : globalThis);

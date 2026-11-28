@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v40"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v41"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -293,6 +293,14 @@ label.chip:has(input:checked) { background: var(--accent-soft); color: var(--acc
 .po-flav { display: grid; gap: 10px; }
 .po-fh { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .po-paste { display: grid; gap: 8px; }
+/* 粘贴新口味 */
+.nf-go { width: 100%; margin-bottom: 6px; } #f-nf { width: 100%; box-sizing: border-box; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); resize: vertical; }
+.nf-sum { margin: 4px 0 8px; } .nf-g { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; display: grid; gap: 6px; }
+.nf-gh { display: flex; gap: 8px; align-items: center; } .nf-r { display: grid; grid-template-columns: 1fr 9.5em; gap: 4px 8px; align-items: center; border-top: 1px solid var(--line); padding-top: 6px; }
+.nf-ck { display: flex; gap: 10px; align-items: center; justify-content: flex-start; min-width: 0; margin: 0; padding: 0; text-align: left; font-size: 1rem; color: inherit; }
+.nf-ck input { flex: none; width: 20px; height: 20px; margin: 0; } .nf-ck b, .nf-ck span { min-width: 0; overflow-wrap: break-word; word-break: normal; }
+.nf-cn { width: 100%; box-sizing: border-box; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); }
+.nf-like { grid-column: 1 / -1; color: var(--warn); } .nf-old .nf-r { grid-template-columns: 1fr; }
 .po-paste textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); resize: vertical; }
 .po-paste .actions { align-items: center; }
 .po-parsed { font-size: .86rem; line-height: 1.5; } .po-parsed .warn { color: var(--warn); font-weight: 600; }
@@ -1244,7 +1252,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
   /* English first, Chinese second */
   const enOf = (i) => (i && (i.variant || i.name)) || "";
   const nm = (sku, fb) => { const i = itemBy(sku); return (i && (i.variant || i.name)) || fb || sku; };
-  const pickLabel = (i) => (i.variant ? i.variant + " · " + i.name : i.name);
+  const pickLabel = (i) => (i.variant && i.name && i.name !== i.variant ? i.variant + " · " + i.name : i.variant || i.name);
   function avgCost(sku) {
     let c = 0, q = 0;
     for (const m of S.moves) if (m.sku === sku && m.type === "in" && m.cost != null && Number(m.qty) > 0) { c += Number(m.cost); q += Number(m.qty); }
@@ -2213,7 +2221,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const nextSku = "XF-" + pad(S.items.reduce((a, i) => Math.max(a, skuNum(i.sku) === 9999 ? 0 : skuNum(i.sku)), 0) + 1);
     const v = (k) => esc(it && it[k] != null ? it[k] : "");
     const photos = it && it.photo_links ? (Array.isArray(it.photo_links) ? it.photo_links.join("\n") : it.photo_links) : "";
-    const html =
+    const html = (it ? "" : '<button type="button" class="btn primary nf-go" id="f-tonf">粘贴新口味 · 一次加好几个</button>') +
       '<p class="hint">编号：<span class="sku">' + esc(it ? it.sku : nextSku) + "</span></p>" +
       '<div class="field"><label for="f-series">系列</label><select id="f-series">' + allSeries().map((sr) => "<option" + ((it ? it.series : (invFilter.startsWith("s:") ? invFilter.slice(2) : SERIES[0])) === sr ? " selected" : "") + ">" + esc(sr) + "</option>").join("") + '<option value="__new">＋ 新系列…</option></select></div>' +
       '<div class="field" id="f-series-new-wrap" hidden><label for="f-series-new">新系列名字</label><input id="f-series-new" placeholder="例如 Lost Mary"></div>' +
@@ -2244,7 +2252,63 @@ details.restock > summary::-webkit-details-marker { display: none; }
       if (it) { await db.doc("items/" + it.sku).update(data); return "已保存。"; }
       await db.collection("items").doc(nextSku).set(Object.assign({ sku: nextSku, created_at: new Date().toISOString() }, data));
       return "已新增 " + name + "。";
-    }, () => { $("f-series").addEventListener("change", serNew); });
+    }, () => { $("f-series").addEventListener("change", serNew); const go = $("f-tonf"); if (go) go.addEventListener("click", () => pasteFlavors($("f-series").value === "__new" ? "" : $("f-series").value)); }, { focus: !!it });
+  }
+
+  /* 粘贴新口味（2026-11-28 Bowen：新增口味那里要一键粘贴新口味然后增加）
+     点开先读剪贴板（iPhone 会弹「粘贴」），读不到就自己粘贴进框里；边打边认（orderparse.js parseNew）：
+     一行一个口味，只写系列名的一行 = 下面都是这个系列；根数 / 盒数 / 价钱 / 编号 / 表情都去掉；中文写在中文名。
+     已有的不加（逐词比，拼错一两个字母也算有）；停售的可以顺手改回在售；很像已有的标出来。
+     售价 / 拿货价按这个系列现在最常用的先填好，可以改 */
+  const modeOf = (xs) => { const c = {}; let b = null; for (const x of xs) if (x != null && x !== "") { c[x] = (c[x] || 0) + 1; if (b == null || c[x] > c[b]) b = x; } return b == null ? "" : b; };
+  function pasteFlavors(ser0) {
+    const sers = allSeries(), def = ser0 || (invFilter.startsWith("s:") ? invFilter.slice(2) : "") || sers[0] || "";
+    let res = { list: [], skipped: [] }, timer = null;
+    const html = '<div class="field"><label for="f-nf">把新口味的清单粘贴进来</label><textarea id="f-nf" rows="6" placeholder="一行一个，例如：&#10;One&#10;Peach Ice 蜜桃冰&#10;Grape Bubblegum&#10;Ali&#10;Sour Apple"></textarea></div>' +
+      '<div class="field"><label for="f-nfser">没写系列的算哪个系列</label><select id="f-nfser">' + sers.map((sr) => "<option" + (sr === def ? " selected" : "") + ">" + esc(sr) + "</option>").join("") + "</select></div>" +
+      '<div id="f-nfres"></div>';
+    const run = () => {
+      const pool = S.items.filter((i) => !/合伙人拿货|partner pickup/i.test((i.name || "") + " " + (i.variant || "")));
+      res = window.FBParse ? FBParse.parseNew($("f-nf").value, pool, { series: $("f-nfser").value }) : { list: [], skipped: [] };
+      const box = $("f-nfres"), nw = res.list.filter((x) => !x.have), old = res.list.filter((x) => x.have);
+      if (!res.list.length) { box.innerHTML = $("f-nf").value.trim() ? '<p class="hint warn">没认出口味。一行写一个口味名。</p>' : ""; return; }
+      const by = {}; nw.forEach((x) => { (by[x.series] = by[x.series] || []).push(x); });
+      box.innerHTML = '<p class="nf-sum">新口味 <b>' + nw.length + "</b> 个" + (old.length ? " · 已经有的 " + old.length + " 个不加" : "") + "</p>" +
+        Object.entries(by).map(([sr, xs]) => { const its = S.items.filter((i) => i.series === sr), isNew = !its.length;
+          return '<div class="nf-g"><div class="nf-gh"><b>' + esc(sr) + "</b>" + (isNew ? '<span class="pill warn">新系列</span>' : "") + "</div>" +
+            '<div class="grid2"><div class="field"><label>售价 $</label><input type="number" min="0" step="0.01" inputmode="decimal" data-nfp="' + esc(sr) + '" value="' + esc(modeOf(its.map((i) => i.price_aud))) + '"></div>' +
+            '<div class="field"><label>拿货价 $/根</label><input type="number" min="0" step="0.01" inputmode="decimal" data-nfc="' + esc(sr) + '" value="' + esc(modeOf(its.map((i) => i.cost_aud))) + '"></div></div>' +
+            xs.map((x) => { const k = res.list.indexOf(x), lk = x.like ? itemBy(x.like) : null;
+              return '<div class="nf-r"><label class="nf-ck"><input type="checkbox" data-nfk="' + k + '" checked><b>' + esc(x.variant || x.name) + "</b></label>" +
+                (x.variant ? '<input class="nf-cn" data-nfn="' + k + '" value="' + esc(x.name) + '" placeholder="中文名（可不填）" aria-label="' + esc(x.variant) + ' 的中文名">' : "") +
+                (lk ? '<small class="nf-like">很像已有的 ' + esc(pickLabel(lk)) + "，是同一个就取消勾</small>" : "") + "</div>"; }).join("") + "</div>"; }).join("") +
+        (old.length ? '<div class="nf-g nf-old"><div class="nf-gh"><b>已经有的（不加）</b></div>' + old.map((x) => { const it = itemBy(x.have), k = res.list.indexOf(x);
+          return '<div class="nf-r">' + (it && it.status === "停售" ? '<label class="nf-ck"><input type="checkbox" data-nfon="' + k + '" checked><span>' + esc(it.series + " " + pickLabel(it)) + ' <small>停售中 · 改回在售</small></span></label>' : '<span class="muted">' + esc(it ? it.series + " " + pickLabel(it) : x.raw) + "</span>") + "</div>"; }).join("") + "</div>" : "") +
+        (res.skipped.length ? '<p class="hint warn">不知道是哪个系列：' + esc(res.skipped.join("、")) + "</p>" : "");
+    };
+    openSheet("粘贴新口味", html, async () => {
+      needDb();
+      const pick = res.list.map((x, k) => ({ x, k })).filter(({ x, k }) => !x.have && (document.querySelector('[data-nfk="' + k + '"]') || {}).checked);
+      const on = res.list.map((x, k) => ({ x, k })).filter(({ x, k }) => x.have && (document.querySelector('[data-nfon="' + k + '"]') || {}).checked);
+      if (!pick.length && !on.length) throw userError(res.list.length ? "没有勾要加的口味。" : "先把新口味的清单粘贴进来。");
+      const num = (v) => { const n = numOrNull(v); if (n != null && n < 0) throw userError("价格不能是负数。"); return n; };
+      let next = S.items.reduce((a, i) => Math.max(a, skuNum(i.sku) === 9999 ? 0 : skuNum(i.sku)), 0);
+      const now = new Date().toISOString(), cnt = {};
+      for (const { x, k } of pick) {
+        const sku = "XF-" + pad(++next), cn = ((document.querySelector('[data-nfn="' + k + '"]') || {}).value || x.name || "").trim();
+        await db.collection("items").doc(sku).set({ sku, created_at: now, series: x.series, name: cn || x.variant, variant: x.variant, ref_flavor: "",
+          price_aud: num((document.querySelector('[data-nfp="' + CSS.escape(x.series) + '"]') || {}).value), floor_price_aud: null,
+          cost_aud: num((document.querySelector('[data-nfc="' + CSS.escape(x.series) + '"]') || {}).value), photo_links: [], status: "在售", notes: "", fruits: "", last_updated: today() });
+        cnt[x.series] = (cnt[x.series] || 0) + 1;
+      }
+      for (const { x } of on) await db.doc("items/" + x.have).update({ status: "在售", last_updated: today() });
+      return [pick.length ? "加了 " + pick.length + " 个新口味（" + Object.entries(cnt).map(([sr, n]) => sr + " " + n).join("、") + "）" : "", on.length ? on.length + " 个改回在售" : ""].filter(Boolean).join("，") + "。库存从 0 开始，到货点「进货」。";
+    }, () => {
+      $("f-nf").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 200); });
+      $("f-nfser").addEventListener("change", run);
+      // 一键：点开就读剪贴板（iPhone 会弹「粘贴」，点一下）；读不到就自己粘贴
+      try { if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then((t) => { if (t && t.trim() && !$("f-nf").value.trim()) { $("f-nf").value = t; run(); } }, () => {}); } catch (_) {}
+    }, { focus: false });
   }
 
   /* 其他成本：一笔（类别是一排标签；「上次 $X」一点就填金额；改的时候可以删） */
