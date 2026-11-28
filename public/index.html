@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v41"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name="app-version" content="fb-app-v42"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="FB 记账"><meta name="theme-color" content="#2f6b5a"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><script src="https://accounts.google.com/gsi/client" async></script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>FB 记账</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -472,6 +472,7 @@ body.has-cart .toast { bottom: calc(136px + env(safe-area-inset-bottom, 0px)); }
 .sb-col li:last-child { border-bottom: 0; }
 .sb-col li span { min-width: 0; line-height: 1.3; overflow-wrap: anywhere; }
 .sb-col li b { flex: none; font-variant-numeric: tabular-nums; }
+.sb-col li.zero span, .sb-col li.zero b { color: var(--muted); font-weight: 400; }
 .sb-col li.low b { color: var(--warn); }
 .sb-col li i { font-style: normal; font-weight: 400; color: var(--muted); font-size: .72rem; margin-left: 4px; }
 .sb-foot { margin: 0; padding: 6px 16px 10px; border-top: 1px solid var(--line); font-size: .75rem; color: var(--muted); }
@@ -2403,15 +2404,17 @@ details.restock > summary::-webkit-details-marker { display: none; }
   /* ---------- render: inventory ---------- */
   /* every flavour on hand, one column per series, so stock is readable without scrolling the order tiles */
   function renderStockBox(D, RV) {
+    /* 2026-11-29 Bowen：零库存的口味在库存页也要看得到 → 每个系列有货的在上面，没货的（不含停售）灰着排在下面写 0；「能卖 N 根」照旧只算有货的 */
     const ON = S.items.filter((i) => !isGeneric(i) && (D.st[i.sku] || 0) > 0), av = (i) => Math.max(0, D.st[i.sku] || 0) - (RV[i.sku] || 0);
-    const sers = SERIES.concat([...new Set(ON.map(seriesOf))].filter((x) => !SERIES.includes(x)));
+    const OFF = S.items.filter((i) => !isGeneric(i) && (D.st[i.sku] || 0) <= 0 && i.status !== "停售");
+    const sers = SERIES.concat([...new Set(ON.concat(OFF).map(seriesOf))].filter((x) => !SERIES.includes(x)));
     const tot = {}; let all = 0;
     const cols = sers.map((sr) => {
-      const its = ON.filter((i) => seriesOf(i) === sr).sort((a, b) => nm(a.sku).localeCompare(nm(b.sku)));
-      const n = its.reduce((a, i) => a + av(i), 0); tot[sr] = n; all += n;
+      const byNm = (a, b) => nm(a.sku).localeCompare(nm(b.sku)), on = ON.filter((i) => seriesOf(i) === sr).sort(byNm), zero = OFF.filter((i) => seriesOf(i) === sr).sort(byNm), its = on.concat(zero);
+      const n = on.reduce((a, i) => a + av(i), 0); tot[sr] = n; all += n;
       if (!its.length && !SERIES.includes(sr)) return "";
-      return '<div class="sb-col"><h3><span>' + esc(sr) + "</span><b>" + n + " 根</b></h3>" + (its.length ? "<ul>" + its.map((i) => { const q = av(i), r = RV[i.sku] || 0;
-        return "<li" + (q <= 1 ? ' class="low"' : "") + '><span title="' + esc(nm(i.sku)) + '">' + esc(nm(i.sku)) + "</span><b>" + q + (r ? "<i>订" + r + "</i>" : "") + "</b></li>"; }).join("") + "</ul>" : '<p class="sb-empty">没货</p>') + "</div>";
+      return '<div class="sb-col"><h3><span>' + esc(sr) + "</span><b>" + n + " 根</b></h3>" + (its.length ? "<ul>" + its.map((i) => { const z = !on.includes(i), q = z ? 0 : av(i), r = RV[i.sku] || 0;
+        return "<li" + (z ? ' class="zero"' : q <= 1 ? ' class="low"' : "") + '><span title="' + esc(nm(i.sku)) + '">' + esc(nm(i.sku)) + "</span><b>" + q + (r ? "<i>订" + r + "</i>" : "") + "</b></li>"; }).join("") + "</ul>" : '<p class="sb-empty">没货</p>') + "</div>";
     }).join("");
     $("sb-total").textContent = S.loaded ? all : "–";
     $("sb-sers").textContent = S.loaded ? sers.filter((x) => tot[x]).map((x) => x + " " + tot[x]).join(" · ") : "";

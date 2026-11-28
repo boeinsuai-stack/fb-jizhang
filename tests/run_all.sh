@@ -44,6 +44,7 @@ run python3 tests/test_copy_flavours.py
 run node tests/orderparse_test.js
 run node tests/parsenew_test.js
 run python3 tests/test_paste_flavors.py
+run python3 tests/test_stock_zero.py
 run python3 tests/test_po_quick.py
 run python3 tests/test_sheet.py
 run node tests/v2_cases.js
