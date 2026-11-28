@@ -114,6 +114,17 @@ with sync_playwright() as p:
         pg.fill("#f-nf", "Peach Ice\nCola"); pg.wait_for_timeout(400)
         pg.select_option("#f-nfser", "Ali"); pg.wait_for_timeout(200)
         check("没写系列：算下面选的系列（换成 Ali 马上重认）", pg.evaluate("[...document.querySelectorAll('#f-nfres .nf-gh b')].map((b) => b.textContent)") == ["Ali"])
+        # 4. 没写系列的算「＋ 新系列」（2026-11-28 Bowen：这里要能选新系列）
+        pg.fill("#f-nf", "Peach Ice 蜜桃冰\nCola"); pg.select_option("#f-nfser", "__new"); pg.wait_for_timeout(300)
+        check("选「＋ 新系列」：出来新系列名字框；没填名字先提示", pg.is_visible("#f-nfnew") and "先填上新系列的名字" in res(pg), res(pg))
+        pg.fill("#f-nfnew", "elf bar"); pg.wait_for_timeout(400)
+        check("填了 elf bar：两个口味都算 Elf Bar 系列，标「新系列」", pg.evaluate("[...document.querySelectorAll('#f-nfres .nf-gh')].map((b) => b.innerText.replace(/\\s+/g, ' '))") == ["Elf Bar 新系列"] and "新口味 2 个" in res(pg), res(pg))
+        pg.fill('[data-nfp="Elf Bar"]', "80"); pg.fill('[data-nfc="Elf Bar"]', "40")
+        before = items(pg); save(pg); after = items(pg); added = [v for k, v in after.items() if k not in before]
+        check("保存：Elf Bar 系列加了 Peach Ice（蜜桃冰）、Cola，$80 / $40", sorted((v["series"], v["variant"], v["name"], v["price_aud"], v["cost_aud"]) for v in added) == [("Elf Bar", "Cola", "Cola", 80, 40), ("Elf Bar", "Peach Ice", "蜜桃冰", 80, 40)], added)
+        pg.click("#inv-new"); pg.wait_for_selector("#f-tonf"); pg.click("#f-tonf"); pg.wait_for_timeout(400)
+        check("再打开：下拉里有 Elf Bar 了", "Elf Bar" in pg.evaluate("[...document.querySelectorAll('#f-nfser option')].map((o) => o.value)"))
+        pg.click("#sheet-close"); pg.wait_for_timeout(200)
         check("没有报错", not errs, errs)
         ctx.close()
     br.close()

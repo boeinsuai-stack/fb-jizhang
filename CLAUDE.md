@@ -450,8 +450,9 @@
 - Bowen：新增口味那里要一键粘贴新口味然后增加。新增香型（itemForm 新建）最上面「粘贴新口味 · 一次加好几个」`#f-tonf` → `pasteFlavors(系列)`：点开就 `navigator.clipboard.readText()`（iPhone 弹「粘贴」），读不到自己粘贴；边打边认
 - `FBParse.parseNew(text, items, {series})`（orderparse.js）→ `{list:[{series, variant, name, raw, have, like}], skipped}`：一行一个（逗号 / 顿号也分）；只写系列名的一行、开头是系列名、末尾带冒号的一行（新系列）= 系列；没写系列用界面上选的；
   根数 / 盒 / 价钱 / 编号 / 表情 / 新品 去掉；中文进 name、英文 Title Case 进 variant；have = 这个系列里已有（逐词比、允许拼错，多一个词 / 少一个词都不算）；like = 只差一个词（照样勾上，提醒）；重复的只留一个
+- 「没写系列的算哪个系列」下拉最后是「＋ 新系列…」（#f-nfnew 填名字，Title Case）；没填名字提示「先填上新系列的名字」
 - 界面：按系列一块，售价 / 拿货价按这个系列最常用的（modeOf）先填；每个口味勾选 + 中文名框；已经有的列最后，停售的「改回在售」默认勾上。保存：编号接着往下排，没写中文名的 name = 英文名，库存从 0 开始。pickLabel 在 name == variant 时只写一次
-- 测试 `tests/parsenew_test.js`（写法逐条 + 500 份随机盲测：已有的 3000 个全认成已有、新的没有被当成已有；真实口味表 `node tests/parsenew_test.js <fixture>` 也全过）、`tests/test_paste_flavors.py` 40/40
+- 测试 `tests/parsenew_test.js`（写法逐条 + 500 份随机盲测：已有的 3000 个全认成已有、新的没有被当成已有；真实口味表 `node tests/parsenew_test.js <fixture>` 也全过）、`tests/test_paste_flavors.py` 48/48
 
 ## 已知问题
 - （已修，feat12）以前每个集合 `limit(1000)` 没有 orderBy，按文档 ID 取前 1000 条：超过后先丢 t- 开头的合伙人往来流水，再丢最新的。库存流水 2026-11 每天约 18 条，原本 12 月中旬就会超

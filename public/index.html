@@ -2265,13 +2265,17 @@ details.restock > summary::-webkit-details-marker { display: none; }
     const sers = allSeries(), def = ser0 || (invFilter.startsWith("s:") ? invFilter.slice(2) : "") || sers[0] || "";
     let res = { list: [], skipped: [] }, timer = null;
     const html = '<div class="field"><label for="f-nf">把新口味的清单粘贴进来</label><textarea id="f-nf" rows="6" placeholder="一行一个，例如：&#10;One&#10;Peach Ice 蜜桃冰&#10;Grape Bubblegum&#10;Ali&#10;Sour Apple"></textarea></div>' +
-      '<div class="field"><label for="f-nfser">没写系列的算哪个系列</label><select id="f-nfser">' + sers.map((sr) => "<option" + (sr === def ? " selected" : "") + ">" + esc(sr) + "</option>").join("") + "</select></div>" +
+      '<div class="field"><label for="f-nfser">没写系列的算哪个系列</label><select id="f-nfser">' + sers.map((sr) => "<option" + (sr === def ? " selected" : "") + ">" + esc(sr) + "</option>").join("") + '<option value="__new">＋ 新系列…</option></select></div>' +
+      '<div class="field" id="f-nfnew-wrap" hidden><label for="f-nfnew">新系列名字</label><input id="f-nfnew" placeholder="例如 Lost Mary" autocomplete="off"></div>' +
       '<div id="f-nfres"></div>';
     const run = () => {
       const pool = S.items.filter((i) => !/合伙人拿货|partner pickup/i.test((i.name || "") + " " + (i.variant || "")));
-      res = window.FBParse ? FBParse.parseNew($("f-nf").value, pool, { series: $("f-nfser").value }) : { list: [], skipped: [] };
+      /* 没写系列的算哪个：下拉里选的；选「＋ 新系列」就用填的名字（2026-11-28 Bowen：这里要能选新系列） */
+      const isNew = $("f-nfser").value === "__new"; $("f-nfnew-wrap").hidden = !isNew;
+      const nser = isNew ? titleCase($("f-nfnew").value.trim().replace(/\s+/g, " ")) : $("f-nfser").value;
+      res = window.FBParse ? FBParse.parseNew($("f-nf").value, pool, { series: nser || null }) : { list: [], skipped: [] };
       const box = $("f-nfres"), nw = res.list.filter((x) => !x.have), old = res.list.filter((x) => x.have);
-      if (!res.list.length) { box.innerHTML = $("f-nf").value.trim() ? '<p class="hint warn">没认出口味。一行写一个口味名。</p>' : ""; return; }
+      if (!res.list.length) { box.innerHTML = !$("f-nf").value.trim() ? "" : res.skipped.length && isNew && !nser ? '<p class="hint warn">先填上新系列的名字。</p>' : '<p class="hint warn">没认出口味。一行写一个口味名。</p>'; return; }
       const by = {}; nw.forEach((x) => { (by[x.series] = by[x.series] || []).push(x); });
       box.innerHTML = '<p class="nf-sum">新口味 <b>' + nw.length + "</b> 个" + (old.length ? " · 已经有的 " + old.length + " 个不加" : "") + "</p>" +
         Object.entries(by).map(([sr, xs]) => { const its = S.items.filter((i) => i.series === sr), isNew = !its.length;
@@ -2284,7 +2288,7 @@ details.restock > summary::-webkit-details-marker { display: none; }
                 (lk ? '<small class="nf-like">很像已有的 ' + esc(pickLabel(lk)) + "，是同一个就取消勾</small>" : "") + "</div>"; }).join("") + "</div>"; }).join("") +
         (old.length ? '<div class="nf-g nf-old"><div class="nf-gh"><b>已经有的（不加）</b></div>' + old.map((x) => { const it = itemBy(x.have), k = res.list.indexOf(x);
           return '<div class="nf-r">' + (it && it.status === "停售" ? '<label class="nf-ck"><input type="checkbox" data-nfon="' + k + '" checked><span>' + esc(it.series + " " + pickLabel(it)) + ' <small>停售中 · 改回在售</small></span></label>' : '<span class="muted">' + esc(it ? it.series + " " + pickLabel(it) : x.raw) + "</span>") + "</div>"; }).join("") + "</div>" : "") +
-        (res.skipped.length ? '<p class="hint warn">不知道是哪个系列：' + esc(res.skipped.join("、")) + "</p>" : "");
+        (res.skipped.length ? '<p class="hint warn">不知道是哪个系列：' + esc(res.skipped.join("、")) + (isNew ? "。先填上新系列的名字。" : "") + "</p>" : "");
     };
     openSheet("粘贴新口味", html, async () => {
       needDb();
@@ -2305,7 +2309,8 @@ details.restock > summary::-webkit-details-marker { display: none; }
       return [pick.length ? "加了 " + pick.length + " 个新口味（" + Object.entries(cnt).map(([sr, n]) => sr + " " + n).join("、") + "）" : "", on.length ? on.length + " 个改回在售" : ""].filter(Boolean).join("，") + "。库存从 0 开始，到货点「进货」。";
     }, () => {
       $("f-nf").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 200); });
-      $("f-nfser").addEventListener("change", run);
+      $("f-nfser").addEventListener("change", () => { run(); if ($("f-nfser").value === "__new") $("f-nfnew").focus(); });
+      $("f-nfnew").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 200); });
       // 一键：点开就读剪贴板（iPhone 会弹「粘贴」，点一下）；读不到就自己粘贴
       try { if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then((t) => { if (t && t.trim() && !$("f-nf").value.trim()) { $("f-nf").value = t; run(); } }, () => {}); } catch (_) {}
     }, { focus: false });
